@@ -153,3 +153,49 @@ dialog[open]{margin:auto}
 .public-booking .danger{background:#a4473b;color:white;border-radius:8px;padding:12px 18px;font-size:14px;font-weight:600;min-height:44px}
 .public-booking .danger:hover{background:#86362c}
 .field.narrow{max-width:340px}
+.cal-legend{list-style:none;display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 12px;padding:0;font-size:12px;color:var(--muted)}
+.cal-legend li{display:flex;align-items:center;gap:6px}
+.cal-legend span{width:11px;height:11px;border-radius:3px}
+.cal-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:white;box-shadow:0 5px 25px #1e4b4810}
+.cal{display:grid;grid-template-columns:52px repeat(7,minmax(112px,1fr));min-width:max-content;width:100%}
+.cal-times{position:sticky;left:0;z-index:3;background:white;border-right:1px solid var(--line)}
+.cal-corner{height:64px;border-bottom:1px solid var(--line)}
+.cal-times span{position:absolute;right:7px;margin-top:58px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.cal-day{border-right:1px solid var(--line);min-width:0}
+.cal-day:last-child{border-right:0}
+.cal-day h2{height:64px;margin:0;padding:8px 8px 6px;border-bottom:1px solid var(--line);font-size:15px;font-weight:700;line-height:1.25;text-align:center;position:sticky;top:0;background:white}
+.cal-day h2 span{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:capitalize}
+.cal-day h2 small{display:block;font-size:11px;font-weight:400;color:var(--muted)}
+.cal-day.today h2{background:#e6f3f1;color:var(--teal)}
+.cal-col{position:relative;cursor:copy;background:repeating-linear-gradient(to bottom,transparent 0 calc(var(--hour) - 1px),#edf2f1 calc(var(--hour) - 1px) var(--hour))}
+.cal-off{position:absolute;left:0;right:0;background:repeating-linear-gradient(135deg,#f3f5f5 0 6px,#eceff0 6px 12px);pointer-events:none}
+.cal-now{position:absolute;left:0;right:0;height:2px;background:#d4553f;z-index:2;pointer-events:none}
+.cal-now::before{content:'';position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:#d4553f}
+.cal-event{position:absolute;z-index:1;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:0;overflow:hidden;text-align:left;border-radius:6px;padding:4px 6px;font-size:12px;line-height:1.25;box-shadow:0 1px 2px #0002;cursor:pointer}
+.cal-event:hover{filter:brightness(1.06);z-index:2}
+.cal-event b{font-size:12px;font-weight:700;overflow-wrap:anywhere}
+.cal-event span{opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.cal-event .time{font-variant-numeric:tabular-nums}
+.cal-event .tags{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px;white-space:normal}
+.cal-event em{font-style:normal;font-size:10px;font-weight:700;background:#fffe;color:#1d2b2c;border-radius:99px;padding:0 6px}
+.cal-event.source-block{background:repeating-linear-gradient(135deg,#a9b4b5 0 6px,#9aa7a8 6px 12px)!important}
+.cal-event.status-cancelled{opacity:.35;text-decoration:line-through;z-index:0}
+.cal-event.status-no_show{outline:3px solid #c0533f;outline-offset:-3px}
+.cal-event.status-pending{outline:3px dashed #8a5a00;outline-offset:-3px}
+.cal-event.status-done{opacity:.75}
+.service-group h3{display:flex;align-items:center;gap:8px;font-size:14px;margin:16px 0 6px;color:var(--muted)}
+.service-group h3 small{font-weight:400}
+.service-list .color-dot{flex-shrink:0;width:12px;height:12px;border-radius:4px;margin-top:5px}
+.service-desc{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.service-form input[type=color]{height:44px;padding:4px;width:100%}
+@media(max-width:720px){.cal{grid-template-columns:44px repeat(7,minmax(118px,1fr))}}
+.service-list li>div{flex:1;min-width:0}
+.pb-search{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--muted);background:#fdfbf8}
+.pb-search input{border:0;background:transparent;width:100%;min-width:0;font-size:16px;outline:none;color:var(--ink)}
+.pb-group{display:flex;flex-direction:column;gap:10px}
+.pb-group h2{font-family:Georgia,serif;font-weight:400;font-size:21px;margin:8px 0 0;display:flex;align-items:baseline;justify-content:space-between;gap:10px;border-bottom:1px solid #e6d8c2;padding-bottom:6px}
+.pb-group h2 small{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:var(--muted)}
+.pb-service .pb-desc{grid-column:1/-1;color:var(--muted);font-size:13px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.cal-event.compact{flex-direction:row;flex-wrap:wrap;align-content:flex-start;gap:0 6px;padding:2px 6px}
+.cal-event.compact>span:not(.time),.cal-event.compact .tags{display:none}

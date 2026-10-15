@@ -1,6 +1,14 @@
 // Vymyšlené ukázkové klientky pro náhled. Žádná skutečná data.
-import {PRICE_LIST} from '../../lib/price-list';
+import {CATEGORY_COLORS, PRICE_LIST} from '../../lib/price-list';
 import {DEFAULT_SETTINGS} from '../../lib/booking';
+
+// Ukázkové popisy pro náhled; skutečné popisy si salon doplní v Nastavení.
+const DESCRIPTIONS: Record<string, string> = {
+  'Nevím, jaké ošetření vybrat': 'Pokud si nejste jistá výběrem, zvolte tuto možnost. Na místě společně vybereme ošetření, které vaší pleti sedne.',
+  'A-QS Hacker': 'Moderní dermokosmetické ošetření, které pracuje s přirozenou inteligencí pokožky.',
+  'Derma Collage': 'Tříúrovňová hydratace a obnova kolagenu s plumping efektem.',
+  'Lash Lifting řas': 'Natočení a zvýraznění vašich vlastních řas na několik týdnů.',
+};
 type Run = (sql: string, values: (string | number | null)[]) => void;
 type Put = (key: string, bytes: Uint8Array) => void;
 
@@ -37,24 +45,35 @@ export async function seedDemo(run: Run, put: Put) {
   ];
   for (const v of visits) run('INSERT INTO visits (id,client_id,date,treatment,products,notes,revenue_cents,clean_skin,program_price_cents,program_step) VALUES (?,?,?,?,?,?,?,?,?,?)', v);
 
-  PRICE_LIST.forEach(([name, minutes, price], i) => run('INSERT INTO services (id,name,duration_min,price_cents,active,sort,created) VALUES (?,?,?,?,1,?,?)', ['s-' + i, name, minutes, price * 100, i, now]));
+  PRICE_LIST.forEach(([category, name, minutes, price], i) => run('INSERT INTO services (id,name,duration_min,price_cents,active,sort,category,description,color,created) VALUES (?,?,?,?,1,?,?,?,?,?)', ['s-' + i, name, minutes, price * 100, i, category, DESCRIPTIONS[name] || '', CATEGORY_COLORS[category] || '', now]));
+  const service = (name: string) => { const i = PRICE_LIST.findIndex(x => x[1] === name); return {id: 's-' + i, name, minutes: PRICE_LIST[i][2], price: PRICE_LIST[i][3] * 100}; };
   const workday = (offset: number) => { let o = offset; while ([0, 6].includes(new Date(day(o) + 'T12:00:00Z').getUTCDay())) o += offset < 0 ? -1 : 1; return day(o); };
   const at = (offset: number, time: string, minutes: number) => { const start = `${workday(offset)}T${time}`, d = new Date(start + ':00Z'); d.setUTCMinutes(d.getUTCMinutes() + minutes); return [start, d.toISOString().slice(0, 16)] as [string, string]; };
-  const bookings: [string, string | null, string | null, [string, string], string, number | null, string, string, string, string, string][] = [
-    ['b-1', 's-3', 'demo-1', at(1, '10:00', 70), 'A-QS Hacker', 129000, 'Tereza Nováková', '+420 601 234 567', 'confirmed', 'online', 'Čistá pleť, 3. návštěva.'],
-    ['b-2', 's-26', null, at(2, '13:00', 60), 'Lash Lifting řas', 99000, 'Klára Malá', '+420 605 111 222', 'confirmed', 'online', ''],
-    ['b-3', null, null, at(3, '09:00', 120), 'Školení', null, '', '', 'confirmed', 'block', ''],
-    ['b-4', 's-14', 'demo-2', at(3, '14:00', 60), 'Basic Skin Care', 109000, 'Lucie Horáková', '+420 602 345 678', 'confirmed', 'salon', ''],
-    ['b-5', 's-15', 'demo-3', at(-2, '11:00', 50), 'Čištění pleti s kyselinou jantarovou', 89000, 'Markéta Dvořáková', '+420 603 456 789', 'no_show', 'online', ''],
+  // [id, ošetření, klientka z kartotéky, den od dneška, čas, jméno, telefon, stav, zdroj, poznámka]
+  const bookings: [string, string, string | null, number, string, string, string, string, string, string][] = [
+    ['b-1', 'A-QS Hacker', 'demo-1', 1, '10:00', 'Tereza Nováková', '+420 601 234 567', 'confirmed', 'online', 'Čistá pleť, 3. návštěva.'],
+    ['b-2', 'Lash Lifting řas', null, 2, '13:00', 'Klára Malá', '+420 605 111 222', 'confirmed', 'online', ''],
+    ['b-4', 'Carelika Basic Skin Care', 'demo-2', 3, '14:00', 'Lucie Horáková', '+420 602 345 678', 'confirmed', 'salon', ''],
+    ['b-5', 'Čištění pleti s kyselinou jantarovou', 'demo-3', -2, '11:00', 'Markéta Dvořáková', '+420 603 456 789', 'no_show', 'online', ''],
+    ['b-8', 'Mikrojehličkování – PDRN Multipeptide', null, 0, '15:00', 'Jana Krásná', '+420 606 222 333', 'confirmed', 'online', ''],
+    ['b-9', 'DNA Glow Rebirth', 'demo-4', -1, '16:00', 'Petra Svobodová', '+420 604 567 890', 'done', 'salon', ''],
+    ['b-10', 'Kosmetická masáž + gelová maska', null, 1, '17:30', 'Simona Bílá', '+420 607 444 555', 'confirmed', 'online', ''],
+    ['b-11', 'Hyaluron Collagen 3D Lift', null, 2, '09:30', 'Alena Zelená', '+420 608 666 777', 'confirmed', 'salon', ''],
+    ['b-12', 'Laminace obočí', null, 3, '17:00', 'Nikola Modrá', '+420 609 888 999', 'confirmed', 'online', ''],
   ];
-  for (const [id, serviceId, clientId, [start, end], serviceName, price, name, phone, status, source, note] of bookings)
-    run('INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [id, serviceId, clientId, start, end, serviceName, price, name, phone, '', note, status, source, now]);
+  for (const [id, serviceName, clientId, offset, time, name, phone, status, source, note] of bookings) {
+    const x = service(serviceName), [start, end] = at(offset, time, x.minutes);
+    run('INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [id, x.id, clientId, start, end, x.name, x.price, name, phone, '', note, status, source, now]);
+  }
+  const [blockStart, blockEnd] = at(3, '09:00', 120);
+  run("INSERT INTO bookings (id,start_at,end_at,service_name,status,source,created) VALUES ('b-3',?,?,'Školení','confirmed','block',?)", [blockStart, blockEnd, now]);
   // Ukázka kaucí: jedna čeká na zaplacení, jedna je zaplacená.
-  const [pStart, pEnd] = at(4, '15:00', 60), [kStart, kEnd] = at(5, '10:00', 60);
+  const volumetric = service('Volumetric – Ozempic face'), architect = service('3D Architect');
+  const [pStart, pEnd] = at(4, '15:00', volumetric.minutes), [kStart, kEnd] = at(5, '10:00', architect.minutes);
   run("INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,deposit_cents,deposit_status,deposit_due,vs,manage_token,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending','online',90000,'pending',?,?,?,?)",
-    ['b-6', 's-20', null, pStart, pEnd, 'Volumetric', 299000, 'Petra Svobodová', '+420 604 777 888', 'petra@example.cz', '', [day(1) + 'T12:00', pStart].sort()[0], pStart.slice(2, 10).replace(/-/g, '') + '1507', 'a'.repeat(36), now]);
-  run("INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,deposit_cents,deposit_status,deposit_due,vs,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,'confirmed','online',80000,'paid',?,?,?)",
-    ['b-7', 's-19', 'demo-2', kStart, kEnd, 'Biomikrojehličkování 3D Architect „Zlatá jehla“', 249000, 'Lucie Horáková', '+420 602 345 678', '', '', kStart, kStart.slice(2, 10).replace(/-/g, '') + '1042', now]);
+    ['b-6', volumetric.id, null, pStart, pEnd, volumetric.name, volumetric.price, 'Petra Svobodová', '+420 604 777 888', 'petra@example.cz', '', [day(1) + 'T12:00', pStart].sort()[0], pStart.slice(2, 10).replace(/-/g, '') + '1507', 'a'.repeat(36), now]);
+  run("INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,deposit_cents,deposit_status,deposit_due,vs,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,'confirmed','online',70000,'paid',?,?,?)",
+    ['b-7', architect.id, 'demo-2', kStart, kEnd, architect.name, architect.price, 'Lucie Horáková', '+420 602 345 678', '', '', kStart, kStart.slice(2, 10).replace(/-/g, '') + '1042', now]);
   run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, account: '127326219/0300'})]);
 
   const photos: [string, string, string, string, number][] = [

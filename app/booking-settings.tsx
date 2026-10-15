@@ -3,7 +3,7 @@ import {useEffect, useState} from 'react';
 import {Copy, Pencil, Plus, Trash2, X} from 'lucide-react';
 import {DEFAULT_SETTINGS, WEEKDAYS, type BookingSettings} from '../lib/booking';
 import {formatRevenue} from '../lib/revenue';
-import {PRICE_LIST} from '../lib/price-list';
+import {CATEGORY_COLORS, PRICE_LIST, serviceColor} from '../lib/price-list';
 import type {Service} from './bookings';
 
 async function post(body: unknown) {
@@ -33,6 +33,7 @@ export default function BookingSettingsView({bookingUrl}: {bookingUrl: string}) 
   }
   const setDay = (day: number, value: [string, string] | null) => setSettings(s => ({...s, hours: {...s.hours, [String(day)]: value}}));
 
+  const groups = [...services.reduce((m, x) => m.set(x.category, [...(m.get(x.category) || []), x]), new Map<string, Service[]>())];
   return <div className="booking-settings">
     <div className="heading"><div><p className="eyebrow">ONLINE REZERVACE</p><h1>Nastavení</h1><p>Co si klientky mohou rezervovat a kdy.</p></div></div>
     {error && <div className="error" role="alert">{error}</div>}
@@ -40,14 +41,21 @@ export default function BookingSettingsView({bookingUrl}: {bookingUrl: string}) 
 
     <section className="panel">
       <div className="panel-heading"><h2>Ošetření a ceník</h2><button className="primary" onClick={() => setEditing({durationMin: 60, active: 1})}><Plus size={17}/> Přidat ošetření</button></div>
-      {!services.length && <div className="empty-services"><p>Zatím tu není žádné ošetření. Klientky si online nic nevyberou, dokud ho nepřidáte.</p><button className="secondary" disabled={busy} onClick={() => run(async () => { for (const [i, [name, durationMin, price]] of PRICE_LIST.entries()) await post({kind: 'service', action: 'save', data: {name, durationMin, price: String(price), active: true, sort: i}}); }, 'Ceník z webu byl vložen. Délky a ceny si zkontrolujte.')}>Vložit ceník ze studioiam.cz ({PRICE_LIST.length} ošetření)</button></div>}
-      <ul className="service-list">{services.map(s => <li key={s.id} className={s.active ? '' : 'inactive'}>
-        <div><b>{s.name}</b><small>{s.durationMin} min · {formatRevenue(s.priceCents)}{!s.active && ' · skryté na webu'}</small></div>
-        <span className="actions"><button aria-label={'Upravit ' + s.name} onClick={() => setEditing(s)}><Pencil size={16}/></button><button aria-label={'Smazat ' + s.name} disabled={busy} onClick={() => run(() => post({kind: 'service', action: 'delete', data: {id: s.id}}), 'Ošetření bylo smazáno.')}><Trash2 size={16}/></button></span>
-      </li>)}</ul>
-      {editing && <form className="service-form" onSubmit={e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.currentTarget)); run(() => post({kind: 'service', action: 'save', data: {id: editing.id, name: f.name, durationMin: Number(f.durationMin), price: f.price, active: f.active === 'on', sort: editing.sort ?? services.length}}), 'Ošetření bylo uloženo.'); }}>
+      {!services.length && <div className="empty-services"><p>Zatím tu není žádné ošetření. Klientky si online nic nevyberou, dokud ho nepřidáte.</p><button className="secondary" disabled={busy} onClick={() => run(async () => { for (const [i, [category, name, durationMin, price]] of PRICE_LIST.entries()) await post({kind: 'service', action: 'save', data: {name, category, durationMin, price: String(price), color: CATEGORY_COLORS[category] || '', active: true, sort: i}}); }, 'Ceník byl vložen. Délky, ceny a popisy si zkontrolujte.')}>Vložit ceník z MyFoxu ({PRICE_LIST.length} ošetření)</button></div>}
+      {groups.map(([category, list]) => <div key={category} className="service-group">
+        <h3>{category || 'Bez kategorie'} <small>{list.length}</small></h3>
+        <ul className="service-list">{list.map(s => <li key={s.id} className={s.active ? '' : 'inactive'}>
+          <span className="color-dot" style={{background: serviceColor(s.color, s.category)}} aria-hidden="true"/>
+          <div><b>{s.name}</b><small>{s.durationMin} min · {s.priceCents ? formatRevenue(s.priceCents) : 'bez ceny'}{!s.active && ' · skryté na webu'}</small>{s.description && <small className="service-desc">{s.description}</small>}</div>
+          <span className="actions"><button aria-label={'Upravit ' + s.name} onClick={() => setEditing(s)}><Pencil size={16}/></button><button aria-label={'Smazat ' + s.name} disabled={busy} onClick={() => run(() => post({kind: 'service', action: 'delete', data: {id: s.id}}), 'Ošetření bylo smazáno.')}><Trash2 size={16}/></button></span>
+        </li>)}</ul></div>)}
+      {editing && <form className="service-form" ref={el => el?.scrollIntoView({block: "nearest", behavior: "smooth"})} onSubmit={e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.currentTarget)); run(() => post({kind: 'service', action: 'save', data: {id: editing.id, name: f.name, category: f.category, description: f.description, color: f.color, durationMin: Number(f.durationMin), price: f.price, active: f.active === 'on', sort: editing.sort ?? services.length}}), 'Ošetření bylo uloženo.'); }}>
         <label className="field"><span>Název</span><input name="name" required maxLength={150} defaultValue={editing.name}/></label>
-        <div className="field-grid"><label className="field"><span>Délka (min)</span><input name="durationMin" type="number" min={5} max={600} step={5} required defaultValue={editing.durationMin}/></label><label className="field"><span>Cena (Kč)</span><input name="price" inputMode="decimal" required defaultValue={editing.priceCents != null ? String(editing.priceCents / 100).replace('.', ',') : ''}/></label></div>
+        <div className="field-grid"><label className="field"><span>Kategorie</span><input name="category" list="service-categories" maxLength={80} defaultValue={editing.category} placeholder="Např. Masáže"/></label>
+          <label className="field"><span>Barva v kalendáři</span><input name="color" type="color" defaultValue={serviceColor(editing.color, editing.category)}/></label></div>
+        <datalist id="service-categories">{[...new Set([...Object.keys(CATEGORY_COLORS), ...services.map(x => x.category)])].filter(Boolean).map(c => <option key={c} value={c}/>)}</datalist>
+        <label className="field"><span>Popis pro klientky</span><textarea name="description" rows={2} maxLength={600} defaultValue={editing.description} placeholder="Krátce, co ošetření dělá a pro koho je"/></label>
+        <div className="field-grid"><label className="field"><span>Délka (min)</span><input name="durationMin" type="number" min={5} max={600} step={5} required defaultValue={editing.durationMin}/></label><label className="field"><span>Cena (Kč, 0 = bez ceny)</span><input name="price" inputMode="decimal" required defaultValue={editing.priceCents != null ? String(editing.priceCents / 100).replace('.', ',') : ''}/></label></div>
         <label className="check"><input type="checkbox" name="active" defaultChecked={editing.active !== 0}/> Nabízet v online rezervaci</label>
         <div className="form-actions"><button type="button" className="secondary" onClick={() => setEditing(null)}>Zrušit</button><button className="primary" disabled={busy}>Uložit ošetření</button></div>
       </form>}

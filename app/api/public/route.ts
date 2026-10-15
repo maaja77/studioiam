@@ -7,12 +7,12 @@ import {formatRevenue} from '../../../lib/revenue';
 import {czIban, depositFor, formatIban, spdPayload} from '../../../lib/payment';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
-type Service = {id: string; name: string; durationMin: number; priceCents: number};
+type Service = {id: string; name: string; durationMin: number; priceCents: number; category: string; description: string};
 
 async function context() {
   const db = database();
   const [services, setting] = await db.batch([
-    db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents FROM services WHERE active=1 ORDER BY sort,name'),
+    db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,category,description FROM services WHERE active=1 ORDER BY sort,name'),
     db.prepare("SELECT value FROM settings WHERE key='booking'"),
   ]) as {results: Record<string, unknown>[]}[];
   return {db, services: services.results as Service[], settings: parseSettings((setting.results[0] as {value?: string} | undefined)?.value)};
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
 
     // Kauce u dražších ošetření a u klientek, kterým ji salon zapnul; bez čísla účtu se nevybírá.
     const iban = czIban(settings.account);
-    const needsDeposit = !!iban && ((settings.depositFromKc > 0 && service.priceCents >= settings.depositFromKc * 100) || matches.some(c => c.depositRequired));
+    const needsDeposit = !!iban && service.priceCents > 0 && ((settings.depositFromKc > 0 && service.priceCents >= settings.depositFromKc * 100) || matches.some(c => c.depositRequired));
     const depositCents = needsDeposit ? Math.min(service.priceCents, depositFor(service.priceCents, settings.depositPercent)) : null;
     const due = needsDeposit ? [addMinutes(salonNow(), settings.depositHoldHours * 60), start].sort()[0] : null;
     const vs = needsDeposit ? start.slice(2, 10).replace(/-/g, '') + start.slice(11, 13) + String(Math.floor(Math.random() * 100)).padStart(2, '0') : null;
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     const when = whenText(start), link = `${new URL(request.url).origin}/rezervace?t=${token}`;
     notifySalon(`Nová rezervace: ${name}, ${when}`, [
       'Nová online rezervace ve Studiu I AM', '',
-      `Ošetření: ${service.name} (${service.durationMin} min, ${formatRevenue(service.priceCents)})`,
+      `Ošetření: ${service.name} (${service.durationMin} min${service.priceCents ? ', ' + formatRevenue(service.priceCents) : ''})`,
       `Termín: ${when}`, `Jméno: ${name}`, `Telefon: ${phone}`, email ? `E-mail: ${email}` : '', note ? `Poznámka: ${note}` : '',
       deposit ? `Kauce: ${formatRevenue(deposit.amountCents)}, VS ${deposit.vs}, zaplatit do ${deposit.due.replace('T', ' ')}. Do té doby termín čeká na kauci.` : '',
       matches.length ? 'Klientka už má kartu v kartotéce.' : 'Nová klientka, karta zatím neexistuje.',

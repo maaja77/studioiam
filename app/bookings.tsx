@@ -1,19 +1,37 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
 import {Ban, Check, ChevronLeft, ChevronRight, Clock, ExternalLink, Phone, Plus, UserPlus, X} from 'lucide-react';
-import {addDays, DEFAULT_SETTINGS, salonNow, toMinutes, weekday, type BookingSettings} from '../lib/booking';
+import {addDays, DEFAULT_SETTINGS, fromMinutes, salonNow, toMinutes, weekday, type BookingSettings} from '../lib/booking';
+import {serviceColor} from '../lib/price-list';
 import {formatRevenue} from '../lib/revenue';
 import {czIban, spdPayload} from '../lib/payment';
 import {PaymentDetails} from './qr-payment';
 
-export type Booking = {id: string; serviceId: string | null; clientId: string | null; start: string; end: string; serviceName: string; priceCents: number | null; name: string; phone: string; email: string; note: string; status: string; source: string; depositCents?: number | null; depositStatus?: string | null; depositDue?: string | null; vs?: string | null};
-export type Service = {id: string; name: string; durationMin: number; priceCents: number; active: number; sort: number};
+export type Booking = {id: string; serviceId: string | null; clientId: string | null; start: string; end: string; serviceName: string; priceCents: number | null; name: string; phone: string; email: string; note: string; status: string; source: string; depositCents?: number | null; depositStatus?: string | null; depositDue?: string | null; vs?: string | null; color?: string | null; category?: string | null};
+export type Service = {id: string; name: string; durationMin: number; priceCents: number; active: number; sort: number; category: string; description: string; color: string};
 type ClientLite = {id: string; name: string; phone: string; email: string; blocked?: number};
 const DEPOSIT_LABEL: Record<string, string> = {pending: 'čeká na zaplacení', paid: 'zaplacena', returned: 'vrácena', forfeited: 'propadla', expired: 'nezaplacena, termín uvolněn', cancelled: 'nezaplacena, termín zrušen'};
 
 export const STATUS_LABEL: Record<string, string> = {pending: 'Čeká na kauci', confirmed: 'Potvrzeno', done: 'Proběhlo', no_show: 'Nepřišla', cancelled: 'Zrušeno'};
 const mondayOf = (date: string) => addDays(date, -((weekday(date) + 6) % 7));
 const dayTitle = (date: string) => new Date(date + 'T12:00:00').toLocaleDateString('cs-CZ', {weekday: 'long', day: 'numeric', month: 'numeric'});
+const HOUR = 60; // výška jedné hodiny v kalendáři (px)
+/** Čitelná barva textu na barevném pozadí. */
+function textOn(hex: string) { const n = parseInt(hex.slice(1), 16), l = (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; return l > 0.62 ? '#1d2b2c' : '#fff'; }
+/** Překrývající se termíny dne vedle sebe: pořadí sloupce a počet sloupců ve skupině. */
+function layout(list: Booking[]) {
+  const sorted = [...list].sort((a, b) => a.start.localeCompare(b.start) || b.end.localeCompare(a.end)), result = new Map<string, {index: number; count: number}>();
+  let group: Booking[] = [], lanesEnd: string[] = [], groupEnd = '';
+  const flush = () => { for (const b of group) result.get(b.id)!.count = lanesEnd.length; group = []; lanesEnd = []; };
+  for (const b of sorted) {
+    if (group.length && b.start >= groupEnd) flush();
+    let lane = lanesEnd.findIndex(end => end <= b.start); if (lane < 0) lane = lanesEnd.length;
+    lanesEnd[lane] = b.end; group.push(b); groupEnd = group.length === 1 || b.end > groupEnd ? b.end : groupEnd;
+    result.set(b.id, {index: lane, count: 1});
+  }
+  flush();
+  return result;
+}
 const duration = (b: Booking) => toMinutes(b.end.slice(11)) - toMinutes(b.start.slice(11)) + (b.end.slice(0, 10) > b.start.slice(0, 10) ? 1440 : 0);
 
 async function post(body: unknown) {
@@ -30,8 +48,16 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
   const [loading, setLoading] = useState(true), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<{mode: 'view' | 'edit'; booking: Partial<Booking> & {date?: string; time?: string}} | null>(null);
   const [blockToo, setBlockToo] = useState(false);
-  const dialog = useRef<HTMLDialogElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null), scroller = useRef<HTMLDivElement>(null);
+  // Na telefonu se kalendář posune tak, aby byl vidět dnešek.
+  useEffect(() => { const el = scroller.current, todayCol = el?.querySelector<HTMLElement>('.cal-day.today'); if (el && todayCol && el.scrollWidth > el.clientWidth) el.scrollLeft = todayCol.offsetLeft - 52; }, [week, loading]);
   const days = Array.from({length: 7}, (_, i) => addDays(week, i));
+  // Rozsah mřížky: otevírací doba v týdnu, případně rozšířená o rezervace mimo ni.
+  const opening = Object.values(settings.hours).filter(Boolean) as [string, string][];
+  const startHour = Math.min(9, ...opening.map(h => Math.floor(toMinutes(h[0]) / 60)), ...bookings.map(b => Math.floor(toMinutes(b.start.slice(11)) / 60)));
+  const endHour = Math.max(startHour + 1, ...opening.map(h => Math.ceil(toMinutes(h[1]) / 60)), ...bookings.map(b => b.end.slice(0, 10) > b.start.slice(0, 10) ? 24 : Math.ceil(toMinutes(b.end.slice(11)) / 60)));
+  const now = toMinutes(salonNow().slice(11));
+  const legend = [...new Map(bookings.filter(b => b.source !== 'block' && b.status !== 'cancelled').map(b => [b.category || b.serviceName, serviceColor(b.color, b.category)])).entries()];
 
   async function load() {
     setError('');
@@ -70,18 +96,37 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
       <button className="secondary" aria-label="Další týden" onClick={() => setWeek(addDays(week, 7))}><ChevronRight size={18}/></button>
       {week !== mondayOf(today) && <button className="secondary" onClick={() => setWeek(mondayOf(today))}>Tento týden</button>}
     </div>
-    <div className="week">{days.map(date => {
-      const list = bookings.filter(b => b.start.slice(0, 10) === date), hours = settings.hours[String(weekday(date))];
-      return <section key={date} className={'day ' + (date === today ? 'today ' : '') + (!hours && !list.length ? 'closed' : '')}>
-        <h2>{dayTitle(date)}</h2><small>{hours ? `${hours[0]}–${hours[1]}` : 'Zavřeno'}</small>
-        {loading ? <p className="muted">Načítám…</p> : list.map(b => <button key={b.id} className={`booking-chip status-${b.status} source-${b.source}`} onClick={() => setOpen({mode: 'view', booking: b})}>
-          <span className="time">{b.start.slice(11)}–{b.end.slice(11)}</span>
-          <b>{b.source === 'block' ? b.serviceName : b.name}</b>
-          {b.source !== 'block' && <span>{b.serviceName}</span>}
-          {(b.status !== 'confirmed' || b.source === 'online' || b.depositCents != null) && <span className="tags">{b.source === 'online' && <em>Z webu</em>}{b.status !== 'confirmed' && <em>{STATUS_LABEL[b.status]}</em>}{b.depositStatus === 'paid' && <em>Kauce ✓</em>}</span>}
-        </button>)}
-      </section>;
-    })}</div>
+    {legend.length > 0 && <ul className="cal-legend" aria-label="Barvy ošetření">{legend.map(([name, color]) => <li key={name}><span style={{background: color}}/>{name}</li>)}</ul>}
+    <div className="cal-scroll" ref={scroller}><div className="cal" style={{'--hour': HOUR + 'px'} as React.CSSProperties}>
+      <div className="cal-times" aria-hidden="true"><div className="cal-corner"/>{Array.from({length: endHour - startHour}, (_, i) => <span key={i} style={{top: i * HOUR}}>{startHour + i}:00</span>)}</div>
+      {days.map(date => {
+        const list = bookings.filter(b => b.start.slice(0, 10) === date), hours = settings.hours[String(weekday(date))], lanes = layout(list);
+        const top = (t: string) => (toMinutes(t) - startHour * 60) * HOUR / 60;
+        return <section key={date} className={'cal-day ' + (date === today ? 'today ' : '') + (!hours ? 'closed' : '')} aria-label={dayTitle(date)}>
+          <h2><span>{new Date(date + 'T12:00:00').toLocaleDateString('cs-CZ', {weekday: 'short'})}</span> {new Date(date + 'T12:00:00').toLocaleDateString('cs-CZ', {day: 'numeric', month: 'numeric'})}<small>{hours ? `${hours[0]}–${hours[1]}` : 'Zavřeno'}</small></h2>
+          <div className="cal-col" style={{height: (endHour - startHour) * HOUR}} onClick={e => {
+            if (e.target !== e.currentTarget) return;
+            const minutes = startHour * 60 + Math.floor(e.nativeEvent.offsetY / HOUR * 4) * 15;
+            setOpen({mode: 'edit', booking: {date, time: fromMinutes(Math.min(minutes, 23 * 60 + 45)), source: 'salon'}});
+          }}>
+            {hours ? <><i className="cal-off" style={{top: 0, height: Math.max(0, top(hours[0]))}}/><i className="cal-off" style={{top: Math.max(0, top(hours[1])), bottom: 0}}/></> : <i className="cal-off" style={{top: 0, bottom: 0}}/>}
+            {date === today && now >= startHour * 60 && now < endHour * 60 && <i className="cal-now" style={{top: (now - startHour * 60) * HOUR / 60}}/>}
+            {loading ? null : list.map(b => {
+              const color = b.source === 'block' ? '#9aa7a8' : serviceColor(b.color, b.category), lane = lanes.get(b.id)!;
+              const y = top(b.start.slice(11)), h = Math.max(22, duration(b) * HOUR / 60 - 2);
+              return <button key={b.id} className={`cal-event status-${b.status} source-${b.source}${h < 50 ? ' compact' : ''}`} title={`${b.start.slice(11)}–${b.end.slice(11)} ${b.source === 'block' ? b.serviceName : b.name + ', ' + b.serviceName}`}
+                style={{top: y, height: h, left: `calc(${lane.index / lane.count * 100}% + 2px)`, width: `calc(${100 / lane.count}% - 4px)`, background: color, color: textOn(color)}}
+                onClick={() => setOpen({mode: 'view', booking: b})}>
+                <b>{b.source === 'block' ? b.serviceName : b.name}</b>
+                <span className="time">{b.start.slice(11)}–{b.end.slice(11)}</span>
+                {b.source !== 'block' && <span>{b.serviceName}</span>}
+                {(b.status !== 'confirmed' || b.source === 'online' || b.depositStatus === 'paid') && <span className="tags">{b.source === 'online' && <em>Web</em>}{b.status !== 'confirmed' && <em>{STATUS_LABEL[b.status]}</em>}{b.depositStatus === 'paid' && <em>Kauce ✓</em>}</span>}
+              </button>;
+            })}
+          </div>
+        </section>;
+      })}
+    </div></div>
 
     <dialog ref={dialog} onCancel={e => { if (busy) e.preventDefault(); else setOpen(null); }}>
       {open?.mode === 'view' && current && <div>

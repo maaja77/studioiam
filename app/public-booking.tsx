@@ -1,18 +1,21 @@
 'use client';
 import {useEffect, useState} from 'react';
-import {CalendarCheck, ChevronLeft, ChevronRight, Clock, Flower2} from 'lucide-react';
+import {CalendarCheck, ChevronLeft, ChevronRight, Clock, Flower2, Search} from 'lucide-react';
 import {addDays, salonNow} from '../lib/booking';
 import {formatRevenue} from '../lib/revenue';
 import {PaymentDetails, type DepositInfo} from './qr-payment';
 
-type Service = {id: string; name: string; durationMin: number; priceCents: number; depositCents?: number | null};
+type Service = {id: string; name: string; durationMin: number; priceCents: number; category?: string; description?: string; depositCents?: number | null};
+const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const length = (min: number) => min % 60 === 0 ? `${min / 60} h` : min > 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
+const price = (cents: number) => cents ? formatRevenue(cents) : 'cena po konzultaci';
 const dayLabel = (date: string) => new Date(date + 'T12:00:00').toLocaleDateString('cs-CZ', {weekday: 'short', day: 'numeric', month: 'numeric'});
 const longDate = (date: string) => new Date(date + 'T12:00:00').toLocaleDateString('cs-CZ', {weekday: 'long', day: 'numeric', month: 'long'});
 
 export default function PublicBooking() {
   const [services, setServices] = useState<Service[] | null>(null), [horizon, setHorizon] = useState(60);
   const [service, setService] = useState<Service | null>(null), [reload, setReload] = useState(0);
-  const [date, setDate] = useState(''), [time, setTime] = useState('');
+  const [date, setDate] = useState(''), [time, setTime] = useState(''), [query, setQuery] = useState('');
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [done, setDone] = useState<{start: string; service: string; deposit?: DepositInfo | null; token?: string} | null>(null);
   const [token, setToken] = useState(() => typeof location === 'undefined' ? '' : new URLSearchParams(location.search).get('t') || '');
 
@@ -29,6 +32,9 @@ export default function PublicBooking() {
     } catch (err) { setError((err as Error).message || 'Rezervaci se nepodařilo odeslat.'); } finally { setBusy(false); }
   }
 
+  const q = fold(query.trim());
+  const groups = [...(services || []).filter(x => !q || fold(x.name + ' ' + (x.category || '') + ' ' + (x.description || '')).includes(q))
+    .reduce((m, x) => m.set(x.category || '', [...(m.get(x.category || '') || []), x]), new Map<string, Service[]>())];
   function openManage(t: string) {
     try { history.replaceState(null, '', '?t=' + t); } catch { /* náhled bez adresy */ }
     setToken(t);
@@ -56,14 +62,18 @@ export default function PublicBooking() {
         {error && <p className="error" role="alert">{error}</p>}
         {!service ? <section><h1>Vyberte ošetření</h1>
           {!services ? <p className="pb-muted">Načítám nabídku…</p> : !services.length ? <p className="pb-muted">Online rezervace teď není k dispozici. Zavolejte nám prosím.</p> :
-          <div className="pb-services">{services.map(s => <button key={s.id} className="pb-service" onClick={() => { setService(s); setDate(''); setError(''); }}><b>{s.name}</b><span><Clock size={14}/> {s.durationMin} min</span><strong>{formatRevenue(s.priceCents)}</strong>{s.depositCents ? <small className="pb-deposit">kauce {formatRevenue(s.depositCents)}</small> : null}</button>)}</div>}
+          <>{services.length > 6 && <label className="pb-search"><Search size={17}/><input type="search" placeholder="Hledat ošetření" aria-label="Hledat ošetření" value={query} onChange={e => setQuery(e.target.value)}/></label>}
+          {groups.length ? groups.map(([category, list]) => <div key={category} className="pb-group">
+            {category && <h2>{category} <small>{list.length} {list.length === 1 ? 'položka' : list.length < 5 ? 'položky' : 'položek'}</small></h2>}
+            <div className="pb-services">{list.map(s => <button key={s.id} className="pb-service" onClick={() => { setService(s); setDate(''); setError(''); }}><b>{s.name}</b>{s.description && <small className="pb-desc">{s.description}</small>}<span><Clock size={14}/> {length(s.durationMin)}</span><strong>{price(s.priceCents)}</strong>{s.depositCents ? <small className="pb-deposit">kauce {formatRevenue(s.depositCents)}</small> : null}</button>)}</div>
+          </div>) : <p className="pb-muted">Nic jsme nenašli. Zkuste jiné slovo.</p>}</>}
         </section> : !time ? <section>
           <button className="pb-back" onClick={() => setService(null)}><ChevronLeft size={16}/> Jiné ošetření</button>
-          <h1>{service.name}</h1><p className="pb-muted">{service.durationMin} min · {formatRevenue(service.priceCents)}</p>
+          <h1>{service.name}</h1><p className="pb-muted">{length(service.durationMin)} · {price(service.priceCents)}</p>
           <SlotPicker key={service.id + reload} query={`serviceId=${encodeURIComponent(service.id)}`} horizon={horizon} onPick={(d, t) => { setDate(d); setTime(t); }} onError={setError}/>
         </section> : <section>
           <button className="pb-back" onClick={() => setTime('')}><ChevronLeft size={16}/> Jiný termín</button>
-          <h1>Vaše údaje</h1><p className="pb-summary"><b>{service.name}</b><br/>{longDate(date)} v {time} · {service.durationMin} min · {formatRevenue(service.priceCents)}{service.depositCents ? <><br/>Po rezervaci zaplatíte kauci {formatRevenue(service.depositCents)}, odečte se z ceny.</> : null}</p>
+          <h1>Vaše údaje</h1><p className="pb-summary"><b>{service.name}</b><br/>{longDate(date)} v {time} · {length(service.durationMin)} · {price(service.priceCents)}{service.depositCents ? <><br/>Po rezervaci zaplatíte kauci {formatRevenue(service.depositCents)}, odečte se z ceny.</> : null}</p>
           <form className="pb-form" onSubmit={submit}>
             <label className="field"><span>Jméno a příjmení *</span><input name="name" required maxLength={120} autoComplete="name"/></label>
             <div className="field-grid"><label className="field"><span>Telefon *</span><input name="phone" type="tel" required maxLength={40} autoComplete="tel"/></label><label className="field"><span>E-mail</span><input name="email" type="email" maxLength={200} autoComplete="email"/></label></div>
@@ -75,7 +85,7 @@ export default function PublicBooking() {
         </section>}
       </>}
     </main>
-    <footer className="pb-footer">Studio I AM · Nerudova 884/11, Hradec Králové · tel. 775 963 462</footer>
+    <footer className="pb-footer">Studio I AM · Nerudova 884/11, Hradec Králové · tel. 775 963 462 · IČO 73975052</footer>
   </div>;
 }
 

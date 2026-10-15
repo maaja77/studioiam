@@ -13,8 +13,8 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams, db = database();
     const from = isDate(params.get('from')) ? params.get('from')! : '0000-01-01', to = isDate(params.get('to')) ? params.get('to')! : '9999-12-31';
     const [bookings, services, setting] = await db.batch([
-      db.prepare('SELECT id,service_id AS serviceId,client_id AS clientId,start_at AS start,end_at AS end,service_name AS serviceName,price_cents AS priceCents,name,phone,email,note,status,source,deposit_cents AS depositCents,deposit_status AS depositStatus,deposit_due AS depositDue,vs,created FROM bookings WHERE start_at>=? AND start_at<? ORDER BY start_at').bind(from, to + 'T99'),
-      db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,active,sort FROM services ORDER BY sort,name'),
+      db.prepare('SELECT b.id,b.service_id AS serviceId,b.client_id AS clientId,b.start_at AS start,b.end_at AS end,b.service_name AS serviceName,b.price_cents AS priceCents,b.name,b.phone,b.email,b.note,b.status,b.source,b.deposit_cents AS depositCents,b.deposit_status AS depositStatus,b.deposit_due AS depositDue,b.vs,b.created,s.color,s.category FROM bookings b LEFT JOIN services s ON s.id=b.service_id WHERE b.start_at>=? AND b.start_at<? ORDER BY b.start_at').bind(from, to + 'T99'),
+      db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,active,sort,category,description,color FROM services ORDER BY sort,name'),
       db.prepare("SELECT value FROM settings WHERE key='booking'"),
     ]) as {results: Record<string, unknown>[]}[];
     return json({bookings: bookings.results, services: services.results, settings: parseSettings((setting.results[0] as {value?: string} | undefined)?.value)});
@@ -43,9 +43,9 @@ export async function POST(request: Request) {
       let price: number | null;
       try { price = parseRevenue(typeof d.price === 'number' ? String(d.price) : d.price); } catch (e) { return json({error: (e as Error).message.replace('tržbu', 'cenu').replace('Tržba', 'Cena')}, 400); }
       if (price === null) return json({error: 'Vyplňte cenu ošetření.'}, 400);
-      const id = field('id') || crypto.randomUUID();
-      await db.prepare('INSERT INTO services (id,name,duration_min,price_cents,active,sort,created) VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,duration_min=excluded.duration_min,price_cents=excluded.price_cents,active=excluded.active,sort=excluded.sort')
-        .bind(id, name, duration, price, d.active === false ? 0 : 1, Number.isInteger(d.sort) ? d.sort as number : 0, new Date().toISOString()).run();
+      const id = field('id') || crypto.randomUUID(), color = /^#[0-9a-f]{6}$/i.test(field('color')) ? field('color').toLowerCase() : '';
+      await db.prepare('INSERT INTO services (id,name,duration_min,price_cents,active,sort,category,description,color,created) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,duration_min=excluded.duration_min,price_cents=excluded.price_cents,active=excluded.active,sort=excluded.sort,category=excluded.category,description=excluded.description,color=excluded.color')
+        .bind(id, name, duration, price, d.active === false ? 0 : 1, Number.isInteger(d.sort) ? d.sort as number : 0, field('category', 80), field('description', 600), color, new Date().toISOString()).run();
       return json({ok: true, id});
     }
 
