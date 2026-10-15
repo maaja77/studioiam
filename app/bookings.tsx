@@ -6,11 +6,13 @@ import {serviceColor} from '../lib/price-list';
 import {formatRevenue} from '../lib/revenue';
 import {czIban, spdPayload} from '../lib/payment';
 import {PaymentDetails} from './qr-payment';
+import {ReceiptDialog, type ReceiptDraft} from './receipts';
+import {Receipt as ReceiptIcon} from 'lucide-react';
 
-export type Booking = {id: string; serviceId: string | null; clientId: string | null; start: string; end: string; serviceName: string; priceCents: number | null; name: string; phone: string; email: string; note: string; status: string; source: string; depositCents?: number | null; depositStatus?: string | null; depositDue?: string | null; vs?: string | null; paymentKind?: string | null; color?: string | null; category?: string | null};
+export type Booking = {id: string; serviceId: string | null; clientId: string | null; start: string; end: string; serviceName: string; priceCents: number | null; name: string; phone: string; email: string; note: string; status: string; source: string; depositCents?: number | null; depositStatus?: string | null; depositDue?: string | null; vs?: string | null; paymentKind?: string | null; receiptId?: string | null; color?: string | null; category?: string | null};
 export type Service = {id: string; name: string; durationMin: number; priceCents: number; active: number; sort: number; category: string; description: string; color: string; sessions: number; prepay: number};
 type ClientLite = {id: string; name: string; phone: string; email: string; blocked?: number};
-const DEPOSIT_LABEL: Record<string, string> = {pending: 'čeká na zaplacení', paid: 'zaplacena', returned: 'vrácena', forfeited: 'propadla', expired: 'nezaplacena, termín uvolněn', cancelled: 'nezaplacena, termín zrušen'};
+const DEPOSIT_LABEL: Record<string, string> = {pending: 'čeká na zaplacení', paid: 'zaplacena', returned: 'vrácena', forfeited: 'propadla', expired: 'nezaplacena, termín uvolněn', cancelled: 'nezaplacena, termín zrušen', used: 'započtena do účtenky'};
 
 export const STATUS_LABEL: Record<string, string> = {pending: 'Čeká na kauci', confirmed: 'Potvrzeno', done: 'Proběhlo', no_show: 'Nepřišla', cancelled: 'Zrušeno'};
 const mondayOf = (date: string) => addDays(date, -((weekday(date) + 6) % 7));
@@ -47,7 +49,7 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
   const [bookings, setBookings] = useState<Booking[]>([]), [services, setServices] = useState<Service[]>([]), [settings, setSettings] = useState<BookingSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<{mode: 'view' | 'edit'; booking: Partial<Booking> & {date?: string; time?: string}} | null>(null);
-  const [blockToo, setBlockToo] = useState(false);
+  const [blockToo, setBlockToo] = useState(false), [receipt, setReceipt] = useState<{draft?: ReceiptDraft; id?: string} | null>(null);
   const dialog = useRef<HTMLDialogElement>(null), scroller = useRef<HTMLDivElement>(null);
   // Na telefonu se kalendář posune tak, aby byl vidět dnešek.
   useEffect(() => { const el = scroller.current, todayCol = el?.querySelector<HTMLElement>('.cal-day.today'); if (el && todayCol && el.scrollWidth > el.clientWidth) el.scrollLeft = todayCol.offsetLeft - 52; }, [week, loading]);
@@ -128,6 +130,7 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
       })}
     </div></div>
 
+    {receipt && <ReceiptDialog draft={receipt.draft} receiptId={receipt.id} clients={clients} onClose={() => setReceipt(null)} onChanged={load}/>}
     <dialog ref={dialog} onCancel={e => { if (busy) e.preventDefault(); else setOpen(null); }}>
       {open?.mode === 'view' && current && <div>
         <div className="dialog-header"><div><p className="eyebrow">{current.source === 'block' ? 'BLOKOVANÝ ČAS' : current.source === 'online' ? 'REZERVACE Z WEBU' : 'REZERVACE'}</p><h2>{current.source === 'block' ? current.serviceName : current.name}</h2></div><button type="button" aria-label="Zavřít" onClick={() => setOpen(null)}><X size={21}/></button></div>
@@ -142,7 +145,7 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
               {current.depositStatus === 'pending' && current.depositDue && <p className="muted-inline">Termín se uvolní {new Date(current.depositDue + ':00').toLocaleString('cs-CZ', {day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit'})}, pokud platba nedorazí.</p>}
               {current.depositStatus === 'pending' && czIban(settings.account) && <details><summary>QR kód pro platbu</summary><PaymentDetails deposit={{amountCents: current.depositCents, due: current.depositDue || current.start!, vs: current.vs || '', iban: czIban(settings.account)!, account: settings.account, recipient: settings.accountName, qr: spdPayload({iban: czIban(settings.account)!, amountCents: current.depositCents, vs: current.vs || '', message: (current.paymentKind === 'prepay' ? '' : 'Kauce ') + current.serviceName, recipient: settings.accountName})}}/></details>}
               <div className="booking-actions">
-                {current.depositStatus !== 'paid' && <button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'deposit', data: {id: current.id, depositStatus: 'paid'}}), `${payLabel} je zaplacená, termín potvrzený.`)}><Check size={16}/> {payLabel} zaplacena</button>}
+                {!['paid', 'used'].includes(current.depositStatus || '') && <button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'deposit', data: {id: current.id, depositStatus: 'paid'}}), `${payLabel} je zaplacená, termín potvrzený.`)}><Check size={16}/> {payLabel} zaplacena</button>}
                 {current.depositStatus === 'paid' && <><button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'deposit', data: {id: current.id, depositStatus: 'returned'}}), `${payLabel} označena jako vrácená.`)}>{payLabel} vrácena</button><button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'deposit', data: {id: current.id, depositStatus: 'forfeited'}}), `${payLabel} propadla.`)}>{payLabel} propadla</button></>}
               </div>
             </div>}
@@ -162,6 +165,9 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
           {current.source !== 'block' && (current.clientId
             ? <button className="secondary" onClick={() => { setOpen(null); onOpenClient(current.clientId!); }}><ExternalLink size={16}/> Otevřít kartu</button>
             : <button className="secondary" disabled={busy} onClick={() => run(async () => { const d = await post({kind: 'booking', action: 'createClient', data: {id: current.id}}); await onClientsChanged(); onOpenClient(d.clientId!); }, 'Karta klientky byla založena.')}><UserPlus size={16}/> Založit kartu</button>)}
+          {current.source !== 'block' && current.status !== 'cancelled' && (current.receiptId
+            ? <button className="secondary" onClick={() => { setReceipt({id: current.receiptId!}); setOpen(null); }}><ReceiptIcon size={16}/> Účtenka</button>
+            : <button className="primary" onClick={() => { setReceipt({draft: {bookingId: current.id, clientId: current.clientId, clientName: current.name, items: [{name: current.serviceName!, qty: 1, unitCents: current.priceCents || 0, kind: 'service'}], prepaidCents: current.depositStatus === 'paid' ? current.depositCents || 0 : 0, prepaidLabel: current.paymentKind === 'prepay' ? 'Zaplaceno předem' : 'Zaplacená kauce'}}); setOpen(null); }}><ReceiptIcon size={16}/> Vystavit účtenku</button>)}
           <button className="secondary" onClick={() => setOpen({mode: 'edit', booking: {...current, date: current.start!.slice(0, 10), time: current.start!.slice(11)}})}>Upravit</button>
           {current.source === 'block' && <button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'delete', data: {id: current.id}}), 'Blokace byla odstraněna.')}>Odstranit</button>}
         </div>

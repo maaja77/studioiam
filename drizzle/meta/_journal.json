@@ -43,6 +43,13 @@
       "when": 1792091430628,
       "tag": "0005_deposits",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792092414869,
+      "tag": "0006_receipts",
+      "breakpoints": true
     }
   ]
 }

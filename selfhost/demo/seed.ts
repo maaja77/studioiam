@@ -75,7 +75,18 @@ export async function seedDemo(run: Run, put: Put) {
     ['b-6', volumetric.id, null, pStart, pEnd, volumetric.name, volumetric.price, 'Petra Svobodová', '+420 604 777 888', 'petra@example.cz', '', [day(1) + 'T12:00', pStart].sort()[0], pStart.slice(2, 10).replace(/-/g, '') + '1507', 'a'.repeat(36), now]);
   run("INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,deposit_cents,deposit_status,deposit_due,vs,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,'confirmed','online',70000,'paid',?,?,?)",
     ['b-7', architect.id, 'demo-2', kStart, kEnd, architect.name, architect.price, 'Lucie Horáková', '+420 602 345 678', '', '', kStart, kStart.slice(2, 10).replace(/-/g, '') + '1042', now]);
-  run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, account: '127326219/0300'})]);
+  // Ukázkové produkty a účtenky.
+  const products: [string, number][] = [['Čisticí gel pro citlivou pleť', 590], ['Hydratační sérum s kyselinou hyaluronovou', 1290], ['Krém s SPF 50', 790], ['Pleťová maska – vzorek', 120]];
+  products.forEach(([name, price], i) => run('INSERT INTO products (id,name,price_cents,active,sort,created) VALUES (?,?,?,1,?,?)', ['p-' + i, name, price * 100, i, now]));
+  const year = Number(day(0).slice(0, 4)), dna = service('DNA Glow Rebirth');
+  const receipt = (seq: number, bookingId: string | null, clientId: string | null, clientName: string, issued: string, items: {name: string; qty: number; unitCents: number; kind: string}[], method: string, paid: number) => {
+    const total = items.reduce((a, x) => a + x.qty * x.unitCents, 0);
+    run('INSERT INTO receipts (id,year,seq,number,booking_id,client_id,client_name,issued,items,total_cents,prepaid_cents,due_cents,method,paid,vs,status,note,created) VALUES (?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?,?,?)',
+      ['r-' + seq, year, seq, `${year}/${String(seq).padStart(4, '0')}`, bookingId, clientId, clientName, issued, JSON.stringify(items), total, total, method, paid, `${year}${String(seq).padStart(4, '0')}`, 'issued', '', now]);
+  };
+  receipt(1, 'b-9', 'demo-4', 'Petra Svobodová', workday(-1) + 'T17:05', [{name: dna.name, qty: 1, unitCents: dna.price, kind: 'service'}, {name: 'Krém s SPF 50', qty: 1, unitCents: 79000, kind: 'product'}], 'card', 1);
+  receipt(2, null, 'demo-1', 'Tereza Nováková', day(0) + 'T10:30', [{name: 'Čisticí gel pro citlivou pleť', qty: 2, unitCents: 59000, kind: 'product'}], 'qr', 0);
+  run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, account: '127326219/0300', businessOwner: 'Jana Ukázková'})]);
 
   const photos: [string, string, string, string, number][] = [
     ['p-1', 'demo-1', day(-30), 'Před ošetřením', 18],

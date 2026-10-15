@@ -200,3 +200,45 @@ dialog[open]{margin:auto}
 .cal-event.compact{flex-direction:row;flex-wrap:wrap;align-content:flex-start;gap:0 6px;padding:2px 6px}
 .cal-event.compact>span:not(.time),.cal-event.compact .tags{display:none}
 .prepay-check{align-self:end;padding-bottom:10px}
+.receipt-dialog{width:min(640px,calc(100% - 24px))}
+.receipt-items{display:flex;flex-direction:column;gap:8px}
+.receipt-item{display:grid;grid-template-columns:minmax(0,1fr) 64px 100px 40px;gap:6px;align-items:center}
+.receipt-item input,.receipt-add select,.receipt-form select{border:1px solid #cad8d6;border-radius:7px;padding:9px 10px;font-size:15px;min-width:0;background:white;color:var(--ink)}
+.receipt-item button{background:transparent;color:var(--muted);padding:8px;border-radius:6px}
+.receipt-add{display:flex;gap:8px;flex-wrap:wrap}
+.receipt-add select{flex:1;min-width:200px}
+.receipt-sum{display:flex;flex-direction:column;gap:2px;align-items:flex-end;font-size:15px;border-top:1px solid var(--line);padding-top:10px}
+.receipt-sum b{font-size:18px}
+.method{border:0;padding:0;margin:0;display:flex;gap:8px;flex-wrap:wrap}
+.method legend{font-size:14px;font-weight:600;margin-bottom:7px}
+.method label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:14px;cursor:pointer}
+.method label.active{border-color:var(--teal);background:#e8f4f2;color:var(--teal);font-weight:600}
+.method input{position:absolute;opacity:0;pointer-events:none}
+.receipt-paper{max-width:380px;margin:0 auto;border:1px dashed #cbd8d6;border-radius:8px;padding:18px 20px;font-size:13px;line-height:1.45;color:#111;background:white}
+.receipt-paper header{all:unset;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px;padding-bottom:10px;border-bottom:1px solid #ddd;margin-bottom:10px}
+.receipt-paper header b{font-size:17px;letter-spacing:1px}
+.receipt-paper h3{font-size:15px;margin:0;text-align:center}
+.receipt-meta{margin:4px 0;text-align:center;color:#444}
+.receipt-paper table{width:100%;border-collapse:collapse;margin:10px 0}
+.receipt-paper td,.receipt-paper th{padding:4px 0;text-align:left;vertical-align:top}
+.receipt-paper td:last-child,.receipt-paper th:last-child{text-align:right;white-space:nowrap;padding-left:10px}
+.receipt-paper td small{display:block;color:#555}
+.receipt-paper tfoot tr:first-child th{border-top:1px solid #333;padding-top:7px;font-size:15px}
+.receipt-qr{display:flex;gap:12px;align-items:center;justify-content:center;margin:10px 0}
+.receipt-qr span{font-size:12px}
+.receipt-paper footer{all:unset;display:block;text-align:center;margin-top:10px;color:#444}
+.receipt-paper.cancelled{opacity:.6;background:repeating-linear-gradient(135deg,#fff 0 10px,#fbeeee 10px 20px)}
+.receipt-actions{flex-wrap:wrap;align-items:center}
+.danger-text{color:#a4473b}
+.receipt-list{list-style:none;margin:0;padding:0}
+.receipt-list li+li{border-top:1px solid var(--line)}
+.receipt-list li.muted{padding:20px}
+.receipt-list button{width:100%;display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:12px;align-items:center;text-align:left;background:white;padding:12px 6px;color:var(--ink)}
+.receipt-list button:hover{background:#f2f7f6}
+.receipt-list button.cancelled{opacity:.5;text-decoration:line-through}
+.receipt-no{font-variant-numeric:tabular-nums;font-weight:700;color:var(--teal)}
+.receipt-who small,.receipt-amount small{display:block;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.receipt-amount{text-align:right}
+.receipts-overview{margin-bottom:20px}
+@media(max-width:560px){.receipt-item{grid-template-columns:70px minmax(0,1fr) 40px;padding-bottom:6px;border-bottom:1px solid var(--line)}.receipt-item input:first-child{grid-column:1/-1}.receipt-list button{grid-template-columns:minmax(0,1fr) auto}.receipt-no{grid-column:1/-1;font-size:12px}}
+@media print{body *{visibility:hidden!important}.receipt-paper,.receipt-paper *{visibility:visible!important}.receipt-paper{position:fixed;left:0;top:0;border:0;max-width:80mm;padding:0}dialog::backdrop{background:none}}

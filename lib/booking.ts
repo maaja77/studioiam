@@ -4,7 +4,8 @@ import {czIban} from './payment';
 
 export type Hours = Record<string, [string, string] | null>; // klíč 0 = neděle … 6 = sobota
 export type BookingSettings = {hours: Hours; leadHours: number; horizonDays: number; stepMinutes: number;
-  depositFromKc: number; depositPercent: number; depositHoldHours: number; account: string; accountName: string; changeLimitHours: number};
+  depositFromKc: number; depositPercent: number; depositHoldHours: number; account: string; accountName: string; changeLimitHours: number;
+  businessName: string; businessOwner: string; businessAddress: string; businessId: string};
 export type BusyRange = {start: string; end: string};
 
 export const DEFAULT_SETTINGS: BookingSettings = {
@@ -18,6 +19,10 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   account: '',
   accountName: 'STUDIO I AM',
   changeLimitHours: 24,
+  businessName: 'STUDIO I AM',
+  businessOwner: '',
+  businessAddress: 'Nerudova 884/11, 500 02 Hradec Králové',
+  businessId: '73975052',
 };
 export const WEEKDAYS = ['Neděle', 'Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota'];
 export const ACTIVE_STATUSES = ['confirmed', 'done', 'pending'];
@@ -72,7 +77,11 @@ export function validateSettings(v: unknown): BookingSettings | string {
   const accountName = typeof s.accountName === 'string' ? s.accountName.trim().slice(0, 60) : '';
   const change = Number(s.changeLimitHours ?? DEFAULT_SETTINGS.changeLimitHours);
   if (!Number.isInteger(change) || change < 0 || change > 336) return 'Lhůta pro online změnu termínu musí být 0–336 hodin.';
-  return {hours, leadHours: lead, horizonDays: horizon, stepMinutes: step, depositFromKc: depositFrom, depositPercent: percent, depositHoldHours: hold, account, accountName, changeLimitHours: change};
+  const raw = s as unknown as Record<string, unknown>, text = (k: keyof BookingSettings, max: number) => typeof raw[k] === 'string' ? (raw[k] as string).trim().slice(0, max) : String(DEFAULT_SETTINGS[k]);
+  const businessId = text('businessId', 12);
+  if (businessId && !/^\d{8}$/.test(businessId)) return 'IČO musí mít 8 číslic.';
+  return {businessName: text('businessName', 80), businessOwner: text('businessOwner', 80), businessAddress: text('businessAddress', 160), businessId,
+    hours, leadHours: lead, horizonDays: horizon, stepMinutes: step, depositFromKc: depositFrom, depositPercent: percent, depositHoldHours: hold, account, accountName, changeLimitHours: change};
 }
 
 /** Volné začátky termínů pro ošetření dané délky v daný den. */

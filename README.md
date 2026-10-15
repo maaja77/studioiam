@@ -74,6 +74,14 @@ docker compose up -d --build
 - **Balíčky a programy:** u ošetření lze nastavit počet ošetření v balíčku a platbu předem. Klientka online rezervuje 1. termín a hned dostane QR platbu na celou částku; termín čeká na platbu stejně jako u kauce. Další termíny balíčku domluví salon.
 - **Změna termínu klientkou:** po rezervaci (a e-mailem, pokud ho vyplní) dostane klientka tajný odkaz `/rezervace?t=…`, přes který termín zruší nebo přesune, nejpozději 24 h předem (nastavitelné). Salon dostane e-mail a do poznámky rezervace se zapíše, co klientka změnila. V administraci jde termín změnit kdykoliv.
 
+## Účtenky
+
+- U rezervace v kalendáři tlačítko **Vystavit účtenku**: předvyplní ošetření, přidáte produkty ze seznamu (Nastavení → Produkty k prodeji) nebo vlastní položku, zvolíte platbu hotově / kartou / QR.
+- Zaplacená kauce nebo platba předem se z účtenky odečte; rezervace se označí jako proběhlá.
+- QR platba (SPD) na doplatek, číslování `RRRR/0001` po letech, VS = číslo účtenky. Storno účtenku nemaže, jen označí.
+- Záložka **Účtenky**: přehled za měsíc, nezaplacené účtenky a prodej bez rezervace. Tisk přes tlačítko Tisk (účtenka je připravená na úzký papír 80 mm i A4).
+- Údaje na účtence (název, provozovatel, adresa, IČO, neplátce DPH) se nastaví v Nastavení.
+
 ## Náhled s ukázkovými daty
 
 `pnpm run demo:build` sestaví verzi, která běží celá v prohlížeči: skutečné API handlery

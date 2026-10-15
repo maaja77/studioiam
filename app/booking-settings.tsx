@@ -5,6 +5,7 @@ import {DEFAULT_SETTINGS, WEEKDAYS, type BookingSettings} from '../lib/booking';
 import {formatRevenue} from '../lib/revenue';
 import {CATEGORY_COLORS, PRICE_LIST, serviceColor} from '../lib/price-list';
 import type {Service} from './bookings';
+import {ProductsPanel} from './receipts';
 
 async function post(body: unknown) {
   const r = await fetch('/api/bookings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
@@ -93,6 +94,20 @@ export default function BookingSettingsView({bookingUrl}: {bookingUrl: string}) 
       {!settings.account && <p className="muted-inline">Bez čísla účtu se kauce nevybírá.</p>}
       <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Nastavení kauce bylo uloženo.')}>Uložit kauce a platby</button></div>
     </section>
+
+    <section className="panel">
+      <div className="panel-heading"><h2>Údaje na účtence</h2></div>
+      <div className="field-grid">
+        <label className="field"><span>Název provozovny</span><input value={settings.businessName} maxLength={80} onChange={e => setSettings({...settings, businessName: e.target.value})}/></label>
+        <label className="field"><span>Provozovatel (jméno podnikatelky)</span><input value={settings.businessOwner} maxLength={80} onChange={e => setSettings({...settings, businessOwner: e.target.value})}/></label>
+        <label className="field"><span>Adresa</span><input value={settings.businessAddress} maxLength={160} onChange={e => setSettings({...settings, businessAddress: e.target.value})}/></label>
+        <label className="field"><span>IČO</span><input value={settings.businessId} inputMode="numeric" maxLength={8} onChange={e => setSettings({...settings, businessId: e.target.value})}/></label>
+      </div>
+      <p className="muted-inline">Na účtence bude i „neplátce DPH“ a QR kód na účet z části Kauce a platby.</p>
+      <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Údaje na účtence byly uloženy.')}>Uložit údaje</button></div>
+    </section>
+
+    <ProductsPanel/>
 
     <section className="panel">
       <div className="panel-heading"><h2>Rezervace na vašem webu</h2></div>
