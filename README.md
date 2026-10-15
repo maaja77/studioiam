@@ -63,6 +63,14 @@ git pull
 docker compose up -d --build
 ```
 
+## Online rezervace
+
+- Administrace: záložky **Rezervace** (týdenní kalendář, ruční rezervace, blokace času, stav Proběhlo / Nepřišla / Zrušeno, založení karty z rezervace) a **Nastavení** (ceník ošetření, otevírací doba, předstih, kód pro web).
+- Veřejná stránka `/rezervace` (bez hesla) s volnými termíny; rezervace se potvrdí sama. Bez hesla je dostupné jen `/rezervace`, `/assets/*` a `/api/public` (max. 20 odeslání za hodinu z jedné IP).
+- Klientka se zablokovanými online rezervacemi (karta klientky nebo „Nepřišla“ v kalendáři) se pozná podle telefonu nebo e-mailu a online se neobjedná.
+- E-mail o nové rezervaci: v `.env.selfhost` vyplňte `SMTP_*` a `SALON_NOTIFY_EMAIL` (Seznam: `smtp.seznam.cz`, port 465, přihlášení celým e-mailem).
+- Na reverse proxy zveřejněte pro internet jen adresu rezervace (např. `rezervace.studioiam.cz`), administraci nechte za VPN nebo heslem. `SALON_BOOKING_FRAME_ANCESTORS` určuje weby, které smí stránku vložit do iframe.
+
 ## Náhled s ukázkovými daty
 
 `pnpm run demo:build` sestaví verzi, která běží celá v prohlížeči: skutečné API handlery

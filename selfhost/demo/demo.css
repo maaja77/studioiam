@@ -2,3 +2,5 @@
 .demo-bar button{font:inherit;font-size:13px;padding:4px 10px;border:1px solid #c9ad5c;border-radius:6px;background:#fffaf0;color:#5a4410;cursor:pointer}
 .demo-bar button:focus-visible{outline:2px solid var(--teal,#126b66);outline-offset:2px}
 .demo-actions{display:inline-flex;gap:8px}
+.demo-bar button[aria-pressed="true"]{background:#5a4410;color:#fff8e6;border-color:#5a4410}
+.demo-mail{flex-basis:100%;font-size:13px}

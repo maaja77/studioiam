@@ -1,6 +1,7 @@
 import {DatabaseSync} from 'node:sqlite';
 import {mkdirSync,readFileSync,readdirSync,writeFileSync,renameSync,rmSync,existsSync} from 'node:fs';
 import path from 'node:path';
+import {mailConfig,sendMail} from './mail';
 export const dataDir=path.resolve(process.env.SALON_DATA_DIR||'data');mkdirSync(dataDir,{recursive:true,mode:0o700});
 const db=new DatabaseSync(path.join(dataDir,'salon.sqlite'));db.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
 db.exec('CREATE TABLE IF NOT EXISTS selfhost_migrations(name TEXT PRIMARY KEY)');
@@ -10,4 +11,6 @@ const DB={prepare:(sql:string)=>new Prepared(sql),async batch(statements:Prepare
 const root=path.join(dataDir,'objects');mkdirSync(root,{recursive:true,mode:0o700});
 function objectPath(key:string){const p=path.resolve(root,key);if(!p.startsWith(root+path.sep))throw Error('Invalid object key');return p;}
 const BUCKET={async put(key:string,bytes:Uint8Array){const p=objectPath(key);mkdirSync(path.dirname(p),{recursive:true,mode:0o700});const temp=p+'.'+crypto.randomUUID()+'.tmp';writeFileSync(temp,bytes,{mode:0o600});renameSync(temp,p);},async get(key:string){const p=objectPath(key);return existsSync(p)?{body:new Uint8Array(readFileSync(p))}:null;},async delete(keys:string|string[]){for(const k of Array.isArray(keys)?keys:[keys])rmSync(objectPath(k),{force:true});}};
-export const env={DB,BUCKET};
+const mail=mailConfig();if(!mail)console.log('E-mailová upozornění nejsou nastavená (SMTP_HOST, SMTP_USER, SMTP_PASS, SALON_NOTIFY_EMAIL).');
+const NOTIFY=mail?(subject:string,text:string)=>sendMail(mail,subject,text):undefined;
+export const env={DB,BUCKET,NOTIFY};

@@ -1,4 +1,5 @@
 // Vymyšlené ukázkové klientky pro náhled. Žádná skutečná data.
+import {PRICE_LIST} from '../../lib/price-list';
 type Run = (sql: string, values: (string | number | null)[]) => void;
 type Put = (key: string, bytes: Uint8Array) => void;
 
@@ -34,6 +35,19 @@ export async function seedDemo(run: Run, put: Put) {
     ['v-5', 'demo-4', day(-40), 'Lifting řas a laminace obočí', '', '', 90000, 0, null, null],
   ];
   for (const v of visits) run('INSERT INTO visits (id,client_id,date,treatment,products,notes,revenue_cents,clean_skin,program_price_cents,program_step) VALUES (?,?,?,?,?,?,?,?,?,?)', v);
+
+  PRICE_LIST.forEach(([name, minutes, price], i) => run('INSERT INTO services (id,name,duration_min,price_cents,active,sort,created) VALUES (?,?,?,?,1,?,?)', ['s-' + i, name, minutes, price * 100, i, now]));
+  const workday = (offset: number) => { let o = offset; while ([0, 6].includes(new Date(day(o) + 'T12:00:00Z').getUTCDay())) o += offset < 0 ? -1 : 1; return day(o); };
+  const at = (offset: number, time: string, minutes: number) => { const start = `${workday(offset)}T${time}`, d = new Date(start + ':00Z'); d.setUTCMinutes(d.getUTCMinutes() + minutes); return [start, d.toISOString().slice(0, 16)] as [string, string]; };
+  const bookings: [string, string | null, string | null, [string, string], string, number | null, string, string, string, string, string][] = [
+    ['b-1', 's-3', 'demo-1', at(1, '10:00', 70), 'A-QS Hacker', 129000, 'Tereza Nováková', '+420 601 234 567', 'confirmed', 'online', 'Čistá pleť, 3. návštěva.'],
+    ['b-2', 's-26', null, at(2, '13:00', 60), 'Lash Lifting řas', 99000, 'Klára Malá', '+420 605 111 222', 'confirmed', 'online', ''],
+    ['b-3', null, null, at(3, '09:00', 120), 'Školení', null, '', '', 'confirmed', 'block', ''],
+    ['b-4', 's-14', 'demo-2', at(3, '14:00', 60), 'Basic Skin Care', 109000, 'Lucie Horáková', '+420 602 345 678', 'confirmed', 'salon', ''],
+    ['b-5', 's-15', 'demo-3', at(-2, '11:00', 50), 'Čištění pleti s kyselinou jantarovou', 89000, 'Markéta Dvořáková', '+420 603 456 789', 'no_show', 'online', ''],
+  ];
+  for (const [id, serviceId, clientId, [start, end], serviceName, price, name, phone, status, source, note] of bookings)
+    run('INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [id, serviceId, clientId, start, end, serviceName, price, name, phone, '', note, status, source, now]);
 
   const photos: [string, string, string, string, number][] = [
     ['p-1', 'demo-1', day(-30), 'Před ošetřením', 18],
