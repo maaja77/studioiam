@@ -1,0 +1,33 @@
+import { database, deleteClientPhotos } from '../../../db/raw';
+import { parseRevenue } from '../../../lib/revenue';
+import {programQuote,PROGRAM_TREATMENT,type ProgramVisit} from '../../../lib/clean-skin';
+export const dynamic='force-dynamic';
+const json=(x:unknown,status=200)=>Response.json(x,{status,headers:{'Cache-Control':'no-store'}});
+export async function GET(){try{const db=database();const [clients,visits]=await db.batch([db.prepare('SELECT *,clean_skin_active AS programActive FROM clients ORDER BY name COLLATE NOCASE'),db.prepare('SELECT id,client_id AS clientId,date,treatment,products,notes,revenue_cents AS revenueCents,clean_skin AS cleanSkin,program_price_cents AS programPriceCents,program_step AS programStep FROM visits ORDER BY date DESC')]);return json({clients:clients.results,visits:visits.results});}catch(e){console.error(e);return json({error:'Kartotéku se nepodařilo načíst. Zkuste to znovu.'},503);}}
+export async function POST(request:Request){try{
+ if(request.headers.get('origin')&&request.headers.get('origin')!==new URL(request.url).origin)return json({error:'Nepovolený požadavek.'},403);
+ const body=await request.json() as {kind:string;action:string;data?:Record<string,unknown>};if(!body||typeof body!=='object')return json({error:'Neplatný záznam.'},400);const {kind,action}=body,d=body.data||{},db=database();
+ if(!['client','visit','program'].includes(kind)||!['save','delete'].includes(action))return json({error:'Neplatná operace.'},400);
+ const field=(k:string)=>typeof d[k]==='string'?d[k].trim():'';
+ if(Object.values(d).some(v=>typeof v==='string'&&v.length>20000))return json({error:'Záznam je příliš dlouhý.'},400);
+ if(kind==='program'){if(action!=='save'||!field('id')||typeof d.active!=='boolean')return json({error:'Neplatné nastavení programu.'},400);const exists=await db.prepare('SELECT id FROM clients WHERE id=?').bind(field('id')).first();if(!exists)return json({error:'Klient nebyl nalezen.'},404);await db.prepare('UPDATE clients SET clean_skin_active=? WHERE id=?').bind(d.active?1:0,field('id')).run();return json({ok:true});}
+ if(action==='delete'){if(!field('id'))return json({error:'Chybí záznam.'},400);if(kind==='client'){await deleteClientPhotos(field('id'));await db.batch([db.prepare('DELETE FROM visits WHERE client_id=?').bind(field('id')),db.prepare('DELETE FROM clients WHERE id=?').bind(field('id'))]);}else await db.prepare('DELETE FROM visits WHERE id=?').bind(field('id')).run();return json({ok:true});}
+ const id=field('id')||crypto.randomUUID();
+ if(kind==='client'){if(!field('name')||field('name').length>150)return json({error:'Vyplňte jméno klienta (nejvýše 150 znaků).'},400);await db.prepare('INSERT INTO clients (id,name,phone,email,skin,cautions,notes,created) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,phone=excluded.phone,email=excluded.email,skin=excluded.skin,cautions=excluded.cautions,notes=excluded.notes').bind(id,field('name'),field('phone'),field('email'),field('skin'),field('cautions'),field('notes'),new Date().toISOString()).run();}
+ else {
+ let hasRevenue=Object.prototype.hasOwnProperty.call(d,'revenue'),revenueCents:number|null=null;try{revenueCents=parseRevenue(d.revenue);}catch(e){return json({error:(e as Error).message},400);}
+ const date=field('date');if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date)return json({error:'Vyplňte platné datum návštěvy.'},400);
+ const client=await db.prepare('SELECT id,clean_skin_active AS active FROM clients WHERE id=?').bind(field('clientId')).first<{id:string;active:number}>();if(!client)return json({error:'Klient nebyl nalezen.'},404);
+ const prior=await db.prepare('SELECT id,client_id AS clientId,date,clean_skin AS cleanSkin,program_price_cents AS programPriceCents,program_step AS programStep FROM visits WHERE id=?').bind(id).first<ProgramVisit&{clientId:string}>();if(prior&&prior.clientId!==client.id)return json({error:'Návštěva patří jinému klientovi.'},400);
+ const hasProgram=Object.prototype.hasOwnProperty.call(d,'cleanSkin');if(hasProgram&&!['0','1',0,1,false,true].includes(d.cleanSkin as string))return json({error:'Neplatný výběr programu.'},400);
+ const cleanSkin=hasProgram?(d.cleanSkin==='1'||d.cleanSkin===1||d.cleanSkin===true?1:0):(prior?.cleanSkin||0);
+ let programPriceCents:number|null=null,programStep:number|null=null;
+ if(cleanSkin){if(!client.active&&!prior?.cleanSkin)return json({error:'Nejprve klientovi zapněte program Čistá pleť.'},400);
+ if(prior?.cleanSkin&&prior.date===date&&prior.programPriceCents!==null){programPriceCents=prior.programPriceCents;programStep=prior.programStep;}
+ else{const rows=await db.prepare('SELECT id,date,clean_skin AS cleanSkin,program_price_cents AS programPriceCents,program_step AS programStep FROM visits WHERE client_id=?').bind(client.id).all<ProgramVisit>();const quote=programQuote(rows.results,date,id);programPriceCents=quote.priceCents;programStep=quote.step;}
+ if(!hasRevenue&&!prior?.cleanSkin){revenueCents=programPriceCents;hasRevenue=true;}}
+ const treatment=cleanSkin?PROGRAM_TREATMENT:field('treatment');if(!treatment)return json({error:'Vyplňte název ošetření.'},400);
+ await db.prepare('INSERT INTO visits (id,client_id,date,treatment,products,notes,revenue_cents,clean_skin,program_price_cents,program_step) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET date=excluded.date,treatment=excluded.treatment,products=excluded.products,notes=excluded.notes,revenue_cents=CASE WHEN ?=1 THEN excluded.revenue_cents ELSE visits.revenue_cents END,clean_skin=excluded.clean_skin,program_price_cents=excluded.program_price_cents,program_step=excluded.program_step').bind(id,client.id,date,treatment,field('products'),field('notes'),revenueCents,cleanSkin,programPriceCents,programStep,hasRevenue?1:0).run();
+ }
+ return json({ok:true,id});
+ }catch(e){console.error(e);return json({error:'Záznam se nepodařilo uložit. Vaše rozepsané údaje zůstaly ve formuláři.'},503);}}

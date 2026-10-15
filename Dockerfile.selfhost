@@ -1,0 +1,18 @@
+# Sestaví kartotéku ze zdrojů a spustí ji na Node.js 24 se SQLite a fotkami na disku.
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+RUN npm install -g pnpm@11.25.0
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+RUN pnpm install --frozen-lockfile
+COPY . .
+RUN node node_modules/vite/bin/vite.js build --config selfhost/vite.client.ts \
+ && node node_modules/vite/bin/vite.js build --config selfhost/vite.server.ts
+
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY --from=build /app/dist-selfhost ./dist-selfhost
+COPY --from=build /app/drizzle ./drizzle
+COPY --from=build /app/package.json ./package.json
+USER node
+ENV HOST=0.0.0.0 PORT=8787 SALON_DATA_DIR=/app/data
+CMD ["node","dist-selfhost/server.js"]
