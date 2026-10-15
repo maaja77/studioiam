@@ -1,0 +1,1 @@
+import {randomBytes,scryptSync} from 'node:crypto';let p='';for await(const chunk of process.stdin)p+=chunk;const salt=randomBytes(16).toString('hex');if(p.length<12)throw Error('Use a password of at least 12 characters.');console.log(salt+':'+scryptSync(p,salt,64).toString('hex'));

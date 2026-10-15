@@ -1,0 +1,1 @@
+ALTER TABLE `visits` ADD `revenue_cents` integer;

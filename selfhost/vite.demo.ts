@@ -1,0 +1,3 @@
+import {defineConfig} from 'vite';import react from '@vitejs/plugin-react';import path from 'node:path';
+// Náhled bez serveru: jeden JS a jeden CSS soubor s relativními cestami, API běží v prohlížeči nad ukázkovými daty.
+export default defineConfig({root:'selfhost/demo',base:'./',publicDir:false,plugins:[react()],css:{postcss:path.resolve('.')},resolve:{alias:{'cloudflare:workers':path.resolve('selfhost/demo/runtime.ts')}},build:{outDir:path.resolve('dist-demo'),emptyOutDir:true,assetsInlineLimit:0,rollupOptions:{output:{inlineDynamicImports:true,entryFileNames:'assets/app.js',assetFileNames:'assets/[name][extname]'}}}});

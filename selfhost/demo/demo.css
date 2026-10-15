@@ -1,0 +1,4 @@
+.demo-bar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:center;padding:10px max(16px,env(safe-area-inset-left,0px)) 10px max(16px,env(safe-area-inset-right,0px));background:#fff4d6;color:#5a4410;border-bottom:1px solid #ecd9a3;font-size:14px;line-height:1.4;text-align:center}
+.demo-bar button{font:inherit;font-size:13px;padding:4px 10px;border:1px solid #c9ad5c;border-radius:6px;background:#fffaf0;color:#5a4410;cursor:pointer}
+.demo-bar button:focus-visible{outline:2px solid var(--teal,#126b66);outline-offset:2px}
+.demo-actions{display:inline-flex;gap:8px}
