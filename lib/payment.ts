@@ -13,7 +13,7 @@ export function czIban(account: string): string | null {
 
 export function formatIban(iban: string) { return iban.replace(/(.{4})/g, '$1 ').trim(); }
 
-const spdText = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[*]/g, ' ').replace(/[^\x20-\x7E]/g, '-').toUpperCase().slice(0, 60);
+const spdText = (s: string) => s.replace(/×/g, 'x').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[*]/g, ' ').replace(/[^\x20-\x7E]/g, '-').toUpperCase().slice(0, 60);
 
 /** Text pro QR kód platby. Částka v haléřích, variabilní symbol nejvýše 10 číslic. */
 export function spdPayload({iban, amountCents, vs, message, recipient}: {iban: string; amountCents: number; vs?: string; message?: string; recipient?: string}) {

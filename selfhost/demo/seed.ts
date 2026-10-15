@@ -7,6 +7,7 @@ const DESCRIPTIONS: Record<string, string> = {
   'Nevím, jaké ošetření vybrat': 'Pokud si nejste jistá výběrem, zvolte tuto možnost. Na místě společně vybereme ošetření, které vaší pleti sedne.',
   'A-QS Hacker': 'Moderní dermokosmetické ošetření, které pracuje s přirozenou inteligencí pokožky.',
   'Derma Collage': 'Tříúrovňová hydratace a obnova kolagenu s plumping efektem.',
+  'Mandelic Forte Peel – balíček 3× ošetření': 'Tři chemické peelingy Mandelic Forte za zvýhodněnou cenu. Platí se předem, další termíny domluvíme při první návštěvě.',
   'Lash Lifting řas': 'Natočení a zvýraznění vašich vlastních řas na několik týdnů.',
 };
 type Run = (sql: string, values: (string | number | null)[]) => void;
@@ -45,7 +46,7 @@ export async function seedDemo(run: Run, put: Put) {
   ];
   for (const v of visits) run('INSERT INTO visits (id,client_id,date,treatment,products,notes,revenue_cents,clean_skin,program_price_cents,program_step) VALUES (?,?,?,?,?,?,?,?,?,?)', v);
 
-  PRICE_LIST.forEach(([category, name, minutes, price], i) => run('INSERT INTO services (id,name,duration_min,price_cents,active,sort,category,description,color,created) VALUES (?,?,?,?,1,?,?,?,?,?)', ['s-' + i, name, minutes, price * 100, i, category, DESCRIPTIONS[name] || '', CATEGORY_COLORS[category] || '', now]));
+  PRICE_LIST.forEach(([category, name, minutes, price, extra], i) => run('INSERT INTO services (id,name,duration_min,price_cents,active,sort,category,description,color,sessions,prepay,created) VALUES (?,?,?,?,1,?,?,?,?,?,?,?)', ['s-' + i, name, minutes, price * 100, i, category, DESCRIPTIONS[name] || '', CATEGORY_COLORS[category] || '', extra?.sessions ?? 1, extra?.prepay ? 1 : 0, now]));
   const service = (name: string) => { const i = PRICE_LIST.findIndex(x => x[1] === name); return {id: 's-' + i, name, minutes: PRICE_LIST[i][2], price: PRICE_LIST[i][3] * 100}; };
   const workday = (offset: number) => { let o = offset; while ([0, 6].includes(new Date(day(o) + 'T12:00:00Z').getUTCDay())) o += offset < 0 ? -1 : 1; return day(o); };
   const at = (offset: number, time: string, minutes: number) => { const start = `${workday(offset)}T${time}`, d = new Date(start + ':00Z'); d.setUTCMinutes(d.getUTCMinutes() + minutes); return [start, d.toISOString().slice(0, 16)] as [string, string]; };

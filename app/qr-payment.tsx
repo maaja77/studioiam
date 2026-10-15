@@ -2,7 +2,7 @@
 import qrcode from 'qrcode-generator';
 import {formatRevenue} from '../lib/revenue';
 
-export type DepositInfo = {amountCents: number; due: string; vs: string; iban: string; account: string; recipient: string; qr: string};
+export type DepositInfo = {amountCents: number; due: string; vs: string; iban: string; account: string; recipient: string; qr: string; kind?: 'deposit' | 'prepay'};
 
 /** QR kód platby (SPD) vykreslený jako SVG, bez externích služeb. */
 export function QrCode({payload, size = 200, label}: {payload: string; size?: number; label: string}) {
@@ -14,7 +14,7 @@ export function QrCode({payload, size = 200, label}: {payload: string; size?: nu
   </svg>;
 }
 
-export function PaymentDetails({deposit, title = 'Kauce'}: {deposit: DepositInfo; title?: string}) {
+export function PaymentDetails({deposit, title = deposit.kind === 'prepay' ? 'K zaplacení' : 'Kauce'}: {deposit: DepositInfo; title?: string}) {
   return <div className="payment">
     <QrCode payload={deposit.qr} label={`QR platba ${formatRevenue(deposit.amountCents)}`}/>
     <dl>

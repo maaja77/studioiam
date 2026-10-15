@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4cd0b052-9390-4f47-b3d5-15098c5638fb",
+  "id": "613f4886-ceec-4a2f-8d47-9a28394aaf7a",
   "prevId": "6ea3e168-b44d-4723-a5e5-24f79f1bdb5f",
   "tables": {
     "bookings": {
@@ -128,6 +128,13 @@
         },
         "vs": {
           "name": "vs",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "payment_kind": {
+          "name": "payment_kind",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -438,6 +445,22 @@
           "notNull": true,
           "autoincrement": false,
           "default": "''"
+        },
+        "sessions": {
+          "name": "sessions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "prepay": {
+          "name": "prepay",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "created": {
           "name": "created",

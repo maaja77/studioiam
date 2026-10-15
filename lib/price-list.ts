@@ -1,4 +1,5 @@
-// Ceník podle rezervací salonu v MyFoxu (stav 15. 10. 2026), jednotlivá ošetření bez balíčků a programů.
+// Ceník podle rezervací salonu v MyFoxu (stav 15. 10. 2026). Balíčky a programy se platí celé předem;
+// online se rezervuje první ošetření, další termíny domluví salon.
 // Kategorie mají v kalendáři vlastní barvu; ceny, délky i barvy jde v administraci upravit.
 export const CATEGORY_COLORS: Record<string, string> = {
   'Konzultace': '#8a6d3f',
@@ -16,7 +17,9 @@ export const CATEGORY_COLORS: Record<string, string> = {
   'Masáže': '#e56fa8',
 };
 
-export const PRICE_LIST: [category: string, name: string, durationMin: number, priceKc: number][] = [
+export type PackageInfo = {sessions: number; prepay: true};
+const pack = (sessions: number): PackageInfo => ({sessions, prepay: true});
+export const PRICE_LIST: [category: string, name: string, durationMin: number, priceKc: number, extra?: PackageInfo][] = [
   ['Konzultace', 'Nevím, jaké ošetření vybrat', 90, 0],
   ['Expresní ošetření', 'Expresní ošetření C-Fusion Glow', 35, 990],
   ['Základní ošetření', 'Carelika Basic Skin Care', 60, 1090],
@@ -25,6 +28,8 @@ export const PRICE_LIST: [category: string, name: string, durationMin: number, p
   ['Ošetření problematické pleti', 'Carelika Amber s kyselinou jantarovou', 90, 1290],
   ['Ošetření problematické pleti', 'Čištění pleti s kyselinou jantarovou', 50, 890],
   ['Ošetření problematické pleti', 'Čištění pleti', 40, 690],
+  ['Ošetření problematické pleti', 'Program Cesta k čisté pleti s rostoucí slevou', 70, 1290, pack(1)],
+  ['Ošetření problematické pleti', 'Program Cesta k čisté pleti na 6 měsíců', 70, 7928, pack(6)],
   ['Hydratační ošetření', 'Derma Collage', 70, 1790],
   ['Hydratační ošetření', 'Oxyfy Me – ošetření pro buněčnou obnovu', 90, 1390],
   ['Hydratační ošetření', 'Karboxyterapie', 60, 1350],
@@ -34,13 +39,18 @@ export const PRICE_LIST: [category: string, name: string, durationMin: number, p
   ['Prémiová ošetření', 'DNA Glow Rebirth', 60, 2190],
   ['Prémiová ošetření', 'Buněčná obnova pleti', 70, 2190],
   ['Prémiové estetické programy', '3D Architect', 50, 2490],
+  ['Prémiové estetické programy', '3D Architect – balíček 2× ošetření', 50, 4490, pack(2)],
   ['Prémiové estetické programy', 'Volumetric – Ozempic face', 50, 2990],
+  ['Prémiové estetické programy', 'Volumetric – Ozempic face – balíček 2× ošetření', 50, 5390, pack(2)],
   ['Mezoterapie', 'Mikrojehličkování – základní ošetření', 75, 1600],
   ['Mezoterapie', 'Mikrojehličkování – PDRN Multipeptide', 80, 1900],
   ['Mezoterapie', 'Mikrojehličkování – Exo Lift Supreme', 90, 2600],
+  ['Mezoterapie', 'Mikrojehličkování – Exo Lift Supreme – balíček 2× ošetření', 90, 4900, pack(2)],
   ['Chemické peelingy', 'Bio Renewal Peel', 30, 1190],
   ['Chemické peelingy', 'Mandelic Forte Peel', 30, 1290],
   ['Chemické peelingy', 'Amber & Glycolic Exfoliator', 30, 1290],
+  ['Chemické peelingy', 'Amber & Glycolic Exfoliator – balíček 3× ošetření', 30, 3570, pack(3)],
+  ['Chemické peelingy', 'Mandelic Forte Peel – balíček 3× ošetření', 30, 3570, pack(3)],
   ['Laminace a Lash Lifting', 'Laminace obočí', 60, 890],
   ['Laminace a Lash Lifting', 'Lash Lifting řas', 60, 990],
   ['Zábaly', 'Zeštíhlující zábal Vacuslim 48', 60, 900],

@@ -7,12 +7,12 @@ import {formatRevenue} from '../../../lib/revenue';
 import {czIban, depositFor, formatIban, spdPayload} from '../../../lib/payment';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
-type Service = {id: string; name: string; durationMin: number; priceCents: number; category: string; description: string};
+type Service = {id: string; name: string; durationMin: number; priceCents: number; category: string; description: string; sessions: number; prepay: number};
 
 async function context() {
   const db = database();
   const [services, setting] = await db.batch([
-    db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,category,description FROM services WHERE active=1 ORDER BY sort,name'),
+    db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,category,description,sessions,prepay FROM services WHERE active=1 ORDER BY sort,name'),
     db.prepare("SELECT value FROM settings WHERE key='booking'"),
   ]) as {results: Record<string, unknown>[]}[];
   return {db, services: services.results as Service[], settings: parseSettings((setting.results[0] as {value?: string} | undefined)?.value)};
@@ -42,26 +42,36 @@ function slotDays(params: URLSearchParams, durationMin: number, settings: Bookin
 const newToken = () => Array.from(crypto.getRandomValues(new Uint8Array(18)), b => b.toString(16).padStart(2, '0')).join('');
 const whenText = (start: string) => new Date(start + ':00').toLocaleString('cs-CZ', {weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'});
 const minutesBetween = (a: string, b: string) => Math.round((Date.parse(b + ':00Z') - Date.parse(a + ':00Z')) / 60000);
-type Managed = {id: string; start: string; end: string; serviceName: string; name: string; phone: string; email: string; note: string; status: string; depositCents: number | null; depositStatus: string | null; depositDue: string | null; vs: string | null};
+type Managed = {id: string; start: string; end: string; serviceName: string; name: string; phone: string; email: string; note: string; status: string; depositCents: number | null; depositStatus: string | null; depositDue: string | null; vs: string | null; paymentKind: PaymentKind | null};
 
 async function managed(token: string | null) {
   if (!token || !/^[a-f0-9]{36}$/.test(token)) return null;
-  return database().prepare('SELECT id,start_at AS start,end_at AS end,service_name AS serviceName,name,phone,email,note,status,deposit_cents AS depositCents,deposit_status AS depositStatus,deposit_due AS depositDue,vs FROM bookings WHERE manage_token=?').bind(token).first<Managed>();
+  return database().prepare('SELECT id,start_at AS start,end_at AS end,service_name AS serviceName,name,phone,email,note,status,deposit_cents AS depositCents,deposit_status AS depositStatus,deposit_due AS depositDue,vs,payment_kind AS paymentKind FROM bookings WHERE manage_token=?').bind(token).first<Managed>();
 }
 /** Klientka smí měnit jen platný termín, který začíná nejdříve za nastavenou lhůtu. */
 const canChange = (b: Managed, settings: BookingSettings) => ['confirmed', 'pending'].includes(b.status) && b.start >= addMinutes(salonNow(), settings.changeLimitHours * 60);
 
-function depositInfo(settings: BookingSettings, amountCents: number, due: string, vs: string, label: string) {
+type PaymentKind = 'deposit' | 'prepay';
+/** Co se platí předem: celá cena u balíčků a programů, jinak kauce u dražších ošetření a u klientek se zapnutou kaucí.
+ *  Bez čísla účtu salonu se předem neplatí nic. */
+function payment(service: Service, settings: BookingSettings, clientRequires: boolean): {cents: number; kind: PaymentKind} | null {
+  if (!czIban(settings.account) || service.priceCents <= 0) return null;
+  if (service.prepay) return {cents: service.priceCents, kind: 'prepay'};
+  if ((settings.depositFromKc > 0 && service.priceCents >= settings.depositFromKc * 100) || clientRequires) return {cents: Math.min(service.priceCents, depositFor(service.priceCents, settings.depositPercent)), kind: 'deposit'};
+  return null;
+}
+
+function depositInfo(settings: BookingSettings, amountCents: number, due: string, vs: string, label: string, kind: PaymentKind) {
   const iban = czIban(settings.account);
   if (!iban) return null;
-  return {amountCents, due, vs, iban: formatIban(iban), account: settings.account, recipient: settings.accountName,
-    qr: spdPayload({iban, amountCents, vs, message: 'Kauce ' + label, recipient: settings.accountName})};
+  return {amountCents, due, vs, kind, iban: formatIban(iban), account: settings.account, recipient: settings.accountName,
+    qr: spdPayload({iban, amountCents, vs, message: (kind === 'prepay' ? '' : 'Kauce ') + label, recipient: settings.accountName})};
 }
 
 async function manageInfo(b: Managed, settings: BookingSettings) {
   return {start: b.start, end: b.end, service: b.serviceName, status: b.status, durationMin: minutesBetween(b.start, b.end),
     canChange: canChange(b, settings), limitHours: settings.changeLimitHours,
-    deposit: b.status === 'pending' && b.depositCents && b.depositDue && b.vs ? depositInfo(settings, b.depositCents, b.depositDue, b.vs, b.serviceName) : null};
+    deposit: b.status === 'pending' && b.depositCents && b.depositDue && b.vs ? depositInfo(settings, b.depositCents, b.depositDue, b.vs, b.serviceName, b.paymentKind || 'deposit') : null};
 }
 
 export async function GET(request: Request) {
@@ -76,8 +86,7 @@ export async function GET(request: Request) {
     }
     const serviceId = params.get('serviceId');
     if (!serviceId) {
-      const withDeposit = czIban(settings.account) && settings.depositFromKc > 0;
-      return json({services: services.map(x => ({...x, depositCents: withDeposit && x.priceCents >= settings.depositFromKc * 100 ? Math.min(x.priceCents, depositFor(x.priceCents, settings.depositPercent)) : null})), horizonDays: settings.horizonDays});
+      return json({services: services.map(x => ({...x, prepay: !!x.prepay, depositCents: payment(x, settings, false)?.cents ?? null})), horizonDays: settings.horizonDays});
     }
     const service = services.find(s => s.id === serviceId);
     if (!service) return json({error: 'Ošetření není k dispozici.'}, 404);
@@ -113,30 +122,29 @@ export async function POST(request: Request) {
     const busy = await busyBetween(date + 'T00:00', addDays(date, 1) + 'T00:00');
     if (!freeSlots(date, service.durationMin, settings, busy, salonNow()).includes(time)) return json({error: 'Tento termín už není volný. Vyberte prosím jiný.'}, 409);
 
-    // Kauce u dražších ošetření a u klientek, kterým ji salon zapnul; bez čísla účtu se nevybírá.
-    const iban = czIban(settings.account);
-    const needsDeposit = !!iban && service.priceCents > 0 && ((settings.depositFromKc > 0 && service.priceCents >= settings.depositFromKc * 100) || matches.some(c => c.depositRequired));
-    const depositCents = needsDeposit ? Math.min(service.priceCents, depositFor(service.priceCents, settings.depositPercent)) : null;
+    const pay = payment(service, settings, matches.some(c => c.depositRequired));
+    const needsDeposit = !!pay, depositCents = pay?.cents ?? null, kind = pay?.kind ?? null;
     const due = needsDeposit ? [addMinutes(salonNow(), settings.depositHoldHours * 60), start].sort()[0] : null;
     const vs = needsDeposit ? start.slice(2, 10).replace(/-/g, '') + start.slice(11, 13) + String(Math.floor(Math.random() * 100)).padStart(2, '0') : null;
 
     const id = crypto.randomUUID(), token = newToken();
-    await db.prepare('INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,deposit_cents,deposit_status,deposit_due,vs,manage_token,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(id, service.id, matches[0]?.id ?? null, start, end, service.name, service.priceCents, name, phone, email, note, needsDeposit ? 'pending' : 'confirmed', 'online', depositCents, needsDeposit ? 'pending' : null, due, vs, token, new Date().toISOString()).run();
-    const deposit = needsDeposit ? depositInfo(settings, depositCents!, due!, vs!, service.name) : null;
+    await db.prepare('INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,deposit_cents,deposit_status,deposit_due,vs,payment_kind,manage_token,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(id, service.id, matches[0]?.id ?? null, start, end, service.name, service.priceCents, name, phone, email, service.sessions > 1 ? [`Balíček ${service.sessions}× ošetření, 1. termín; další termíny domluvit.`, note].filter(Boolean).join('\n') : note, needsDeposit ? 'pending' : 'confirmed', 'online', depositCents, needsDeposit ? 'pending' : null, due, vs, kind, token, new Date().toISOString()).run();
+    const deposit = needsDeposit ? depositInfo(settings, depositCents!, due!, vs!, service.name, kind!) : null;
 
     const when = whenText(start), link = `${new URL(request.url).origin}/rezervace?t=${token}`;
     notifySalon(`Nová rezervace: ${name}, ${when}`, [
       'Nová online rezervace ve Studiu I AM', '',
       `Ošetření: ${service.name} (${service.durationMin} min${service.priceCents ? ', ' + formatRevenue(service.priceCents) : ''})`,
       `Termín: ${when}`, `Jméno: ${name}`, `Telefon: ${phone}`, email ? `E-mail: ${email}` : '', note ? `Poznámka: ${note}` : '',
-      deposit ? `Kauce: ${formatRevenue(deposit.amountCents)}, VS ${deposit.vs}, zaplatit do ${deposit.due.replace('T', ' ')}. Do té doby termín čeká na kauci.` : '',
+      deposit ? `${deposit.kind === 'prepay' ? 'Platba předem' : 'Kauce'}: ${formatRevenue(deposit.amountCents)}, VS ${deposit.vs}, zaplatit do ${deposit.due.replace('T', ' ')}. Do té doby termín čeká na platbu.` : '',
+      service.sessions > 1 ? `Balíček ${service.sessions}× ošetření: toto je 1. termín, další je potřeba domluvit.` : '',
       matches.length ? 'Klientka už má kartu v kartotéce.' : 'Nová klientka, karta zatím neexistuje.',
     ].filter(Boolean).join('\n'));
     if (email) notifyClient(email, `Rezervace ve Studiu I AM: ${when}`, [
       `Dobrý den, děkujeme za rezervaci.`, '',
       `Ošetření: ${service.name}`, `Termín: ${when}`, 'Studio I AM, Nerudova 884/11, Hradec Králové', '',
-      deposit ? `Termín držíme do zaplacení kauce ${formatRevenue(deposit.amountCents)} na účet ${deposit.account}, VS ${deposit.vs}, nejpozději ${deposit.due.replace('T', ' ')}.\n` : '',
+      deposit ? `Termín držíme do zaplacení ${deposit.kind === 'prepay' ? 'částky' : 'kauce'} ${formatRevenue(deposit.amountCents)} na účet ${deposit.account}, VS ${deposit.vs}, nejpozději ${deposit.due.replace('T', ' ')}.\n` : '',
       `Zrušit nebo změnit termín můžete nejpozději ${settings.changeLimitHours} h předem zde: ${link}`,
       'Později nám prosím zavolejte: 775 963 462.', '', 'Těšíme se na vás, Studio I AM',
     ].filter(Boolean).join('\n'));
@@ -156,7 +164,7 @@ async function manage(action: 'cancel' | 'move', token: string, date: string, ti
     await db.prepare("UPDATE bookings SET status='cancelled',deposit_status=CASE WHEN deposit_status='pending' THEN 'cancelled' ELSE deposit_status END,note=ltrim(note||char(10)||?,char(10)) WHERE id=?")
       .bind(`Klientka zrušila online ${stamp}.`, b.id).run();
     notifySalon(`Zrušená rezervace: ${b.name}, ${old}`, ['Klientka zrušila online rezervaci.', '', `Ošetření: ${b.serviceName}`, `Termín: ${old}`, `Jméno: ${b.name}`, `Telefon: ${b.phone}`,
-      b.depositStatus === 'paid' ? `Kauce ${formatRevenue(b.depositCents!)} byla zaplacená, rozhodněte o vrácení v kalendáři.` : ''].filter(Boolean).join('\n'));
+      b.depositStatus === 'paid' ? `${b.paymentKind === 'prepay' ? 'Platba předem' : 'Kauce'} ${formatRevenue(b.depositCents!)} byla zaplacená, rozhodněte o vrácení v kalendáři.` : ''].filter(Boolean).join('\n'));
     return json({ok: true, booking: await manageInfo({...b, status: 'cancelled'}, settings)});
   }
   if (!isDate(date) || !isTime(time)) return json({error: 'Vyberte prosím nový termín.'}, 400);

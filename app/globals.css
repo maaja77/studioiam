@@ -199,3 +199,4 @@ dialog[open]{margin:auto}
 .pb-service .pb-desc{grid-column:1/-1;color:var(--muted);font-size:13px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .cal-event.compact{flex-direction:row;flex-wrap:wrap;align-content:flex-start;gap:0 6px;padding:2px 6px}
 .cal-event.compact>span:not(.time),.cal-event.compact .tags{display:none}
+.prepay-check{align-self:end;padding-bottom:10px}

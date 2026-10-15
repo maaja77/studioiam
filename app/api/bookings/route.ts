@@ -13,8 +13,8 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams, db = database();
     const from = isDate(params.get('from')) ? params.get('from')! : '0000-01-01', to = isDate(params.get('to')) ? params.get('to')! : '9999-12-31';
     const [bookings, services, setting] = await db.batch([
-      db.prepare('SELECT b.id,b.service_id AS serviceId,b.client_id AS clientId,b.start_at AS start,b.end_at AS end,b.service_name AS serviceName,b.price_cents AS priceCents,b.name,b.phone,b.email,b.note,b.status,b.source,b.deposit_cents AS depositCents,b.deposit_status AS depositStatus,b.deposit_due AS depositDue,b.vs,b.created,s.color,s.category FROM bookings b LEFT JOIN services s ON s.id=b.service_id WHERE b.start_at>=? AND b.start_at<? ORDER BY b.start_at').bind(from, to + 'T99'),
-      db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,active,sort,category,description,color FROM services ORDER BY sort,name'),
+      db.prepare('SELECT b.id,b.service_id AS serviceId,b.client_id AS clientId,b.start_at AS start,b.end_at AS end,b.service_name AS serviceName,b.price_cents AS priceCents,b.name,b.phone,b.email,b.note,b.status,b.source,b.deposit_cents AS depositCents,b.deposit_status AS depositStatus,b.deposit_due AS depositDue,b.vs,b.payment_kind AS paymentKind,b.created,s.color,s.category FROM bookings b LEFT JOIN services s ON s.id=b.service_id WHERE b.start_at>=? AND b.start_at<? ORDER BY b.start_at').bind(from, to + 'T99'),
+      db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,active,sort,category,description,color,sessions,prepay FROM services ORDER BY sort,name'),
       db.prepare("SELECT value FROM settings WHERE key='booking'"),
     ]) as {results: Record<string, unknown>[]}[];
     return json({bookings: bookings.results, services: services.results, settings: parseSettings((setting.results[0] as {value?: string} | undefined)?.value)});
@@ -43,9 +43,11 @@ export async function POST(request: Request) {
       let price: number | null;
       try { price = parseRevenue(typeof d.price === 'number' ? String(d.price) : d.price); } catch (e) { return json({error: (e as Error).message.replace('tržbu', 'cenu').replace('Tržba', 'Cena')}, 400); }
       if (price === null) return json({error: 'Vyplňte cenu ošetření.'}, 400);
+      const sessions = d.sessions === undefined ? 1 : Number(d.sessions);
+      if (!Number.isInteger(sessions) || sessions < 1 || sessions > 50) return json({error: 'Počet ošetření v balíčku musí být 1–50.'}, 400);
       const id = field('id') || crypto.randomUUID(), color = /^#[0-9a-f]{6}$/i.test(field('color')) ? field('color').toLowerCase() : '';
-      await db.prepare('INSERT INTO services (id,name,duration_min,price_cents,active,sort,category,description,color,created) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,duration_min=excluded.duration_min,price_cents=excluded.price_cents,active=excluded.active,sort=excluded.sort,category=excluded.category,description=excluded.description,color=excluded.color')
-        .bind(id, name, duration, price, d.active === false ? 0 : 1, Number.isInteger(d.sort) ? d.sort as number : 0, field('category', 80), field('description', 600), color, new Date().toISOString()).run();
+      await db.prepare('INSERT INTO services (id,name,duration_min,price_cents,active,sort,category,description,color,sessions,prepay,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,duration_min=excluded.duration_min,price_cents=excluded.price_cents,active=excluded.active,sort=excluded.sort,category=excluded.category,description=excluded.description,color=excluded.color,sessions=excluded.sessions,prepay=excluded.prepay')
+        .bind(id, name, duration, price, d.active === false ? 0 : 1, Number.isInteger(d.sort) ? d.sort as number : 0, field('category', 80), field('description', 600), color, sessions, d.prepay === true ? 1 : 0, new Date().toISOString()).run();
       return json({ok: true, id});
     }
 

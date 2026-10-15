@@ -7,8 +7,8 @@ import {formatRevenue} from '../lib/revenue';
 import {czIban, spdPayload} from '../lib/payment';
 import {PaymentDetails} from './qr-payment';
 
-export type Booking = {id: string; serviceId: string | null; clientId: string | null; start: string; end: string; serviceName: string; priceCents: number | null; name: string; phone: string; email: string; note: string; status: string; source: string; depositCents?: number | null; depositStatus?: string | null; depositDue?: string | null; vs?: string | null; color?: string | null; category?: string | null};
-export type Service = {id: string; name: string; durationMin: number; priceCents: number; active: number; sort: number; category: string; description: string; color: string};
+export type Booking = {id: string; serviceId: string | null; clientId: string | null; start: string; end: string; serviceName: string; priceCents: number | null; name: string; phone: string; email: string; note: string; status: string; source: string; depositCents?: number | null; depositStatus?: string | null; depositDue?: string | null; vs?: string | null; paymentKind?: string | null; color?: string | null; category?: string | null};
+export type Service = {id: string; name: string; durationMin: number; priceCents: number; active: number; sort: number; category: string; description: string; color: string; sessions: number; prepay: number};
 type ClientLite = {id: string; name: string; phone: string; email: string; blocked?: number};
 const DEPOSIT_LABEL: Record<string, string> = {pending: 'čeká na zaplacení', paid: 'zaplacena', returned: 'vrácena', forfeited: 'propadla', expired: 'nezaplacena, termín uvolněn', cancelled: 'nezaplacena, termín zrušen'};
 
@@ -77,7 +77,7 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
   }
 
   const clientOf = (b: Partial<Booking>) => clients.find(c => c.id === b.clientId);
-  const current = open?.booking;
+  const current = open?.booking, payLabel = current?.paymentKind === 'prepay' ? 'Platba předem' : 'Kauce';
 
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -120,7 +120,7 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
                 <b>{b.source === 'block' ? b.serviceName : b.name}</b>
                 <span className="time">{b.start.slice(11)}–{b.end.slice(11)}</span>
                 {b.source !== 'block' && <span>{b.serviceName}</span>}
-                {(b.status !== 'confirmed' || b.source === 'online' || b.depositStatus === 'paid') && <span className="tags">{b.source === 'online' && <em>Web</em>}{b.status !== 'confirmed' && <em>{STATUS_LABEL[b.status]}</em>}{b.depositStatus === 'paid' && <em>Kauce ✓</em>}</span>}
+                {(b.status !== 'confirmed' || b.source === 'online' || b.depositStatus === 'paid') && <span className="tags">{b.source === 'online' && <em>Web</em>}{b.status !== 'confirmed' && <em>{STATUS_LABEL[b.status]}</em>}{b.depositStatus === 'paid' && <em>{b.paymentKind === 'prepay' ? 'Zaplaceno ✓' : 'Kauce ✓'}</em>}</span>}
               </button>;
             })}
           </div>
@@ -138,12 +138,12 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
             {current.phone && <p><Phone size={16}/> {current.phone}{current.email && <> · {current.email}</>}</p>}
             <p className={'status-pill status-' + current.status}>{STATUS_LABEL[current.status!]}</p>
             {current.depositCents != null && <div className="deposit-box">
-              <p><b>Kauce {formatRevenue(current.depositCents)}</b> · {DEPOSIT_LABEL[current.depositStatus || 'pending']}{current.vs && <> · VS {current.vs}</>}</p>
-              {current.depositStatus === 'pending' && current.depositDue && <p className="muted-inline">Termín se uvolní {new Date(current.depositDue + ':00').toLocaleString('cs-CZ', {day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit'})}, pokud kauce nedorazí.</p>}
-              {current.depositStatus === 'pending' && czIban(settings.account) && <details><summary>QR kód pro platbu</summary><PaymentDetails deposit={{amountCents: current.depositCents, due: current.depositDue || current.start!, vs: current.vs || '', iban: czIban(settings.account)!, account: settings.account, recipient: settings.accountName, qr: spdPayload({iban: czIban(settings.account)!, amountCents: current.depositCents, vs: current.vs || '', message: 'Kauce ' + current.serviceName, recipient: settings.accountName})}}/></details>}
+              <p><b>{payLabel} {formatRevenue(current.depositCents)}</b> · {DEPOSIT_LABEL[current.depositStatus || 'pending']}{current.vs && <> · VS {current.vs}</>}</p>
+              {current.depositStatus === 'pending' && current.depositDue && <p className="muted-inline">Termín se uvolní {new Date(current.depositDue + ':00').toLocaleString('cs-CZ', {day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit'})}, pokud platba nedorazí.</p>}
+              {current.depositStatus === 'pending' && czIban(settings.account) && <details><summary>QR kód pro platbu</summary><PaymentDetails deposit={{amountCents: current.depositCents, due: current.depositDue || current.start!, vs: current.vs || '', iban: czIban(settings.account)!, account: settings.account, recipient: settings.accountName, qr: spdPayload({iban: czIban(settings.account)!, amountCents: current.depositCents, vs: current.vs || '', message: (current.paymentKind === 'prepay' ? '' : 'Kauce ') + current.serviceName, recipient: settings.accountName})}}/></details>}
               <div className="booking-actions">
-                {current.depositStatus !== 'paid' && <button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'deposit', data: {id: current.id, depositStatus: 'paid'}}), 'Kauce je zaplacená, termín potvrzený.')}><Check size={16}/> Kauce zaplacena</button>}
-                {current.depositStatus === 'paid' && <><button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'deposit', data: {id: current.id, depositStatus: 'returned'}}), 'Kauce označena jako vrácená.')}>Kauce vrácena</button><button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'deposit', data: {id: current.id, depositStatus: 'forfeited'}}), 'Kauce propadla.')}>Kauce propadla</button></>}
+                {current.depositStatus !== 'paid' && <button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'deposit', data: {id: current.id, depositStatus: 'paid'}}), `${payLabel} je zaplacená, termín potvrzený.`)}><Check size={16}/> {payLabel} zaplacena</button>}
+                {current.depositStatus === 'paid' && <><button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'deposit', data: {id: current.id, depositStatus: 'returned'}}), `${payLabel} označena jako vrácená.`)}>{payLabel} vrácena</button><button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'deposit', data: {id: current.id, depositStatus: 'forfeited'}}), `${payLabel} propadla.`)}>{payLabel} propadla</button></>}
               </div>
             </div>}
             {clientOf(current)?.blocked === 1 && <p className="caution-line"><Ban size={16}/> Klientka má zablokované online rezervace.</p>}
