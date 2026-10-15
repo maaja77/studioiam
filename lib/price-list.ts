@@ -1,5 +1,5 @@
 // Ceník ze studioiam.cz/cenik (stav 15. 10. 2026), jednotlivá ošetření bez balíčků.
-// Kde web délku neuvádí, je odhad 60 min a v administraci ji lze upravit.
+// Kde web délku neuvádí, je 60 min (odsouhlaseno salonem) a v administraci ji lze upravit.
 export const PRICE_LIST: [name: string, durationMin: number, priceKc: number][] = [
   ['C-fusion glow', 35, 990],
   ['Bio Renewal Glow', 70, 1390],

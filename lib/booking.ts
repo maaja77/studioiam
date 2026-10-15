@@ -6,7 +6,7 @@ export type BookingSettings = {hours: Hours; leadHours: number; horizonDays: num
 export type BusyRange = {start: string; end: string};
 
 export const DEFAULT_SETTINGS: BookingSettings = {
-  hours: {'0': null, '1': ['09:00', '18:00'], '2': ['09:00', '18:00'], '3': ['09:00', '18:00'], '4': ['09:00', '18:00'], '5': ['09:00', '16:00'], '6': null},
+  hours: {'0': null, '1': ['09:00', '20:00'], '2': ['09:00', '20:00'], '3': ['09:00', '20:00'], '4': ['09:00', '20:00'], '5': ['09:00', '20:00'], '6': null},
   leadHours: 12,
   horizonDays: 60,
   stepMinutes: 30,
