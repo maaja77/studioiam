@@ -63,6 +63,12 @@ git pull
 docker compose up -d --build
 ```
 
+## Náhled s ukázkovými daty
+
+`pnpm run demo:build` sestaví verzi, která běží celá v prohlížeči: skutečné API handlery
+(`app/api/*`) nad databází sql.js s vymyšlenými klientkami (`selfhost/demo/`). Výsledná stránka
+`dist-demo/nahled.html` se zveřejňuje jako živý náhled pro odsouhlasení změn. Skutečná data do ní nepatří.
+
 ## Vývoj
 
 ```sh

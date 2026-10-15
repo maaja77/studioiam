@@ -54,3 +54,4 @@ next-env.d.ts
 *.zip
 *.tar.gz
 !.env.selfhost.example
+/dist-demo/
