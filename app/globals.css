@@ -130,3 +130,26 @@ a.secondary{display:inline-flex;align-items:center;text-decoration:none}
 dialog[open]{margin:auto}
 .pb-header{height:auto;background:transparent;border:0;justify-content:flex-start;padding-block:22px 10px}
 .pb-footer{max-width:760px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-right,0px)) 32px max(16px,env(safe-area-inset-left,0px));color:var(--muted);font-size:13px;text-align:center}
+.pb-deposit{grid-column:1/-1;font-size:12px;color:var(--muted)}
+.payment{display:flex;gap:20px;align-items:center;flex-wrap:wrap;justify-content:center;background:white;border:1px solid var(--line);border-radius:12px;padding:16px;color:var(--ink);text-align:left}
+.payment .qr-code{width:180px;height:180px;max-width:100%}
+.payment dl{margin:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.payment dl div{display:flex;flex-direction:column}
+.payment dt{color:var(--muted);font-size:12px}
+.payment dd{margin:0;font-variant-numeric:tabular-nums}
+.booking-chip.status-pending{background:#fff7e6;border-left-color:#c58a1b}
+.booking-chip.status-pending em{color:#8a5a00}
+.status-pill.status-pending{background:#fff7e6;color:#8a5a00}
+.deposit-box{display:flex;flex-direction:column;gap:8px;background:#fffaf0;border:1px solid #f1dfb8;border-radius:10px;padding:12px 14px}
+.deposit-box details summary{cursor:pointer;color:var(--teal);font-size:14px}
+.deposit-box .booking-actions{border-top:0;padding-top:0}
+.block-links{display:flex;gap:18px;flex-wrap:wrap;justify-content:flex-end}
+.pb-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.pb-manage .pb-actions{justify-content:flex-start}
+.pb-manage h2{font-family:Georgia,serif;font-weight:400;font-size:22px}
+.pb-ok{background:#eef6ef;color:#2f6a3a;border:1px solid #d3e8d6;padding:12px 16px;border-radius:8px;margin:0;font-size:14px}
+.pb-confirm{display:flex;flex-direction:column;gap:10px}
+.pb-confirm p{margin:0}
+.public-booking .danger{background:#a4473b;color:white;border-radius:8px;padding:12px 18px;font-size:14px;font-weight:600;min-height:44px}
+.public-booking .danger:hover{background:#86362c}
+.field.narrow{max-width:340px}

@@ -12,18 +12,19 @@ export function mailConfig(): MailConfig | null {
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 const clean = (s: string) => s.replace(/[\r\n<>]/g, '');
 
-export function sendMail(config: MailConfig, subject: string, text: string): Promise<void> {
+/** Odešle e-mail salonu, nebo zadanému příjemci (`to`), např. klientce s odkazem na její rezervaci. */
+export function sendMail(config: MailConfig, subject: string, text: string, to = config.to): Promise<void> {
   return new Promise((resolve, reject) => {
     const socket = tls.connect({host: config.host, port: config.port, servername: config.host});
     const date = new Date().toUTCString();
     const message = [
-      `From: Studio I AM <${clean(config.from)}>`, `To: <${clean(config.to)}>`, `Subject: =?UTF-8?B?${b64(subject)}?=`, `Date: ${date}`,
+      `From: Studio I AM <${clean(config.from)}>`, `To: <${clean(to)}>`, `Subject: =?UTF-8?B?${b64(subject)}?=`, `Date: ${date}`,
       `Message-ID: <${crypto.randomUUID()}@${clean(config.host)}>`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '',
       (b64(text).match(/.{1,76}/g) || []).join('\r\n'), '.',
     ].join('\r\n');
     const steps: [string | null, number][] = [
       [null, 220], [`EHLO ${clean(config.host)}`, 250], ['AUTH LOGIN', 334], [b64(config.user), 334], [b64(config.pass), 235],
-      [`MAIL FROM:<${clean(config.from)}>`, 250], [`RCPT TO:<${clean(config.to)}>`, 250], ['DATA', 354], [message, 250], ['QUIT', 221],
+      [`MAIL FROM:<${clean(config.from)}>`, 250], [`RCPT TO:<${clean(to)}>`, 250], ['DATA', 354], [message, 250], ['QUIT', 221],
     ];
     let step = 0, buffer = '';
     const fail = (e: Error) => { socket.destroy(); reject(e); };

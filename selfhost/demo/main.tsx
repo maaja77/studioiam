@@ -52,8 +52,8 @@ new MutationObserver(list => {
 }).observe(document.body, {subtree: true, childList: true, attributes: true, attributeFilter: ['src']});
 
 function DemoBar({view, setView}: {view: 'admin' | 'public'; setView: (v: 'admin' | 'public') => void}) {
-  const [confirming, setConfirming] = React.useState(false), [mail, setMail] = React.useState('');
-  React.useEffect(() => { const on = (e: Event) => setMail((e as CustomEvent<string>).detail); window.addEventListener('demo-mail', on); return () => window.removeEventListener('demo-mail', on); }, []);
+  const [confirming, setConfirming] = React.useState(false), [mail, setMail] = React.useState<string[]>([]);
+  React.useEffect(() => { const on = (e: Event) => setMail(list => [...list, (e as CustomEvent<string>).detail].slice(-3)); window.addEventListener('demo-mail', on); return () => window.removeEventListener('demo-mail', on); }, []);
   return (
     <div className="demo-bar" role="note">
       <span><strong>Ukázková verze</strong> s vymyšlenými klientkami. Změny se ukládají jen ve vašem prohlížeči.</span>
@@ -64,7 +64,7 @@ function DemoBar({view, setView}: {view: 'admin' | 'public'; setView: (v: 'admin
       {confirming
         ? <span className="demo-actions"><button type="button" onClick={resetDemo}>Ano, obnovit</button><button type="button" onClick={() => setConfirming(false)}>Zpět</button></span>
         : <button type="button" onClick={() => setConfirming(true)}>Obnovit ukázková data</button>}
-      {mail && <span className="demo-mail">E-mail, který by teď přišel do salonu: <b>{mail}</b> <button type="button" onClick={() => setMail('')}>Zavřít</button></span>}
+      {mail.length > 0 && <span className="demo-mail">E-mail, který by se teď odeslal: {mail.map((m, i) => <b key={i}>{m.startsWith('klientce') ? m : 'do salonu: ' + m}</b>)} <button type="button" onClick={() => setMail([])}>Zavřít</button></span>}
     </div>
   );
 }

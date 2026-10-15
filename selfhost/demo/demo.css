@@ -3,4 +3,4 @@
 .demo-bar button:focus-visible{outline:2px solid var(--teal,#126b66);outline-offset:2px}
 .demo-actions{display:inline-flex;gap:8px}
 .demo-bar button[aria-pressed="true"]{background:#5a4410;color:#fff8e6;border-color:#5a4410}
-.demo-mail{flex-basis:100%;font-size:13px}
+.demo-mail{flex-basis:100%;font-size:13px}.demo-mail b{display:block}

@@ -69,7 +69,9 @@ docker compose up -d --build
 - Veřejná stránka `/rezervace` (bez hesla) s volnými termíny; rezervace se potvrdí sama. Bez hesla je dostupné jen `/rezervace`, `/assets/*` a `/api/public` (max. 20 odeslání za hodinu z jedné IP).
 - Klientka se zablokovanými online rezervacemi (karta klientky nebo „Nepřišla“ v kalendáři) se pozná podle telefonu nebo e-mailu a online se neobjedná.
 - E-mail o nové rezervaci: v `.env.selfhost` vyplňte `SMTP_*` a `SALON_NOTIFY_EMAIL` (Seznam: `smtp.seznam.cz`, port 465, přihlášení celým e-mailem).
-- Na reverse proxy zveřejněte pro internet jen adresu rezervace (např. `rezervace.studioiam.cz`), administraci nechte za VPN nebo heslem. `SALON_BOOKING_FRAME_ANCESTORS` určuje weby, které smí stránku vložit do iframe.
+- Na reverse proxy zveřejněte pro internet jen adresu rezervace (např. `rezervace.studioiam.cz`) a nastavte ji do `SALON_PUBLIC_ORIGIN`; na této adrese server vrací jen rezervační stránku, administrace tam odpoví 404. Administraci nechte za VPN nebo heslem. `SALON_BOOKING_FRAME_ANCESTORS` určuje weby, které smí stránku vložit do iframe.
+- **Kauce:** v Nastavení → Kauce a platby se zadá číslo účtu, hranice ceny (výchozí 2 000 Kč), procento (30 %, zaokrouhleno na stovky) a lhůta (24 h). Kauci lze zapnout i jednotlivé klientce na kartě. Rezervace pak čeká na kauci, klientka dostane QR platbu, v kalendáři se kauce označí jako zaplacená / vrácená / propadlá. Nezaplacená rezervace se po lhůtě sama zruší.
+- **Změna termínu klientkou:** po rezervaci (a e-mailem, pokud ho vyplní) dostane klientka tajný odkaz `/rezervace?t=…`, přes který termín zruší nebo přesune, nejpozději 24 h předem (nastavitelné). Salon dostane e-mail a do poznámky rezervace se zapíše, co klientka změnila. V administraci jde termín změnit kdykoliv.
 
 ## Náhled s ukázkovými daty
 

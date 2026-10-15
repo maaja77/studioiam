@@ -1,5 +1,6 @@
 // Vymyšlené ukázkové klientky pro náhled. Žádná skutečná data.
 import {PRICE_LIST} from '../../lib/price-list';
+import {DEFAULT_SETTINGS} from '../../lib/booking';
 type Run = (sql: string, values: (string | number | null)[]) => void;
 type Put = (key: string, bytes: Uint8Array) => void;
 
@@ -48,6 +49,13 @@ export async function seedDemo(run: Run, put: Put) {
   ];
   for (const [id, serviceId, clientId, [start, end], serviceName, price, name, phone, status, source, note] of bookings)
     run('INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [id, serviceId, clientId, start, end, serviceName, price, name, phone, '', note, status, source, now]);
+  // Ukázka kaucí: jedna čeká na zaplacení, jedna je zaplacená.
+  const [pStart, pEnd] = at(4, '15:00', 60), [kStart, kEnd] = at(5, '10:00', 60);
+  run("INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,deposit_cents,deposit_status,deposit_due,vs,manage_token,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending','online',90000,'pending',?,?,?,?)",
+    ['b-6', 's-20', null, pStart, pEnd, 'Volumetric', 299000, 'Petra Svobodová', '+420 604 777 888', 'petra@example.cz', '', [day(1) + 'T12:00', pStart].sort()[0], pStart.slice(2, 10).replace(/-/g, '') + '1507', 'a'.repeat(36), now]);
+  run("INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,deposit_cents,deposit_status,deposit_due,vs,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,'confirmed','online',80000,'paid',?,?,?)",
+    ['b-7', 's-19', 'demo-2', kStart, kEnd, 'Biomikrojehličkování 3D Architect „Zlatá jehla“', 249000, 'Lucie Horáková', '+420 602 345 678', '', '', kStart, kStart.slice(2, 10).replace(/-/g, '') + '1042', now]);
+  run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, account: '127326219/0300'})]);
 
   const photos: [string, string, string, string, number][] = [
     ['p-1', 'demo-1', day(-30), 'Před ošetřením', 18],

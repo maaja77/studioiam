@@ -64,7 +64,24 @@ export default function BookingSettingsView({bookingUrl}: {bookingUrl: string}) 
         <label className="field"><span>Nejdál dopředu (dní)</span><input type="number" min={1} max={365} value={settings.horizonDays} onChange={e => setSettings({...settings, horizonDays: Number(e.target.value)})}/></label>
         <label className="field"><span>Nabízet časy po</span><select value={settings.stepMinutes} onChange={e => setSettings({...settings, stepMinutes: Number(e.target.value)})}><option value={15}>15 minutách</option><option value={30}>30 minutách</option><option value={60}>hodině</option></select></label>
       </div>
+      <label className="field narrow"><span>Klientka může zrušit nebo přesunout termín nejpozději (hodin předem)</span><input type="number" min={0} max={336} value={settings.changeLimitHours} onChange={e => setSettings({...settings, changeLimitHours: Number(e.target.value)})}/></label>
       <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Nastavení bylo uloženo.')}>Uložit otevírací dobu</button></div>
+    </section>
+
+    <section className="panel">
+      <div className="panel-heading"><h2>Kauce a platby</h2></div>
+      <p className="muted-inline">Kauci zaplatí klientka QR platbou hned po online rezervaci. Do té doby termín čeká a po lhůtě se sám uvolní. U jednotlivých klientek můžete kauci zapnout na jejich kartě.</p>
+      <div className="field-grid three">
+        <label className="field"><span>Kauce od ceny (Kč)</span><input type="number" min={0} step={100} value={settings.depositFromKc} onChange={e => setSettings({...settings, depositFromKc: Number(e.target.value)})}/></label>
+        <label className="field"><span>Výše kauce (%)</span><input type="number" min={1} max={100} value={settings.depositPercent} onChange={e => setSettings({...settings, depositPercent: Number(e.target.value)})}/></label>
+        <label className="field"><span>Zaplatit do (hodin)</span><input type="number" min={1} max={168} value={settings.depositHoldHours} onChange={e => setSettings({...settings, depositHoldHours: Number(e.target.value)})}/></label>
+      </div>
+      <div className="field-grid">
+        <label className="field"><span>Číslo účtu</span><input value={settings.account} placeholder="123456789/0300" onChange={e => setSettings({...settings, account: e.target.value})}/></label>
+        <label className="field"><span>Příjemce</span><input value={settings.accountName} maxLength={60} onChange={e => setSettings({...settings, accountName: e.target.value})}/></label>
+      </div>
+      {!settings.account && <p className="muted-inline">Bez čísla účtu se kauce nevybírá.</p>}
+      <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Nastavení kauce bylo uloženo.')}>Uložit kauce a platby</button></div>
     </section>
 
     <section className="panel">

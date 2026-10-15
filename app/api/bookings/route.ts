@@ -2,16 +2,18 @@
 import {database} from '../../../db/raw';
 import {addMinutes, isDate, isTime, parseSettings, validateSettings} from '../../../lib/booking';
 import {parseRevenue} from '../../../lib/revenue';
+import {releaseExpiredDeposits} from '../public/route';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
-const STATUSES = ['confirmed', 'done', 'no_show', 'cancelled'];
+const STATUSES = ['confirmed', 'pending', 'done', 'no_show', 'cancelled'];
 
 export async function GET(request: Request) {
   try {
+    await releaseExpiredDeposits();
     const params = new URL(request.url).searchParams, db = database();
     const from = isDate(params.get('from')) ? params.get('from')! : '0000-01-01', to = isDate(params.get('to')) ? params.get('to')! : '9999-12-31';
     const [bookings, services, setting] = await db.batch([
-      db.prepare('SELECT id,service_id AS serviceId,client_id AS clientId,start_at AS start,end_at AS end,service_name AS serviceName,price_cents AS priceCents,name,phone,email,note,status,source,created FROM bookings WHERE start_at>=? AND start_at<? ORDER BY start_at').bind(from, to + 'T99'),
+      db.prepare('SELECT id,service_id AS serviceId,client_id AS clientId,start_at AS start,end_at AS end,service_name AS serviceName,price_cents AS priceCents,name,phone,email,note,status,source,deposit_cents AS depositCents,deposit_status AS depositStatus,deposit_due AS depositDue,vs,created FROM bookings WHERE start_at>=? AND start_at<? ORDER BY start_at').bind(from, to + 'T99'),
       db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,active,sort FROM services ORDER BY sort,name'),
       db.prepare("SELECT value FROM settings WHERE key='booking'"),
     ]) as {results: Record<string, unknown>[]}[];
@@ -53,6 +55,12 @@ export async function POST(request: Request) {
       return json({ok: true});
     }
 
+    if (body.kind === 'depositRequired') {
+      const res = await db.prepare('UPDATE clients SET deposit_required=? WHERE id=?').bind(d.required ? 1 : 0, field('clientId')).run();
+      if (!res.meta.changes) return json({error: 'Klient nebyl nalezen.'}, 404);
+      return json({ok: true});
+    }
+
     if (body.kind !== 'booking') return json({error: 'Neplatná operace.'}, 400);
     const id = field('id');
 
@@ -66,6 +74,14 @@ export async function POST(request: Request) {
       const statements = [db.prepare('UPDATE bookings SET status=? WHERE id=?').bind(status, id)];
       if (status === 'no_show' && d.block === true && booking.clientId) statements.push(db.prepare('UPDATE clients SET blocked=1 WHERE id=?').bind(booking.clientId));
       await db.batch(statements);
+      return json({ok: true});
+    }
+
+    if (body.action === 'deposit') {
+      const state = field('depositStatus');
+      if (!['paid', 'returned', 'forfeited'].includes(state)) return json({error: 'Neplatný stav kauce.'}, 400);
+      const res = await db.prepare("UPDATE bookings SET deposit_status=?,status=CASE WHEN status='pending' AND ?='paid' THEN 'confirmed' ELSE status END WHERE id=? AND deposit_cents IS NOT NULL").bind(state, state, id).run();
+      if (!res.meta.changes) return json({error: 'Rezervace s kaucí nebyla nalezena.'}, 404);
       return json({ok: true});
     }
 

@@ -4,7 +4,7 @@ import initSqlJs from 'sql.js/dist/sql-asm.js';
 import {seedDemo} from './seed';
 
 type Value = string | number | null;
-const DB_KEY = 'studioiam-demo-db-v3', PHOTO_KEY = 'studioiam-demo-photos-v3';
+const DB_KEY = 'studioiam-demo-db-v4', PHOTO_KEY = 'studioiam-demo-photos-v4';
 const migrations = import.meta.glob('../../drizzle/*.sql', {query: '?raw', import: 'default', eager: true}) as Record<string, string>;
 
 function toBase64(bytes: Uint8Array) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); }
@@ -64,7 +64,7 @@ const BUCKET = {
 };
 
 // V ukázce se e-mail neposílá, jen se zobrazí jeho předmět v horní liště.
-const NOTIFY = async (subject: string) => { window.dispatchEvent(new CustomEvent('demo-mail', {detail: subject})); };
+const NOTIFY = async (subject: string, _text: string, to?: string) => { window.dispatchEvent(new CustomEvent('demo-mail', {detail: to ? `klientce (${to}): ${subject}` : subject})); };
 
 export const env = {DB, BUCKET, NOTIFY};
 

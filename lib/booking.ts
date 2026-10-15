@@ -1,8 +1,10 @@
 // Pravidla online rezervací: otevírací doba, volné termíny a porovnání telefonů.
+import {czIban} from './payment';
 // Časy se ukládají jako místní čas salonu (Europe/Prague) ve tvaru YYYY-MM-DDTHH:MM.
 
 export type Hours = Record<string, [string, string] | null>; // klíč 0 = neděle … 6 = sobota
-export type BookingSettings = {hours: Hours; leadHours: number; horizonDays: number; stepMinutes: number};
+export type BookingSettings = {hours: Hours; leadHours: number; horizonDays: number; stepMinutes: number;
+  depositFromKc: number; depositPercent: number; depositHoldHours: number; account: string; accountName: string; changeLimitHours: number};
 export type BusyRange = {start: string; end: string};
 
 export const DEFAULT_SETTINGS: BookingSettings = {
@@ -10,9 +12,15 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   leadHours: 12,
   horizonDays: 60,
   stepMinutes: 30,
+  depositFromKc: 2000,
+  depositPercent: 30,
+  depositHoldHours: 24,
+  account: '',
+  accountName: 'STUDIO I AM',
+  changeLimitHours: 24,
 };
 export const WEEKDAYS = ['Neděle', 'Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota'];
-export const ACTIVE_STATUSES = ['confirmed', 'done'];
+export const ACTIVE_STATUSES = ['confirmed', 'done', 'pending'];
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const isTime = (s: unknown): s is string => typeof s === 'string' && TIME.test(s);
@@ -55,7 +63,16 @@ export function validateSettings(v: unknown): BookingSettings | string {
   if (!Number.isInteger(lead) || lead < 0 || lead > 168) return 'Minimální předstih musí být 0–168 hodin.';
   if (!Number.isInteger(horizon) || horizon < 1 || horizon > 365) return 'Rezervace dopředu musí být 1–365 dní.';
   if (![15, 30, 60].includes(step)) return 'Krok nabízených časů musí být 15, 30 nebo 60 minut.';
-  return {hours, leadHours: lead, horizonDays: horizon, stepMinutes: step};
+  const depositFrom = Number(s.depositFromKc), percent = Number(s.depositPercent), hold = Number(s.depositHoldHours);
+  if (!Number.isInteger(depositFrom) || depositFrom < 0) return 'Hranice pro kauci musí být celé číslo v Kč (0 = kauce vypnutá).';
+  if (!Number.isInteger(percent) || percent < 1 || percent > 100) return 'Výše kauce musí být 1–100 %.';
+  if (!Number.isInteger(hold) || hold < 1 || hold > 168) return 'Lhůta na zaplacení kauce musí být 1–168 hodin.';
+  const account = typeof s.account === 'string' ? s.account.trim() : '';
+  if (account && !czIban(account)) return 'Zkontrolujte číslo účtu (např. 123456789/0300).';
+  const accountName = typeof s.accountName === 'string' ? s.accountName.trim().slice(0, 60) : '';
+  const change = Number(s.changeLimitHours ?? DEFAULT_SETTINGS.changeLimitHours);
+  if (!Number.isInteger(change) || change < 0 || change > 336) return 'Lhůta pro online změnu termínu musí být 0–336 hodin.';
+  return {hours, leadHours: lead, horizonDays: horizon, stepMinutes: step, depositFromKc: depositFrom, depositPercent: percent, depositHoldHours: hold, account, accountName, changeLimitHours: change};
 }
 
 /** Volné začátky termínů pro ošetření dané délky v daný den. */
