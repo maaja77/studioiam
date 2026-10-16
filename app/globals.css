@@ -246,3 +246,5 @@ dialog[open]{margin:auto}
 .pb-header .brand-logo{width:56px;height:56px}
 .receipt-paper header img{width:56px;height:56px;margin-bottom:4px}
 @media(max-width:720px){header .brand-logo{width:44px;height:44px}}
+.logout{background:transparent;color:var(--muted);font-size:14px;padding:8px 10px;border-radius:7px;min-height:38px}.logout:hover{background:#f2f7f6;color:var(--ink)}
+@media(max-width:720px){.app>header .private{display:none}.logout{padding:8px 4px}}

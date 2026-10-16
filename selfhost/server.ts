@@ -1,13 +1,13 @@
-import http from 'node:http';import {readFileSync,existsSync,statSync} from 'node:fs';import path from 'node:path';import {scryptSync,timingSafeEqual} from 'node:crypto';
+import http from 'node:http';import {readFileSync,existsSync,statSync} from 'node:fs';import path from 'node:path';import {createAuth,loginPage,loginBlocked,loginFailed,loginSucceeded,safeNext} from './auth';
 import * as records from '../app/api/records/route';import * as photos from '../app/api/photos/route';import * as bookings from '../app/api/bookings/route';import * as publicBooking from '../app/api/public/route';import * as receipts from '../app/api/receipts/route';
 const user=process.env.SALON_USER,encoded=process.env.SALON_PASSWORD_HASH,origin=process.env.SALON_ORIGIN;
 if(!user||!encoded||!origin)throw Error('Set SALON_USER, SALON_PASSWORD_HASH and SALON_ORIGIN before starting.');
-const [salt,hash]=encoded.split(':');if(!/^[a-f0-9]{32}$/.test(salt||'')||!/^[a-f0-9]{128}$/.test(hash||''))throw Error('Invalid password hash.');const expected=Buffer.from(hash,'hex');new URL(origin);
+const auth=createAuth(user,encoded,new URL(origin).protocol==='https:');
 // Volitelně samostatná veřejná adresa rezervací (např. https://rezervace.studioiam.cz); na ní je jen rezervační stránka.
 const publicOrigin=process.env.SALON_PUBLIC_ORIGIN?new URL(process.env.SALON_PUBLIC_ORIGIN).origin:'';const publicHost=publicOrigin?new URL(publicOrigin).host:'';
 const webRoot=path.resolve('dist-selfhost/client');
 const types:Record<string,string>={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.ico':'image/x-icon','.woff2':'font/woff2'};
-// Veřejné jsou jen rezervační stránka, její statické soubory a /api/public; vše ostatní chrání heslo.
+// Veřejné jsou jen rezervační stránka, její statické soubory a /api/public; vše ostatní chrání přihlášení.
 const isPublic=(p:string)=>p==='/rezervace'||p==='/rezervace/'||p.startsWith('/assets/')||p==='/favicon.svg'||p==='/logo.png'||p==='/api/public';
 const frameAncestors=process.env.SALON_BOOKING_FRAME_ANCESTORS||'*';
 const hits=new Map<string,number[]>();
@@ -15,10 +15,27 @@ function rateLimited(ip:string){const now=Date.now(),list=(hits.get(ip)||[]).fil
 const server=http.createServer(async(req,res)=>{try{
  const pathname=new URL(req.url||'/','http://x').pathname;const publicPath=isPublic(pathname);
  const onPublicHost=!!publicHost&&req.headers.host===publicHost&&publicOrigin!==origin;if(onPublicHost&&!publicPath){res.writeHead(404);res.end();return;}
- const auth=req.headers.authorization||'';let allowed=false;if(auth.startsWith('Basic ')){const decoded=Buffer.from(auth.slice(6),'base64').toString('utf8');const split=decoded.indexOf(':');const name=decoded.slice(0,split),password=decoded.slice(split+1);if(split>=0&&name===user&&password.length<=1024)allowed=timingSafeEqual(scryptSync(password,salt,64),expected);}
- if(!allowed&&!publicPath){res.writeHead(401,{'WWW-Authenticate':'Basic realm="Studio I AM", charset="UTF-8"','Cache-Control':'no-store'});res.end('Prihlaste se.');return;}
+ const clientIp=String(req.headers['x-forwarded-for']||'').split(',')[0].trim()||req.socket.remoteAddress||'';
+ const html=(status:number,body:string,extra:Record<string,string>={})=>{res.writeHead(status,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Frame-Options':'DENY','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin',...extra});res.end(req.method==='HEAD'?undefined:body);};
+ const allowed=auth.valid(req.headers.cookie);
+ if(!onPublicHost&&pathname==='/prihlaseni'){
+  const query=new URL(req.url||'/','http://x').searchParams;
+  if(req.method==='GET'||req.method==='HEAD'){if(allowed){res.writeHead(303,{Location:safeNext(query.get('next'))});res.end();return;}html(200,loginPage({next:safeNext(query.get('next')),notice:query.has('odhlaseno')?'Byli jste odhlášeni.':''}));return;}
+  if(req.method!=='POST'){res.writeHead(405);res.end();return;}
+  if(req.headers.origin&&req.headers.origin!==origin){res.writeHead(403);res.end();return;}
+  let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>8192){res.writeHead(413);res.end();return;}}
+  const form=new URLSearchParams(raw),name=(form.get('name')||'').trim(),next=safeNext(form.get('next'));
+  if(loginBlocked(clientIp)){html(429,loginPage({name,next,error:'Příliš mnoho neúspěšných pokusů. Zkuste to znovu za 15 minut.'}));return;}
+  if(!auth.check(name,form.get('password')||'')){loginFailed(clientIp);html(401,loginPage({name,next,error:'Jméno nebo heslo nesouhlasí. Zkontrolujte velká a malá písmena.'}));return;}
+  loginSucceeded(clientIp);res.writeHead(303,{Location:next,'Set-Cookie':auth.issue(form.get('remember')==='1'),'Cache-Control':'no-store'});res.end();return;
+ }
+ if(!onPublicHost&&pathname==='/odhlaseni'&&req.method==='POST'){if(req.headers.origin&&req.headers.origin!==origin){res.writeHead(403);res.end();return;}res.writeHead(303,{Location:'/prihlaseni?odhlaseno','Set-Cookie':auth.clear(),'Cache-Control':'no-store'});res.end();return;}
+ if(!allowed&&!publicPath){
+  if(pathname.startsWith('/api/')){res.writeHead(401,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:'Přihlášení vypršelo. Obnovte stránku a přihlaste se znovu.'}));return;}
+  const wanted=new URL(req.url||'/','http://x');res.writeHead(303,{Location:'/prihlaseni'+(wanted.pathname==='/'&&!wanted.search?'':'?next='+encodeURIComponent(wanted.pathname+wanted.search)),'Cache-Control':'no-store'});res.end();return;
+ }
  const base=onPublicHost?publicOrigin:origin;const url=new URL(req.url||'/',base);if(url.origin!==new URL(base).origin){res.writeHead(400);res.end();return;}
- if(url.pathname==='/api/public'&&req.method==='POST'){const ip=String(req.headers['x-forwarded-for']||'').split(',')[0].trim()||req.socket.remoteAddress||'';if(rateLimited(ip)){res.writeHead(429,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Příliš mnoho pokusů. Zkuste to prosím později nebo nám zavolejte.'}));return;}}
+ if(url.pathname==='/api/public'&&req.method==='POST'){if(rateLimited(clientIp)){res.writeHead(429,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Příliš mnoho pokusů. Zkuste to prosím později nebo nám zavolejte.'}));return;}}
  if(url.pathname.startsWith('/api/')){
   const headers=new Headers();for(const [k,v] of Object.entries(req.headers)){if(v)headers.set(k,Array.isArray(v)?v.join(','):v);}
   const method=req.method||'GET';const chunks:Buffer[]=[];let length=0;if(!['GET','HEAD'].includes(method)){for await(const chunk of req){length+=chunk.length;if(length>11*1024*1024){res.writeHead(413);res.end('Soubor je prilis velky.');return;}chunks.push(chunk);}}

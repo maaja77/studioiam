@@ -10,6 +10,8 @@ import * as receiptsApi from '../../app/api/receipts/route';
 import * as records from '../../app/api/records/route';
 import * as photos from '../../app/api/photos/route';
 import {resetDemo} from './runtime';
+import {loginPage} from '../login-page';
+import {LOGO} from '../../app/logo';
 import '../../app/globals.css';
 import './demo.css';
 
@@ -53,7 +55,8 @@ new MutationObserver(list => {
   }
 }).observe(document.body, {subtree: true, childList: true, attributes: true, attributeFilter: ['src']});
 
-function DemoBar({view, setView}: {view: 'admin' | 'public'; setView: (v: 'admin' | 'public') => void}) {
+type View = 'admin' | 'public' | 'login';
+function DemoBar({view, setView}: {view: View; setView: (v: View) => void}) {
   const [confirming, setConfirming] = React.useState(false), [mail, setMail] = React.useState<string[]>([]);
   React.useEffect(() => { const on = (e: Event) => setMail(list => [...list, (e as CustomEvent<string>).detail].slice(-3)); window.addEventListener('demo-mail', on); return () => window.removeEventListener('demo-mail', on); }, []);
   return (
@@ -62,6 +65,7 @@ function DemoBar({view, setView}: {view: 'admin' | 'public'; setView: (v: 'admin
       <span className="demo-actions" role="group" aria-label="Pohled">
         <button type="button" aria-pressed={view === 'admin'} onClick={() => setView('admin')}>Administrace</button>
         <button type="button" aria-pressed={view === 'public'} onClick={() => setView('public')}>Rezervace pro klientky</button>
+        <button type="button" aria-pressed={view === 'login'} onClick={() => setView('login')}>Přihlášení</button>
       </span>
       {confirming
         ? <span className="demo-actions"><button type="button" onClick={resetDemo}>Ano, obnovit</button><button type="button" onClick={() => setConfirming(false)}>Zpět</button></span>
@@ -71,9 +75,18 @@ function DemoBar({view, setView}: {view: 'admin' | 'public'; setView: (v: 'admin
   );
 }
 
+// Přihlašovací stránku server posílá jako samostatné HTML; v náhledu ji ukážeme v rámu a přihlášení jen přepne na administraci.
+function DemoLogin({onLogin}: {onLogin: () => void}) {
+  const html = React.useMemo(() => loginPage({logo: LOGO, notice: 'Ukázka: zadejte cokoli a klikněte na Přihlásit se.'}), []);
+  return <iframe className="demo-login" title="Přihlášení" srcDoc={html} onLoad={e => {
+    const form = e.currentTarget.contentDocument?.querySelector('form');
+    form?.addEventListener('submit', ev => { ev.preventDefault(); onLogin(); });
+  }}/>;
+}
+
 function Demo() {
-  const [view, setView] = React.useState<'admin' | 'public'>(() => location.hash === '#rezervace' ? 'public' : 'admin');
-  return <><DemoBar view={view} setView={setView}/>{view === 'admin' ? <Home/> : <PublicBooking/>}</>;
+  const [view, setView] = React.useState<View>(() => location.hash === '#rezervace' ? 'public' : location.hash === '#prihlaseni' ? 'login' : 'admin');
+  return <><DemoBar view={view} setView={setView}/>{view === 'admin' ? <Home onLogout={() => setView('login')}/> : view === 'login' ? <DemoLogin onLogin={() => setView('admin')}/> : <PublicBooking/>}</>;
 }
 
 createRoot(document.getElementById('root')!).render(<Demo/>);

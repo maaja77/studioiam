@@ -17,7 +17,7 @@ Aplikace vznikla v ChatGPT a 13. 10. 2026 byla exportována pro vlastní provoz
 ## Technologie
 
 React + Tailwind (klient), Node.js 24 server (`selfhost/server.ts`), SQLite přes `node:sqlite`,
-fotky na disku. Přístup chrání jedno salonní jméno a heslo (HTTP Basic přes HTTPS).
+fotky na disku. Přístup chrání jedno salonní jméno a heslo na přihlašovací stránce `/prihlaseni`.
 Původní cloudová varianta (vinext/Cloudflare) zůstává ve zdrojích, pro vlastní server se nepoužívá.
 
 ## Data klientek nepatří do Gitu
@@ -55,6 +55,14 @@ Aplikace poslouchá jen na `127.0.0.1:8787` uvnitř VM. Před ni patří HTTPS r
 Port 8787 nevystavujte přímo do internetu, přístup zvenku ideálně přes VPN.
 
 Podrobný postup přechodu, kontroly po importu a zálohování: [docs/MIGRACE.md](docs/MIGRACE.md).
+
+## Přihlášení
+
+Administrace má vlastní přihlašovací stránku (`/prihlaseni`) v designu studia. Jméno je `SALON_USER`,
+heslo je to, ze kterého vznikl `SALON_PASSWORD_HASH` (ne samotný hash). Volba „Pamatovat si přihlášení“
+drží přihlášení 30 dní, bez ní do zavření prohlížeče (nejdéle 12 hodin). Tlačítko Odhlásit je v hlavičce.
+Po 10 chybných pokusech z jedné adresy se přihlášení na 15 minut zablokuje. Změna hesla
+(nový hash a `docker compose up -d`) odhlásí všechna zařízení.
 
 ## Aktualizace
 
