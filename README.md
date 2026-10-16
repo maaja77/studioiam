@@ -35,7 +35,7 @@ cd studioiam
 
 # 1. Data: rozbalte exportní ZIP mimo repozitář a ověřte zálohu
 python3 selfhost/verify-backup.py /cesta/k/Kartoteka-salonu/backup
-test ! -e data && cp -a /cesta/k/Kartoteka-salonu/backup data
+if [ -e data ]; then echo 'Složka data už existuje, záloha se NEZKOPÍROVALA (viz Import zálohy).'; else cp -a /cesta/k/Kartoteka-salonu/backup data; fi
 sudo chown -R 1000:1000 data && sudo chmod -R go-rwx data
 
 # 2. Přihlášení
@@ -63,6 +63,22 @@ heslo je to, ze kterého vznikl `SALON_PASSWORD_HASH` (ne samotný hash). Volba 
 drží přihlášení 30 dní, bez ní do zavření prohlížeče (nejdéle 12 hodin). Tlačítko Odhlásit je v hlavičce.
 Po 10 chybných pokusech z jedné adresy se přihlášení na 15 minut zablokuje. Změna hesla
 (nový hash a `docker compose up -d`) odhlásí všechna zařízení.
+
+## Import zálohy do běžící instalace
+
+Když aplikace už běží s prázdnou nebo starou složkou `data`, záloha se při instalaci nezkopíruje.
+Postup (složka zálohy obsahuje `salon.sqlite` a `objects/`):
+
+```sh
+docker compose down
+mv data data-puvodni
+python3 selfhost/verify-backup.py /cesta/k/zaloze
+cp -a /cesta/k/zaloze data
+sudo chown -R 1000:1000 data && sudo chmod -R go-rwx data
+docker compose up -d
+```
+
+Databáze se při spuštění sama doplní o nové tabulky. Po kontrole smažte `data-puvodni` a kopie zálohy mimo server.
 
 ## Aktualizace
 
