@@ -8,7 +8,7 @@ const publicOrigin=process.env.SALON_PUBLIC_ORIGIN?new URL(process.env.SALON_PUB
 const webRoot=path.resolve('dist-selfhost/client');
 const types:Record<string,string>={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.ico':'image/x-icon','.woff2':'font/woff2'};
 // Veřejné jsou jen rezervační stránka, její statické soubory a /api/public; vše ostatní chrání heslo.
-const isPublic=(p:string)=>p==='/rezervace'||p==='/rezervace/'||p.startsWith('/assets/')||p==='/favicon.svg'||p==='/api/public';
+const isPublic=(p:string)=>p==='/rezervace'||p==='/rezervace/'||p.startsWith('/assets/')||p==='/favicon.svg'||p==='/logo.png'||p==='/api/public';
 const frameAncestors=process.env.SALON_BOOKING_FRAME_ANCESTORS||'*';
 const hits=new Map<string,number[]>();
 function rateLimited(ip:string){const now=Date.now(),list=(hits.get(ip)||[]).filter(t=>now-t<3600_000);list.push(now);hits.set(ip,list);if(hits.size>5000)hits.clear();return list.length>20;}

@@ -86,7 +86,7 @@ export async function seedDemo(run: Run, put: Put) {
   };
   receipt(1, 'b-9', 'demo-4', 'Petra Svobodová', workday(-1) + 'T17:05', [{name: dna.name, qty: 1, unitCents: dna.price, kind: 'service'}, {name: 'Krém s SPF 50', qty: 1, unitCents: 79000, kind: 'product'}], 'card', 1);
   receipt(2, null, 'demo-1', 'Tereza Nováková', day(0) + 'T10:30', [{name: 'Čisticí gel pro citlivou pleť', qty: 2, unitCents: 59000, kind: 'product'}], 'qr', 0);
-  run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, account: '127326219/0300', businessOwner: 'Jana Ukázková'})]);
+  run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, account: '127326219/0300'})]);
 
   const photos: [string, string, string, string, number][] = [
     ['p-1', 'demo-1', day(-30), 'Před ošetřením', 18],

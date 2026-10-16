@@ -242,3 +242,7 @@ dialog[open]{margin:auto}
 .receipts-overview{margin-bottom:20px}
 @media(max-width:560px){.receipt-item{grid-template-columns:70px minmax(0,1fr) 40px;padding-bottom:6px;border-bottom:1px solid var(--line)}.receipt-item input:first-child{grid-column:1/-1}.receipt-list button{grid-template-columns:minmax(0,1fr) auto}.receipt-no{grid-column:1/-1;font-size:12px}}
 @media print{body *{visibility:hidden!important}.receipt-paper,.receipt-paper *{visibility:visible!important}.receipt-paper{position:fixed;left:0;top:0;border:0;max-width:80mm;padding:0}dialog::backdrop{background:none}}
+.brand-logo{display:block;flex-shrink:0;object-fit:contain}
+.pb-header .brand-logo{width:56px;height:56px}
+.receipt-paper header img{width:56px;height:56px;margin-bottom:4px}
+@media(max-width:720px){header .brand-logo{width:44px;height:44px}}

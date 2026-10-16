@@ -20,7 +20,7 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   accountName: 'STUDIO I AM',
   changeLimitHours: 24,
   businessName: 'STUDIO I AM',
-  businessOwner: '',
+  businessOwner: 'Andrea Marešová',
   businessAddress: 'Nerudova 884/11, 500 02 Hradec Králové',
   businessId: '73975052',
 };

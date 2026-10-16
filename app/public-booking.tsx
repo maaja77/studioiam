@@ -1,9 +1,10 @@
 'use client';
 import {useEffect, useState} from 'react';
-import {CalendarCheck, ChevronLeft, ChevronRight, Clock, Flower2, Search} from 'lucide-react';
+import {CalendarCheck, ChevronLeft, ChevronRight, Clock, Search} from 'lucide-react';
 import {addDays, salonNow} from '../lib/booking';
 import {formatRevenue} from '../lib/revenue';
 import {PaymentDetails, type DepositInfo} from './qr-payment';
+import {LOGO} from './logo';
 
 type Service = {id: string; name: string; durationMin: number; priceCents: number; category?: string; description?: string; depositCents?: number | null; sessions?: number; prepay?: boolean};
 const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -45,7 +46,7 @@ export default function PublicBooking() {
   }
 
   return <div className="public-booking">
-    <header className="pb-header"><span className="brand-mark"><Flower2 size={24}/></span><div><b>STUDIO I AM</b><span>ONLINE REZERVACE</span></div></header>
+    <header className="pb-header"><img className="brand-logo" src={LOGO} alt="" width={56} height={56}/><div><b>STUDIO I AM</b><span>ONLINE REZERVACE</span></div></header>
     <main className="pb-main">
       {token ? <ManageBooking token={token} horizon={horizon} onLeave={leaveManage}/>
       : done ? <section className="pb-done"><CalendarCheck size={44} strokeWidth={1.4}/><h1>{done.deposit ? (done.deposit.kind === 'prepay' ? 'Termín držíme, čeká na platbu' : 'Termín držíme, čeká na kauci') : 'Termín je rezervovaný'}</h1>
