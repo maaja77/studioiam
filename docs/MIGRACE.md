@@ -84,11 +84,11 @@ docker compose logs --tail=50 salon
 
 Compose publikuje port 8787 pouze na loopback VM. Před něj nastavte HTTPS reverse
 proxy (např. již používaný Nginx/Caddy) na TOMTÉŽ VM s cílem http://127.0.0.1:8787.
-Proxy musí předat Authorization a původní Origin. SALON_ORIGIN musí přesně
+Proxy musí předat cookies a původní Origin. SALON_ORIGIN musí přesně
 odpovídat adrese v prohlížeči. Použijte platný důvěryhodný certifikát. Pro focení
 z telefonu je HTTPS potřeba. Port 8787 přímo na internet nevystavujte.
 
-Přístup nyní chrání nové místní heslo (HTTP Basic přes HTTPS), nikoli účet ChatGPT.
+Přístup nyní chrání nové místní heslo (přihlašovací stránka /prihlaseni, přes HTTPS), nikoli účet ChatGPT.
 Tato varianta je určena pro soukromou kartotéku s jedním společným salonním účtem;
 nepřidává více uživatelů ani role. Přístupy zvenku omezte VPN nebo firewallem,
 pokud je nepotřebujete veřejně.
