@@ -117,6 +117,17 @@ export async function seedDemo(run: Run, put: Put) {
       run("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,note,created) VALUES (?,?,?,'use',-1,?,'Tester',?)", ['sm-c' + i, 'p-' + i, day(-7) + 'T10:00', stock, now]);
     }
   });
+  // Faktury za zboží (vymyšlení dodavatelé): první naskladnila gel a krém, druhá čeká na zaplacení.
+  run("INSERT INTO invoices (id,supplier,number,date,due,total_cents,paid,note,created) VALUES ('inv-1','Kosmetika Ukázka s.r.o.','FV2026-0412',?,?,192000,1,'',?)", [day(-3), day(11), now]);
+  run("INSERT INTO invoices (id,supplier,number,date,due,total_cents,paid,note,created) VALUES ('inv-2','Salon Supply Demo','2026/118',?,?,84500,0,'Rukavice a vatové tampony',?)", [day(-24), day(-10), now]);
+  for (const [id, inv, pid, name, qty, cost, stocked] of [['ii-1', 'inv-1', 'p-0', 'Čisticí gel pro citlivou pleť', 2, 32000, 1], ['ii-2', 'inv-1', 'p-2', 'Krém s SPF 50', 3, 41000, 1], ['ii-3', 'inv-1', null, 'Doprava', 1, 9000, 0],
+    ['ii-4', 'inv-2', null, 'Nitrilové rukavice M, 100 ks', 3, 18500, 0], ['ii-5', 'inv-2', null, 'Vatové tampony', 2, 14500, 0]] as const) {
+    run('INSERT INTO invoice_items (id,invoice_id,sort,product_id,name,qty,unit_cost_cents,stocked,created) VALUES (?,?,0,?,?,?,?,?,?)', [id, inv, pid, name, qty, cost, stocked, now]);
+    if (pid) {
+      run('UPDATE products SET stock=stock+? WHERE id=?', [qty, pid]);
+      run("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,invoice_id,note,created) SELECT ?,id,?,'delivery',?,stock,'inv-1','Faktura FV2026-0412 (Kosmetika Ukázka s.r.o.)',? FROM products WHERE id=?", ['sm-i' + id, day(-3) + 'T11:00', qty, now, pid]);
+    }
+  }
   const year = Number(day(0).slice(0, 4)), dna = service('DNA Glow Rebirth');
   const receipt = (seq: number, bookingId: string | null, clientId: string | null, clientName: string, issued: string, items: {name: string; qty: number; unitCents: number; kind: string}[], method: string, paid: number) => {
     const total = items.reduce((a, x) => a + x.qty * x.unitCents, 0);

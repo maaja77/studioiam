@@ -1,11 +1,12 @@
 // Podklady pro účetní: měsíční souhrn účtenek podle způsobu platby a druhu položek, export CSV.
-// Jména klientek se do podkladů nedávají; účetní je k evidenci příjmů nepotřebuje.
+// Faktury za zboží se přidávají jako nákupy. Jména klientek se do podkladů nedávají; účetní je k evidenci příjmů nepotřebuje.
 export type AccountingReceipt = {number: string; issued: string; status: string; method: string; paid: number; totalCents: number; prepaidCents: number; voucherCents: number;
   dueCents: number; discountCents: number; services: number; products: number; vouchers: number; other: number};
 export type AccountingDeposit = {date: string; vs: string; cents: number};
+export type AccountingInvoice = {date: string; supplier: string; number: string; due: string | null; totalCents: number; paid: number};
 export type AccountingSummary = {count: number; cancelled: number; totalCents: number; voucherCoveredCents: number; receivedCents: number;
   byMethod: {cash: number; card: number; qr: number; prepaid: number}; byKind: {services: number; products: number; vouchers: number; other: number};
-  discountCents: number; unpaid: {count: number; cents: number}; forfeitedCents: number};
+  discountCents: number; unpaid: {count: number; cents: number}; forfeitedCents: number; purchases: {count: number; cents: number; unpaidCents: number}};
 type Item = {qty: number; unitCents: number; kind: string};
 
 /** Rozdělí zaplacenou část účtenky (bez části uhrazené poukazem) na ošetření, produkty, prodané poukazy a ostatní; sleva se rozpočítá poměrně. */
@@ -22,9 +23,10 @@ export function splitItems(items: Item[], paidCents: number) {
   return out;
 }
 
-export function summarize(receipts: AccountingReceipt[], deposits: AccountingDeposit[]): AccountingSummary {
+export function summarize(receipts: AccountingReceipt[], deposits: AccountingDeposit[], invoices: AccountingInvoice[] = []): AccountingSummary {
   const s: AccountingSummary = {count: 0, cancelled: 0, totalCents: 0, voucherCoveredCents: 0, receivedCents: 0, byMethod: {cash: 0, card: 0, qr: 0, prepaid: 0},
-    byKind: {services: 0, products: 0, vouchers: 0, other: 0}, discountCents: 0, unpaid: {count: 0, cents: 0}, forfeitedCents: deposits.reduce((n, d) => n + d.cents, 0)};
+    byKind: {services: 0, products: 0, vouchers: 0, other: 0}, discountCents: 0, unpaid: {count: 0, cents: 0}, forfeitedCents: deposits.reduce((n, d) => n + d.cents, 0),
+    purchases: {count: invoices.length, cents: invoices.reduce((n, i) => n + i.totalCents, 0), unpaidCents: invoices.filter(i => !i.paid).reduce((n, i) => n + i.totalCents, 0)}};
   for (const r of receipts) {
     if (r.status !== 'issued') { s.cancelled++; continue; }
     s.count++; s.totalCents += r.totalCents; s.voucherCoveredCents += r.voucherCents; s.receivedCents += r.totalCents - r.voucherCents; s.discountCents += r.discountCents;
@@ -42,18 +44,20 @@ const cell = (v: string) => /[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 const dateCz = (s: string) => s.slice(0, 10).split('-').reverse().join('.');
 
 /** CSV pro Excel (středník, UTF-8 s BOM): kniha účtenek, propadlé kauce a souhrn. */
-export function accountingCsv(month: string, salon: string, receipts: AccountingReceipt[], deposits: AccountingDeposit[]) {
-  const s = summarize(receipts, deposits), rows: string[][] = [
+export function accountingCsv(month: string, salon: string, receipts: AccountingReceipt[], deposits: AccountingDeposit[], invoices: AccountingInvoice[] = []) {
+  const s = summarize(receipts, deposits, invoices), rows: string[][] = [
     [`Podklady pro účetní ${month.slice(5)}/${month.slice(0, 4)}`, salon], [],
     ['Číslo účtenky', 'Datum', 'Stav', 'Způsob platby', 'Celkem Kč', 'Sleva Kč', 'Uhrazeno poukazem Kč', 'Zaplaceno předem (kauce) Kč', 'K úhradě Kč', 'Zaplaceno', 'Ošetření Kč', 'Produkty Kč', 'Prodej poukazů Kč', 'Ostatní Kč'],
     ...receipts.map(r => [r.number, dateCz(r.issued), r.status === 'issued' ? 'vystaveno' : 'storno', METHOD_TEXT[r.method] || r.method, kc(r.totalCents), kc(r.discountCents), kc(r.voucherCents), kc(r.prepaidCents), kc(r.dueCents),
       r.status !== 'issued' ? '' : r.paid || !r.dueCents ? 'ano' : 'ne', kc(r.services), kc(r.products), kc(r.vouchers), kc(r.other)]),
   ];
   if (deposits.length) rows.push([], ['Propadlé kauce (klientka nepřišla)'], ['Datum termínu', 'Variabilní symbol', 'Částka Kč'], ...deposits.map(d => [dateCz(d.date), d.vs, kc(d.cents)]));
+  if (invoices.length) rows.push([], ['Faktury za zboží (nákup)'], ['Datum', 'Dodavatel', 'Číslo faktury', 'Splatnost', 'Částka Kč', 'Zaplaceno'],
+    ...invoices.map(i => [dateCz(i.date), i.supplier, i.number, i.due ? dateCz(i.due) : '', kc(i.totalCents), i.paid ? 'ano' : 'ne']));
   rows.push([], ['Souhrn'], ['Účtenek', String(s.count)], ['Stornovaných účtenek', String(s.cancelled)], ['Celkem na účtenkách Kč', kc(s.totalCents)],
     ['Uhrazeno dárkovými poukazy Kč (tržba byla při prodeji poukazu)', kc(s.voucherCoveredCents)], ['Tržby Kč', kc(s.receivedCents)],
     ['  z toho hotově Kč', kc(s.byMethod.cash)], ['  z toho kartou Kč', kc(s.byMethod.card)], ['  z toho QR platba / převod Kč', kc(s.byMethod.qr)], ['  z toho kauce zaplacené předem převodem Kč', kc(s.byMethod.prepaid)],
     ['Ošetření Kč', kc(s.byKind.services)], ['Produkty Kč', kc(s.byKind.products)], ['Prodej dárkových poukazů Kč', kc(s.byKind.vouchers)], ['Ostatní Kč', kc(s.byKind.other)],
-    ['Poskytnuté slevy Kč', kc(s.discountCents)], ['Nezaplacené QR účtenky (stav ke dni stažení) Kč', kc(s.unpaid.cents)], ['Propadlé kauce Kč', kc(s.forfeitedCents)]);
+    ['Poskytnuté slevy Kč', kc(s.discountCents)], ['Nezaplacené QR účtenky (stav ke dni stažení) Kč', kc(s.unpaid.cents)], ['Propadlé kauce Kč', kc(s.forfeitedCents)], ['Nákup zboží podle faktur Kč', kc(s.purchases.cents)], ['  z toho nezaplacené faktury Kč', kc(s.purchases.unpaidCents)]);
   return '﻿' + rows.map(r => r.map(cell).join(';')).join('\r\n') + '\r\n';
 }

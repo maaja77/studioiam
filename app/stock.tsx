@@ -1,9 +1,10 @@
 'use client';
 // Sklad: produkty k prodeji, stav zásob, naskladnění, spotřeba v salonu, inventura a historie pohybů.
 import {useEffect, useState} from 'react';
-import {AlertTriangle, History, PackagePlus, Pencil, Plus, Search, Trash2, X} from 'lucide-react';
+import {AlertTriangle, FileText, History, PackagePlus, Pencil, Plus, Search, Trash2, X} from 'lucide-react';
 import {formatRevenue} from '../lib/revenue';
 import {isLow, type StockMove, type StockProduct} from '../lib/stock';
+import Invoices from './invoices';
 
 type Action = {id: string; kind: 'delivery' | 'use' | 'count' | 'history'};
 const KIND_LABEL: Record<string, string> = {sale: 'Prodej', delivery: 'Naskladnění', use: 'Spotřeba', count: 'Inventura', start: 'Počáteční stav', return: 'Storno prodeje'};
@@ -28,7 +29,7 @@ function lastsText(p: StockProduct, sold: number) {
 export default function Stock({onChanged}: {onChanged?: () => void}) {
   const [products, setProducts] = useState<StockProduct[] | null>(null), [sold, setSold] = useState<Record<string, number>>({});
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [query, setQuery] = useState(''), [onlyLow, setOnlyLow] = useState(false);
-  const [editing, setEditing] = useState<Partial<StockProduct> | null>(null), [action, setAction] = useState<Action | null>(null);
+  const [editing, setEditing] = useState<Partial<StockProduct> | null>(null), [action, setAction] = useState<Action | null>(null), [invoices, setInvoices] = useState(false);
   async function load() {
     try {
       const r = await fetch('/api/stock', {cache: 'no-store'}); const d = await r.json() as {products?: StockProduct[]; sold90?: Record<string, number>; error?: string};
@@ -40,6 +41,7 @@ export default function Stock({onChanged}: {onChanged?: () => void}) {
     setBusy(true); setError('');
     try { await post(name, data); setEditing(null); setAction(null); await load(); onChanged?.(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
+  if (products && invoices) return <Invoices products={products} onBack={() => setInvoices(false)} onChanged={() => { load(); onChanged?.(); }}/>;
   if (!products) return error ? <p className="error" role="alert">{error}</p> : <p className="muted">Načítám…</p>;
 
   const tracked = products.filter(p => p.stock !== null), low = products.filter(isLow);
@@ -48,7 +50,8 @@ export default function Stock({onChanged}: {onChanged?: () => void}) {
 
   return <div className="stock">
     <div className="heading"><div><p className="eyebrow">PRODUKTY</p><h1>Sklad</h1><p>Produkty k prodeji a jejich zásoba. Prodej na účtence se ze skladu odečte sám.</p></div>
-      <button className="primary" onClick={() => { setAction(null); setEditing({active: 1, stock: null}); }}><Plus size={18}/> Přidat produkt</button></div>
+      <div className="heading-actions"><button className="secondary" onClick={() => setInvoices(true)}><FileText size={17}/> Faktury za zboží</button>
+        <button className="primary" onClick={() => { setAction(null); setEditing({active: 1, stock: null}); }}><Plus size={18}/> Přidat produkt</button></div></div>
     {error && <div className="error" role="alert">{error}</div>}
     {low.length > 0 && <div className="setup-hint" role="note"><span><AlertTriangle size={16}/> Dochází: {low.map(p => p.name).join(', ')}.</span>{!onlyLow && <button className="secondary" onClick={() => setOnlyLow(true)}>Zobrazit</button>}</div>}
     {tracked.length > 0 && <section className="stat-tiles" aria-label="Souhrn skladu">

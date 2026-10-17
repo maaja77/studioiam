@@ -442,3 +442,15 @@ dialog.care-dialog{width:min(680px,calc(100% - 24px))}
 .accounting-table{min-width:560px}.accounting .table-scroll{overflow-x:auto}.accounting-notes ul{margin:0;padding-left:18px;font-size:14px;display:flex;flex-direction:column;gap:4px}
 @media(max-width:760px){.accounting-grid{grid-template-columns:1fr}}
 @media print{.accounting-print,.accounting-print *{visibility:visible!important}.accounting-print{position:absolute;left:0;top:0;width:100%}.accounting-print .panel{border:0;padding:0;box-shadow:none;break-inside:avoid}.accounting .table-scroll{overflow:visible}.accounting-table{min-width:0;font-size:12px}}
+/* Faktury za zboží */
+.invoice-list{list-style:none;margin:0;padding:0}.invoice-list>li{border-top:1px solid var(--line);padding:10px 0}.invoice-list>li:first-child{border-top:0}
+.invoice-row{display:flex;align-items:center;gap:10px}.invoice-main{flex:1;min-width:0;display:flex;justify-content:space-between;gap:12px;background:none;border:0;padding:4px 0;text-align:left;color:var(--ink)}
+.invoice-main span{display:flex;flex-direction:column;min-width:0}.invoice-main small{color:var(--muted);font-size:13px}.invoice-amount{align-items:flex-end;text-align:right;white-space:nowrap}.invoice-amount small.ok{color:var(--teal)}.invoice-amount small.late{color:#a33d2a}
+.invoice-actions{display:flex;gap:6px;align-items:center}.invoice-actions .secondary{min-height:34px;padding:5px 10px;font-size:13px;display:inline-flex;align-items:center;gap:5px}
+.invoice-detail{padding:8px 0 4px;display:flex;flex-direction:column;gap:8px}.invoice-detail .num,.invoices .num{text-align:right}.accounting-table tr.total td{font-weight:700}
+.invoice-form{display:flex;flex-direction:column;gap:12px;margin-bottom:16px}.invoice-import{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}.file-button{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.invoice-items{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;margin:0}.invoice-items legend{font-weight:600;padding:0 4px}
+.invoice-item{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.6fr) 70px 120px 36px;gap:6px;align-items:center}.invoice-item.head span{font-size:12px;color:var(--muted)}
+.invoice-item select,.invoice-item input{width:100%;min-width:0}.invoice-new{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:13px}.invoice-new input{max-width:140px}.invoice-hint{grid-column:1/-1;color:#8a5212;font-size:12px}
+@media(max-width:700px){.invoice-item{grid-template-columns:1fr 70px 100px 36px;padding-bottom:8px;border-bottom:1px solid var(--line)}.invoice-item>label:first-child{grid-column:1/-1}.invoice-item.head{display:none}.invoice-row{flex-wrap:wrap}.invoice-actions{width:100%;justify-content:flex-end}}
+.invoice-item input,.invoice-item select,.invoice-new input{border:1px solid #cad8d6;border-radius:7px;padding:8px 10px;background:white;font-size:16px;color:var(--ink)}

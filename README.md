@@ -272,6 +272,13 @@ Ručně se zapisuje naskladnění (s nákupní cenou), spotřeba v salonu (teste
 U každého produktu je historie pohybů a odhad, na jak dlouho zásoba vystačí podle prodejů za 90 dní. Když počet klesne
 na nastavené minimum, ukáže se upozornění a odznak u záložky; na účtence se zobrazí, kolik kusů je skladem.
 
+### Faktury za zboží
+
+- Sklad → **Faktury za zboží**: dodavatel, číslo, datum, splatnost, částka, stav zaplacení a soubor faktury (PDF nebo fotka, nejvýše 10 MB; ukládá se na server vedle fotek a zálohuje se s nimi).
+- Položka propojená s produktem ve Skladu se při uložení naskladní a produktu se uloží nákupní cena. Položku jde založit i jako nový produkt, nebo jen zapsat (doprava, spotřební materiál).
+- E-faktura **ISDOC** (.isdoc) vyplní dodavatele, data, částku i položky sama a položky se podle názvu přiřadí k produktům.
+- Smazání faktury naskladnění vrátí. Faktury daného měsíce jsou i v Podkladech pro účetní.
+
 ## Klientky, které dlouho nepřišly
 
 Karty klientů → Dlouho nebyly: klientky, jejichž poslední návštěva (zápis v kartě, proběhlý termín v kalendáři nebo

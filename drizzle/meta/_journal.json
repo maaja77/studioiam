@@ -134,6 +134,13 @@
       "when": 1792253786712,
       "tag": "0018_review_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1792254766032,
+      "tag": "0019_supplier_invoices",
+      "breakpoints": true
     }
   ]
 }

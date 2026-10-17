@@ -3,9 +3,9 @@
 import {useEffect, useState} from 'react';
 import {ChevronLeft, Download, Printer} from 'lucide-react';
 import {formatRevenue} from '../lib/revenue';
-import {METHOD_TEXT, type AccountingDeposit, type AccountingReceipt, type AccountingSummary} from '../lib/accounting';
+import {METHOD_TEXT, type AccountingDeposit, type AccountingInvoice, type AccountingReceipt, type AccountingSummary} from '../lib/accounting';
 
-type Data = {month: string; salon: {name: string; businessId: string; owner: string; address: string}; receipts: AccountingReceipt[]; deposits: AccountingDeposit[]; summary: AccountingSummary};
+type Data = {month: string; salon: {name: string; businessId: string; owner: string; address: string}; receipts: AccountingReceipt[]; deposits: AccountingDeposit[]; invoices: AccountingInvoice[]; summary: AccountingSummary};
 const dateText = (s: string) => s.slice(0, 10).split('-').reverse().map(Number).join('. ');
 const monthText = (m: string) => new Date(m + '-15T12:00:00').toLocaleDateString('cs-CZ', {month: 'long', year: 'numeric'});
 const plural = (n: number, one: string, few: string, many: string) => `${n} ${n === 1 ? one : n >= 2 && n <= 4 ? few : many}`;
@@ -31,7 +31,7 @@ export default function Accounting({month: initial, onBack}: {month: string; onB
   const s = data?.summary;
   return <div className="accounting">
     <button className="pb-back" onClick={onBack}><ChevronLeft size={16}/> Účtenky</button>
-    <div className="heading"><div><p className="eyebrow">ÚČTENKY</p><h1>Podklady pro účetní</h1><p>Souhrn tržeb za měsíc a seznam účtenek. Jména klientek v podkladech nejsou.</p></div>
+    <div className="heading"><div><p className="eyebrow">ÚČTENKY</p><h1>Podklady pro účetní</h1><p>Souhrn tržeb za měsíc, seznam účtenek a faktury za zboží. Jména klientek v podkladech nejsou.</p></div>
       <div className="heading-actions"><button className="secondary" disabled={!data} onClick={() => window.print()}><Printer size={17}/> Vytisknout / PDF</button>
         <button className="primary" disabled={!data || busy} onClick={download}><Download size={17}/> Stáhnout CSV</button></div></div>
     <div className="voucher-tools"><label className="field inline-field"><span>Měsíc</span><input type="month" value={month} required onChange={e => { if (e.target.value) setMonth(e.target.value); }}/></label>
@@ -67,6 +67,11 @@ export default function Accounting({month: initial, onBack}: {month: string; onB
         <tbody>{data.receipts.map(r => <tr key={r.number} className={r.status !== 'issued' ? 'cancelled' : ''}>
           <td>{r.number}</td><td>{dateText(r.issued)}</td><td>{r.status !== 'issued' ? 'storno' : (METHOD_TEXT[r.method] || r.method) + (!r.paid && r.dueCents > 0 ? ', nezaplaceno' : '')}</td>
           <td className="num">{formatRevenue(r.totalCents)}</td><td className="num">{r.voucherCents ? formatRevenue(r.voucherCents) : ''}</td><td className="num">{r.prepaidCents ? formatRevenue(r.prepaidCents) : ''}</td><td className="num">{formatRevenue(r.dueCents)}</td></tr>)}</tbody>
+      </table></div>}</section>
+      <section className="panel"><h3>Faktury za zboží</h3>{!data.invoices.length ? <p className="muted-inline">V tomto měsíci nejsou zapsané žádné faktury. Zapisují se ve Skladu → Faktury za zboží.</p> : <div className="table-scroll"><table className="stats-table accounting-table">
+        <thead><tr><th>Datum</th><th>Dodavatel</th><th>Číslo</th><th>Stav</th><th className="num">Částka</th></tr></thead>
+        <tbody>{data.invoices.map((i, n) => <tr key={n}><td>{dateText(i.date)}</td><td>{i.supplier}</td><td>{i.number}</td><td>{i.paid ? 'zaplaceno' : 'nezaplaceno'}</td><td className="num">{formatRevenue(i.totalCents)}</td></tr>)}
+          <tr className="total"><td colSpan={4}>Nákup zboží celkem{s.purchases.unpaidCents > 0 && `, z toho nezaplaceno ${formatRevenue(s.purchases.unpaidCents)}`}</td><td className="num">{formatRevenue(s.purchases.cents)}</td></tr></tbody>
       </table></div>}</section>
     </div>}
   </div>;
