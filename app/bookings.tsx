@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
-import {Ban, Check, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, MessageSquare, Phone, Plus, Search, UserPlus, X} from 'lucide-react';
+import {AlertTriangle, Ban, Check, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, MessageSquare, Phone, Plus, Search, Trash2, UserPlus, X} from 'lucide-react';
 import {smsPhone} from '../lib/sms';
 import {addDays, DEFAULT_SETTINGS, fromMinutes, salonNow, toMinutes, weekday, type BookingSettings} from '../lib/booking';
 import {serviceColor} from '../lib/price-list';
@@ -12,7 +12,7 @@ import {Receipt as ReceiptIcon} from 'lucide-react';
 
 export type Booking = {id: string; serviceId: string | null; clientId: string | null; start: string; end: string; serviceName: string; priceCents: number | null; name: string; phone: string; email: string; note: string; status: string; source: string; depositCents?: number | null; depositStatus?: string | null; depositDue?: string | null; vs?: string | null; paymentKind?: string | null; receiptId?: string | null; color?: string | null; category?: string | null; remindedStart?: string | null; remindedAt?: string | null; intake?: string | null};
 export type Service = {id: string; name: string; durationMin: number; priceCents: number; active: number; sort: number; category: string; description: string; color: string; sessions: number; prepay: number};
-type ClientLite = {id: string; name: string; phone: string; email: string; blocked?: number};
+type ClientLite = {id: string; name: string; phone: string; email: string; blocked?: number; unreliable?: number};
 const DEPOSIT_LABEL: Record<string, string> = {pending: 'čeká na zaplacení', paid: 'zaplacena', returned: 'vrácena', forfeited: 'propadla', expired: 'nezaplacena, termín uvolněn', cancelled: 'nezaplacena, termín zrušen', used: 'započtena do účtenky'};
 
 export const STATUS_LABEL: Record<string, string> = {pending: 'Čeká na kauci', confirmed: 'Potvrzeno', done: 'Proběhlo', no_show: 'Nepřišla', cancelled: 'Zrušeno'};
@@ -127,7 +127,7 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
                 <b>{b.source === 'block' ? b.serviceName : b.name}</b>
                 <span className="time">{b.start.slice(11)}–{b.end.slice(11)}</span>
                 {b.source !== 'block' && <span>{b.serviceName}</span>}
-                {(b.status !== 'confirmed' || b.source === 'online' || b.depositStatus === 'paid') && <span className="tags">{b.source === 'online' && <em>Web</em>}{b.status !== 'confirmed' && <em>{STATUS_LABEL[b.status]}</em>}{b.depositStatus === 'paid' && <em>{b.paymentKind === 'prepay' ? 'Zaplaceno ✓' : 'Kauce ✓'}</em>}</span>}
+                {(b.status !== 'confirmed' || b.source === 'online' || b.depositStatus === 'paid' || clientOf(b)?.unreliable === 1) && <span className="tags">{clientOf(b)?.unreliable === 1 && <em className="tag-unreliable">Nespolehlivá</em>}{b.source === 'online' && <em>Web</em>}{b.status !== 'confirmed' && <em>{STATUS_LABEL[b.status]}</em>}{b.depositStatus === 'paid' && <em>{b.paymentKind === 'prepay' ? 'Zaplaceno ✓' : 'Kauce ✓'}</em>}</span>}
               </button>;
             })}
           </div>
@@ -159,6 +159,7 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
               </div>
             </div>}
             {clientOf(current)?.blocked === 1 && <p className="caution-line"><Ban size={16}/> Klientka má zablokované online rezervace.</p>}
+            {clientOf(current)?.unreliable === 1 && <p className="caution-line"><AlertTriangle size={16}/> Nespolehlivá klientka.{current.depositCents == null && current.status !== 'cancelled' ? ' U tohoto termínu není kauce, můžete ho zrušit nebo smazat.' : current.depositStatus === 'pending' ? ' Kauce zatím nedorazila.' : ''}</p>}
           </>}
           {current.note && <p className="note">{current.note}</p>}
           {current.status !== 'cancelled' && <MoveRow key={current.id} booking={current as Booking} busy={busy} onMove={(date, time) => run(() => post({kind: 'booking', action: 'move', data: {id: current.id, date, time}}), `Termín přesunut na ${dayTitle(date)} ${time}.`)}/>}
@@ -168,6 +169,7 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
               {current.clientId && <label><input type="checkbox" checked={blockToo} onChange={e => setBlockToo(e.target.checked)}/> a zablokovat online rezervace</label>}</span>}
             {current.status !== 'cancelled' && <button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'status', data: {id: current.id, status: 'cancelled'}}), 'Rezervace byla zrušena, termín je znovu volný.')}><X size={16}/> Zrušit termín</button>}
             {current.status !== 'confirmed' && <button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'status', data: {id: current.id, status: 'confirmed'}}), 'Rezervace je znovu potvrzená.')}>Vrátit na potvrzeno</button>}
+            {!current.receiptId && <button className="secondary danger" disabled={busy} onClick={() => { if (window.confirm(`Smazat rezervaci ${current.name} úplně? Zmizí z kalendáře i z historie.${current.depositStatus === 'paid' ? ' Zaplacenou kauci vraťte nebo si ji poznamenejte zvlášť.' : ''} Klientce se nic neposílá.`)) run(() => post({kind: 'booking', action: 'delete', data: {id: current.id}}), 'Rezervace byla smazána.'); }}><Trash2 size={16}/> Smazat rezervaci</button>}
           </div>}
         </div>
         {error && <p className="error" role="alert">{error}</p>}

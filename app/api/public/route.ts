@@ -4,7 +4,8 @@
 import {database, notifyClient, notifySalon, publicOrigin} from '../../../db/raw';
 import {ACTIVE_STATUSES, addDays, addMinutes, freeSlots, isDate, isTime, normalizePhone, parseSettings, salonName, salonNow, type BookingSettings} from '../../../lib/booking';
 import {formatRevenue} from '../../../lib/revenue';
-import {czIban, depositFor, formatIban, spdPayload} from '../../../lib/payment';
+import {czIban, formatIban, spdPayload} from '../../../lib/payment';
+import {parseRule, ruleAmount, type DepositRule} from '../../../lib/deposit-rule';
 import {intakeGet, intakeSubmit} from './intake';
 import {orderGet, orderSubmit, shopGet} from './vouchers';
 import {createIntake, intakeLink} from '../intake/route';
@@ -58,12 +59,16 @@ export const salonInfo = (s: BookingSettings) => ({name: salonName(s), address: 
 const canChange = (b: Managed, settings: BookingSettings) => ['confirmed', 'pending'].includes(b.status) && b.start >= addMinutes(salonNow(), settings.changeLimitHours * 60);
 
 type PaymentKind = 'deposit' | 'prepay';
-/** Co se platí předem: celá cena u balíčků a programů, jinak kauce u dražších ošetření a u klientek se zapnutou kaucí.
+/** Co se platí předem: celá cena u balíčků a programů, jinak kauce u dražších ošetření a u klientek se zapnutou kaucí
+ *  (nespolehlivé klientky ji mají vždy). Výši kauce může mít klientka nastavenou na míru (procento, pevná částka, celá cena).
  *  Bez čísla účtu salonu se předem neplatí nic. */
-function payment(service: Service, settings: BookingSettings, clientRequires: boolean): {cents: number; kind: PaymentKind} | null {
-  if (!czIban(settings.account) || service.priceCents <= 0) return null;
-  if (service.prepay) return {cents: service.priceCents, kind: 'prepay'};
-  if ((settings.depositFromKc > 0 && service.priceCents >= settings.depositFromKc * 100) || clientRequires) return {cents: Math.min(service.priceCents, depositFor(service.priceCents, settings.depositPercent)), kind: 'deposit'};
+function payment(service: Service, settings: BookingSettings, clientRequires: boolean, rule: DepositRule = {kind: 'salon'}): {cents: number; kind: PaymentKind} | null {
+  if (!czIban(settings.account)) return null;
+  if (service.prepay && service.priceCents > 0) return {cents: service.priceCents, kind: 'prepay'};
+  if ((service.priceCents > 0 && settings.depositFromKc > 0 && service.priceCents >= settings.depositFromKc * 100) || clientRequires) {
+    const cents = ruleAmount(rule, service.priceCents, settings.depositPercent);
+    return cents > 0 ? {cents, kind: 'deposit'} : null;
+  }
   return null;
 }
 
@@ -133,7 +138,7 @@ export async function POST(request: Request) {
     if (!service) return json({error: 'Ošetření není k dispozici.'}, 404);
 
     await releaseExpiredDeposits();
-    const clients = await db.prepare('SELECT id,phone,email,blocked,deposit_required AS depositRequired FROM clients').all<{id: string; phone: string; email: string; blocked: number; depositRequired: number}>();
+    const clients = await db.prepare('SELECT id,phone,email,blocked,deposit_required AS depositRequired,unreliable,deposit_rule AS depositRule FROM clients').all<{id: string; phone: string; email: string; blocked: number; depositRequired: number; unreliable: number; depositRule: string}>();
     const phoneKey = normalizePhone(phone), emailKey = email.toLowerCase();
     const matches = clients.results.filter(c => (c.phone && normalizePhone(c.phone) === phoneKey) || (emailKey && c.email.toLowerCase() === emailKey));
     if (matches.some(c => c.blocked)) return json({error: 'Online rezervace pro vás teď není dostupná. Zavolejte nám prosím, domluvíme termín spolu.'}, 403);
@@ -142,7 +147,7 @@ export async function POST(request: Request) {
     const busy = await busyBetween(date + 'T00:00', addDays(date, 1) + 'T00:00');
     if (!freeSlots(date, service.durationMin, settings, busy, salonNow()).includes(time)) return json({error: 'Tento termín už není volný. Vyberte prosím jiný.'}, 409);
 
-    const pay = payment(service, settings, matches.some(c => c.depositRequired));
+    const pay = payment(service, settings, matches.some(c => c.depositRequired || c.unreliable), parseRule(matches.find(c => c.depositRule)?.depositRule));
     const needsDeposit = !!pay, depositCents = pay?.cents ?? null, kind = pay?.kind ?? null;
     const due = needsDeposit ? [addMinutes(salonNow(), settings.depositHoldHours * 60), start].sort()[0] : null;
     const vs = needsDeposit ? start.slice(2, 10).replace(/-/g, '') + start.slice(11, 13) + String(Math.floor(Math.random() * 100)).padStart(2, '0') : null;

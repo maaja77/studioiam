@@ -1,4 +1,5 @@
 // API administrace rezervací: kalendář, ruční rezervace, ceník ošetření, nastavení a blokování klientek.
+import {parseRule, ruleValue} from '../../../lib/deposit-rule';
 import {database, photoStorage, publicOrigin, salonProfile, smsName, smsSender} from '../../../db/raw';
 import {icalendar} from '../../../lib/ical';
 import {addDays, addMinutes, isDate, isTime, parseSettings, salonName, salonNow, validateSettings, type BookingSettings} from '../../../lib/booking';
@@ -100,6 +101,16 @@ export async function POST(request: Request) {
       return json({ok: true});
     }
 
+    // Kauce a spolehlivost klientky: nespolehlivá klientka platí kauci vždy; výše kauce na míru (viz lib/deposit-rule).
+    if (body.kind === 'clientDeposit') {
+      const rule = typeof d.rule === 'string' ? d.rule : '', parsed = parseRule(rule);
+      if (rule && ruleValue(parsed) !== rule) return json({error: 'Zadejte procento 1–100, nebo pevnou částku aspoň 100 Kč.'}, 400);
+      const unreliable = d.unreliable === true, required = unreliable || d.required === true;
+      const res = await db.prepare('UPDATE clients SET unreliable=?,deposit_required=?,deposit_rule=? WHERE id=?').bind(unreliable ? 1 : 0, required ? 1 : 0, ruleValue(parsed), field('clientId')).run();
+      if (!res.meta.changes) return json({error: 'Klient nebyl nalezen.'}, 404);
+      return json({ok: true});
+    }
+
     if (body.kind === 'depositRequired') {
       const res = await db.prepare('UPDATE clients SET deposit_required=? WHERE id=?').bind(d.required ? 1 : 0, field('clientId')).run();
       if (!res.meta.changes) return json({error: 'Klient nebyl nalezen.'}, 404);
@@ -141,7 +152,10 @@ export async function POST(request: Request) {
     if (body.kind !== 'booking') return json({error: 'Neplatná operace.'}, 400);
     const id = field('id');
 
-    if (body.action === 'delete') { await db.batch([db.prepare('DELETE FROM bookings WHERE id=?').bind(id), db.prepare('DELETE FROM intake_forms WHERE booking_id=? AND client_id IS NULL').bind(id)]); return json({ok: true}); }
+    if (body.action === 'delete') {
+      if (await db.prepare("SELECT id FROM receipts WHERE booking_id=? AND status='issued'").bind(id).first()) return json({error: 'K rezervaci je vystavená účtenka, smazat ji nejde. Můžete ji zrušit.'}, 409);
+      await db.batch([db.prepare('DELETE FROM bookings WHERE id=?').bind(id), db.prepare('DELETE FROM intake_forms WHERE booking_id=? AND client_id IS NULL').bind(id)]); return json({ok: true});
+    }
 
     if (body.action === 'status') {
       const status = field('status');

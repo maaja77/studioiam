@@ -162,6 +162,13 @@
       "when": 1792262974092,
       "tag": "0022_product_lines",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1792265012621,
+      "tag": "0023_client_deposit",
+      "breakpoints": true
     }
   ]
 }

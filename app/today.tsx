@@ -14,6 +14,7 @@ const plural = (n: number, one: string, few: string, many: string) => `${n} ${n 
 
 function Flags({b}: {b: TodayBooking}) {
   const flags: [string, string][] = [];
+  if (b.unreliable) flags.push(['warn', 'Nespolehlivá klientka']);
   if (b.firstVisit) flags.push(['info', 'Nová klientka']);
   if (b.birthday) flags.push(['info', b.birthday]);
   if (b.depositStatus === 'pending') flags.push(['warn', `Kauce ${b.depositCents ? formatRevenue(b.depositCents) + ' ' : ''}nezaplacená`]);

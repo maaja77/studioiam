@@ -11,7 +11,7 @@ const json = (data: unknown, status = 200) => Response.json(data, {status, heade
 
 export type TodayBooking = {id: string; start: string; end: string; serviceName: string; name: string; phone: string; clientId: string | null; status: string; source: string;
   depositCents: number | null; depositStatus: string | null; note: string; receiptId: string | null; cautions: string; intake: string | null; warnings: string[];
-  lastVisit: string | null; lastTreatment: string; firstVisit: boolean; birthday: string};
+  lastVisit: string | null; lastTreatment: string; firstVisit: boolean; birthday: string; unreliable?: number};
 export type TodayData = {today: string; now: string; bookings: TodayBooking[]; blocks: {start: string; end: string; serviceName: string}[];
   todo: {pendingDeposits: {id: string; start: string; name: string; depositCents: number; due: string | null}[]; unpaidReceipts: {count: number; cents: number};
     vouchersPending: number; stockLow: string[]; tomorrow: number; notFinished: number};
@@ -21,7 +21,7 @@ export async function todayData(now = salonNow()): Promise<TodayData> {
   const db = database(), today = now.slice(0, 10), tomorrow = addDays(today, 1);
   const [bookings, blocks, deposits, receipts, vouchers, stock, next, open, setting] = await db.batch([
     db.prepare(`SELECT b.id,b.start_at AS start,b.end_at AS end,b.service_name AS serviceName,b.name,b.phone,b.client_id AS clientId,b.status,b.source,b.deposit_cents AS depositCents,b.deposit_status AS depositStatus,b.note,
-      (SELECT r.id FROM receipts r WHERE r.booking_id=b.id AND r.status='issued' LIMIT 1) AS receiptId,coalesce(c.cautions,'') AS cautions,
+      (SELECT r.id FROM receipts r WHERE r.booking_id=b.id AND r.status='issued' LIMIT 1) AS receiptId,coalesce(c.cautions,'') AS cautions,coalesce(c.unreliable,0) AS unreliable,
       (SELECT f.status FROM intake_forms f WHERE f.client_id=b.client_id OR f.booking_id=b.id ORDER BY f.created DESC LIMIT 1) AS intake,
       (SELECT f.answers FROM intake_forms f WHERE (f.client_id=b.client_id OR f.booking_id=b.id) AND f.status='done' ORDER BY f.created DESC LIMIT 1) AS answers,
       (SELECT max(v.date) FROM visits v WHERE v.client_id=b.client_id AND v.date<?) AS lastVisit,

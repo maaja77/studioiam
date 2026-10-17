@@ -165,6 +165,8 @@ export async function seedDemo(run: Run, put: Put) {
   // Produkty na ošetření (kabinetní balení, vymyšlené ceny): sklad v kusech, spotřeba se odepisuje ručně.
   ([['Enzymatický peeling, kabinetní 250 ml', 2, 1, 89000], ['Hyaluronové sérum, kabinetní 500 ml', 1, 1, 145000], ['Alginátová maska 1 kg', 3, 1, 52000], ['Čisticí gel, kabinetní 1 l', 0, 1, 98000]] as const).forEach(([name, stock, min, cost], i) =>
     run("INSERT INTO products (id,name,price_cents,active,sort,stock,min_stock,cost_cents,kind,created) VALUES (?,?,0,1,?,?,?,?,'pro',?)", ['pro-' + i, name, 10 + i, stock, min, cost, now]));
+  // Ukázková nespolehlivá klientka s pevnou kaucí 500 Kč.
+  run("UPDATE clients SET unreliable=1,deposit_required=1,deposit_rule='k:50000' WHERE id='demo-2'", []);
   // Řady produktů (ukázkové): domácí péče i kabinetní produkty podle linií; vzorek masky zůstává bez řady.
   ([['p-0', 'Neuro Cannabis'], ['p-1', 'PDRN'], ['p-2', 'C-Fusion'], ['pro-0', 'A-QS Hacker'], ['pro-1', 'PDRN'], ['pro-2', 'Derma Collage'], ['pro-3', 'Neuro Gaba & Nana']] as const).forEach(([id, line]) => run('UPDATE products SET line=? WHERE id=?', [line, id]));
   // Spotřební materiál (vymyšlené ceny za balení) s výchozí spotřebou na klientku a odpisem podle účtenek za posledních 30 dní.

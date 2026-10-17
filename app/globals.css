@@ -470,3 +470,9 @@ dialog.care-dialog{width:min(680px,calc(100% - 24px))}
 .theme-swatches{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.theme-swatches button{background:white;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:6px 14px 6px 8px;min-height:38px;font-size:14px}.theme-swatches button.active{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal) inset;font-weight:600}
 .theme-dot{width:22px;height:22px;border-radius:50%;display:inline-block;box-shadow:0 0 0 2px white,0 0 0 3px #0002}
 .theme-custom{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.theme-custom label{display:inline-flex;align-items:center;gap:10px;font-size:14px;color:var(--muted)}.theme-custom input[type=color]{width:46px;height:36px;padding:2px;border:1px solid var(--line);border-radius:8px;background:white;cursor:pointer}.theme-custom .error-inline{flex-basis:100%;color:#963b30;font-size:13px}
+.deposit-card{margin:-10px 0 22px;font-size:14px}.deposit-card.unreliable{background:#fff6e8;border:1px solid #f1dfb8;border-radius:10px;padding:10px 14px;margin:0 0 24px}
+.deposit-card-row{display:flex;justify-content:space-between;align-items:center;gap:8px 16px;flex-wrap:wrap;color:var(--muted)}.deposit-card-row b{color:var(--ink)}.deposit-card-row small{display:block;color:#8a5212}
+.unreliable-line{display:flex;align-items:center;gap:8px;margin:0 0 8px;color:#8a5212;font-weight:600}
+.deposit-edit{display:grid;gap:12px;margin-top:12px;padding:14px;background:white;border:1px solid var(--line);border-radius:10px}.deposit-edit .segmented-mini{flex-wrap:wrap;max-width:max-content}.deposit-edit .field.inline input{max-width:160px}.deposit-edit .error-inline{color:#963b30;font-size:13px;margin:0}.deposit-edit .form-actions{justify-content:flex-start}
+.unreliable-badge{color:#8a5212!important}.cal-event .tags em.tag-unreliable{background:#fff1d6;color:#7a4a0c}
+.secondary.danger{color:#963b30}
