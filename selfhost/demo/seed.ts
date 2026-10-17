@@ -59,6 +59,11 @@ export async function seedDemo(run: Run, put: Put) {
   ];
   run("UPDATE clients SET contacted_at=? WHERE id='demo-7'", [day(-6)]);
   for (const v of visits) run('INSERT INTO visits (id,client_id,date,treatment,products,notes,revenue_cents,clean_skin,program_price_cents,program_step) VALUES (?,?,?,?,?,?,?,?,?,?)', v);
+  // Přípravky u návštěv: místo volného textu seznam s množstvím (u v-1 a v-2 zůstává ukázka staršího textového zápisu).
+  const used: [string, string, string][] = [['v-3', 'Hydratační sérum s kyselinou hyaluronovou', '3 ml'], ['v-3', 'Alginátová maska', '1 sáček'], ['v-4', 'Enzymatický peeling', '2 ml'],
+    ['v-5', 'Lash lifting set', ''], ['v-5', 'Barva na řasy černá', ''], ['v-6', 'Čisticí gel pro citlivou pleť', ''], ['v-6', 'Enzymatický peeling', '2 ml'], ['v-9', 'Mandelic Forte Peel', '1 vrstva'], ['v-10', 'Hyaluron Collagen 3D ampule', '1 ampule']];
+  used.forEach(([visitId, name, amount], i) => run('INSERT INTO visit_products (id,visit_id,sort,product_id,name,amount,created) VALUES (?,?,?,?,?,?,?)', ['vp-' + i, visitId, i, null, name, amount, now]));
+  run("UPDATE visits SET products='' WHERE id IN ('v-3','v-4')", []);
 
   PRICE_LIST.forEach(([category, name, minutes, price, extra], i) => run('INSERT INTO services (id,name,duration_min,price_cents,active,sort,category,description,color,sessions,prepay,created) VALUES (?,?,?,?,1,?,?,?,?,?,?,?)', ['s-' + i, name, minutes, price * 100, i, category, DESCRIPTIONS[name] || '', CATEGORY_COLORS[category] || '', extra?.sessions ?? 1, extra?.prepay ? 1 : 0, now]));
   const service = (name: string) => { const i = PRICE_LIST.findIndex(x => x[1] === name); return {id: 's-' + i, name, minutes: PRICE_LIST[i][2], price: PRICE_LIST[i][3] * 100}; };

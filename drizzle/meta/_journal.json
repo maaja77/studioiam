@@ -113,6 +113,13 @@
       "when": 1792239410451,
       "tag": "0015_bank_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1792244050803,
+      "tag": "0016_visit_products",
+      "breakpoints": true
     }
   ]
 }
