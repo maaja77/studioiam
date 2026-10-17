@@ -1,5 +1,6 @@
 // API administrace rezervací: kalendář, ruční rezervace, ceník ošetření, nastavení a blokování klientek.
-import {database, photoStorage, salonProfile, smsName, smsSender} from '../../../db/raw';
+import {database, photoStorage, publicOrigin, salonProfile, smsName, smsSender} from '../../../db/raw';
+import {icalendar} from '../../../lib/ical';
 import {addDays, addMinutes, isDate, isTime, parseSettings, salonName, salonNow, validateSettings, type BookingSettings} from '../../../lib/booking';
 import {renderSms, smsPhone} from '../../../lib/sms';
 import {parseRevenue} from '../../../lib/revenue';
@@ -21,13 +22,16 @@ export async function GET(request: Request) {
     await releaseExpiredDeposits();
     const params = new URL(request.url).searchParams, db = database();
     const from = isDate(params.get('from')) ? params.get('from')! : '0000-01-01', to = isDate(params.get('to')) ? params.get('to')! : '9999-12-31';
-    const [bookings, services, setting] = await db.batch([
+    const [bookings, services, setting, calendar] = await db.batch([
       db.prepare('SELECT b.id,b.service_id AS serviceId,b.client_id AS clientId,b.start_at AS start,b.end_at AS end,b.service_name AS serviceName,b.price_cents AS priceCents,b.name,b.phone,b.email,b.note,b.status,b.source,b.deposit_cents AS depositCents,b.deposit_status AS depositStatus,b.deposit_due AS depositDue,b.vs,b.payment_kind AS paymentKind,b.reminded_start AS remindedStart,b.reminded_at AS remindedAt,b.created,s.color,s.category,(SELECT r.id FROM receipts r WHERE r.booking_id=b.id AND r.status=\'issued\' ORDER BY r.created DESC LIMIT 1) AS receiptId FROM bookings b LEFT JOIN services s ON s.id=b.service_id WHERE b.start_at>=? AND b.start_at<? ORDER BY b.start_at').bind(from, to + 'T99'),
       db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,active,sort,category,description,color,sessions,prepay FROM services ORDER BY sort,name'),
       db.prepare("SELECT value FROM settings WHERE key='booking'"),
+      db.prepare("SELECT value FROM settings WHERE key='calendar'"),
     ]) as {results: Record<string, unknown>[]}[];
+    const token = (calendar.results[0] as {value?: string} | undefined)?.value;
     return json({bookings: bookings.results, services: services.results, settings: parseSettings((setting.results[0] as {value?: string} | undefined)?.value),
-      features: {studioPriceList: salonProfile() === 'studioiam', sms: smsName()}});
+      features: {studioPriceList: salonProfile() === 'studioiam', sms: smsName(),
+        calendarUrl: token ? `${publicOrigin(new URL(request.url).origin)}/kalendar/${token}.ics` : ''}});
   } catch (e) { console.error(e); return json({error: 'Rezervace se nepodařilo načíst. Zkuste to znovu.'}, 503); }
 }
 
@@ -85,6 +89,14 @@ export async function POST(request: Request) {
     if (body.kind === 'depositRequired') {
       const res = await db.prepare('UPDATE clients SET deposit_required=? WHERE id=?').bind(d.required ? 1 : 0, field('clientId')).run();
       if (!res.meta.changes) return json({error: 'Klient nebyl nalezen.'}, 404);
+      return json({ok: true});
+    }
+
+    // Kalendář v telefonu: zapnutí (nový tajný odkaz), nový odkaz místo starého, nebo vypnutí.
+    if (body.kind === 'calendar') {
+      if (body.action === 'off') { await db.prepare("DELETE FROM settings WHERE key='calendar'").run(); return json({ok: true}); }
+      const token = [...crypto.getRandomValues(new Uint8Array(20))].map(b => b.toString(16).padStart(2, '0')).join('');
+      await db.prepare("INSERT INTO settings (key,value) VALUES ('calendar',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(token).run();
       return json({ok: true});
     }
 
@@ -215,4 +227,22 @@ export async function remindBookings(now = salonNow()) {
     catch (e) { console.error(`SMS připomínka pro ${b.start} se nepodařila:`, e instanceof Error ? e.message : e); if (/přihlášení|heslo|kredit|IP adresa/.test(String(e))) break; }
   }
   return sent;
+}
+
+const FEED_STATUS: Record<string, string> = {pending: 'čeká na kauci nebo platbu', done: 'proběhlo'};
+/** Kalendář rezervací pro odběr v telefonu (/kalendar/<token>.ics). Null = neplatný nebo vypnutý odkaz. */
+export async function calendarFeed(token: string) {
+  const db = database(), saved = (await db.prepare("SELECT value FROM settings WHERE key='calendar'").first<{value: string}>())?.value;
+  if (!saved || !/^[0-9a-f]{40}$/.test(token) || token.length !== saved.length) return null;
+  let diff = 0; for (let i = 0; i < token.length; i++) diff |= token.charCodeAt(i) ^ saved.charCodeAt(i);
+  if (diff) return null;
+  const today = salonNow().slice(0, 10), settings = parseSettings((await db.prepare("SELECT value FROM settings WHERE key='booking'").first<{value: string}>())?.value);
+  const rows = await db.prepare("SELECT id,start_at AS start,end_at AS \"end\",service_name AS serviceName,name,phone,status,source FROM bookings WHERE start_at>=? AND start_at<? AND status IN ('confirmed','pending','done') ORDER BY start_at")
+    .bind(addDays(today, -60), addDays(today, 400)).all<{id: string; start: string; end: string; serviceName: string; name: string; phone: string; status: string; source: string}>();
+  // Do kalendáře jde jen jméno, ošetření a telefon; poznámky ani údaje z karty klientky ne.
+  return icalendar(`Rezervace – ${salonName(settings)}`, rows.results.map(b => ({
+    uid: `${b.id}@salon-rezervace`, start: b.start, end: b.end, tentative: b.status === 'pending',
+    summary: b.source === 'block' ? b.serviceName : `${b.name} – ${b.serviceName}`,
+    description: b.source === 'block' ? 'Blokovaný čas' : [b.phone && `Tel. ${b.phone}`, b.source === 'online' && 'rezervace z webu', FEED_STATUS[b.status]].filter(Boolean).join('\n'),
+  })));
 }

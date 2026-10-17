@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useState} from 'react';
-import {Copy, ImageUp, MessageSquare, Pencil, Plus, Trash2, X} from 'lucide-react';
+import {CalendarDays, Copy, ImageUp, MessageSquare, Pencil, Plus, Trash2, X} from 'lucide-react';
 import {addDays, DEFAULT_SETTINGS, salonName, salonNow, WEEKDAYS, type BookingSettings} from '../lib/booking';
 import {DEFAULT_SMS_TEMPLATE, renderSms, SMS_PLACEHOLDERS, smsParts} from '../lib/sms';
 import {czIban} from '../lib/payment';
@@ -33,14 +33,14 @@ function shrinkImage(file: File): Promise<string> {
 
 export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: string; onSaved?: () => void}) {
   const [services, setServices] = useState<Service[]>([]), [settings, setSettings] = useState<BookingSettings>(DEFAULT_SETTINGS);
-  const [editing, setEditing] = useState<Partial<Service> | null>(null), [features, setFeatures] = useState<{studioPriceList: boolean; sms?: string}>({studioPriceList: false});
+  const [editing, setEditing] = useState<Partial<Service> | null>(null), [features, setFeatures] = useState<{studioPriceList: boolean; sms?: string; calendarUrl?: string}>({studioPriceList: false});
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [copied, setCopied] = useState(false);
   const embed = `<iframe src="${bookingUrl}" title="Rezervace – ${salonName(settings).replace(/"/g, '')}" style="width:100%;min-height:900px;border:0" loading="lazy"></iframe>`;
 
   async function load() {
     try {
       const r = await fetch('/api/bookings?from=2000-01-01&to=2000-01-01', {cache: 'no-store'});
-      const d = await r.json() as {error?: string; services: Service[]; settings: BookingSettings; features?: {studioPriceList: boolean; sms?: string}};
+      const d = await r.json() as {error?: string; services: Service[]; settings: BookingSettings; features?: {studioPriceList: boolean; sms?: string; calendarUrl?: string}};
       if (!r.ok) throw new Error(d.error); setServices(d.services); setSettings(d.settings); if (d.features) setFeatures(d.features);
     } catch (e) { setError((e as Error).message); }
   }
@@ -133,6 +133,8 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
 
     <SmsPanel settings={settings} setSettings={setSettings} provider={features.sms || ''} busy={busy} run={run}/>
 
+    <CalendarPanel url={features.calendarUrl || ''} busy={busy} run={run}/>
+
     <PasswordPanel/>
 
     <ProductsPanel/>
@@ -184,6 +186,31 @@ function SmsPanel({settings, setSettings, provider, busy, run}: {settings: Booki
         <button className="secondary" disabled={busy || test.busy || !phone.trim()} onClick={sendTest}>Poslat zkušební SMS</button></span>}
       <button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Nastavení SMS bylo uloženo.')}>Uložit SMS připomínky</button>
     </div>
+  </section>;
+}
+
+/** Odběr rezervací v kalendáři telefonu přes tajný odkaz (.ics); telefon si změny stahuje sám. */
+function CalendarPanel({url, busy, run}: {url: string; busy: boolean; run: (action: () => Promise<unknown>, message: string) => Promise<void>}) {
+  const [copied, setCopied] = useState(false);
+  return <section className="panel calendar-panel">
+    <div className="panel-heading"><h2>Kalendář v telefonu</h2></div>
+    <p className="muted-inline">Rezervace se ukážou v kalendáři v telefonu (iPhone i Android) vedle Vašich ostatních událostí a samy se aktualizují. V telefonu jde kalendář jen číst, rezervace se dál upravují tady.</p>
+    {!url ? <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'calendar', action: 'on'}), 'Odkaz na kalendář je připravený.')}><CalendarDays size={17}/> Zapnout kalendář v telefonu</button></div> : <>
+      <label className="field"><span>Tajný odkaz na kalendář</span><input readOnly value={url} onFocus={e => e.currentTarget.select()}/></label>
+      <div className="form-actions calendar-actions">
+        <a className="secondary" href={url.replace(/^https?:/, 'webcal:')}>Přidat do iPhonu</a>
+        <button className="secondary" onClick={() => navigator.clipboard.writeText(url).then(() => setCopied(true), () => setCopied(false))}><Copy size={16}/> {copied ? 'Zkopírováno' : 'Zkopírovat odkaz'}</button>
+      </div>
+      <ul className="calendar-help">
+        <li><b>iPhone:</b> otevřete tuto stránku v telefonu a klepněte na Přidat do iPhonu. Nebo Nastavení → Kalendář → Účty → Přidat účet → Jiný → Přidat odebíraný kalendář a vložte odkaz.</li>
+        <li><b>Android (Google Kalendář):</b> na počítači otevřete calendar.google.com → Další kalendáře → + → Z adresy URL a vložte odkaz. Google změny stahuje jen několikrát denně, iPhone častěji.</li>
+      </ul>
+      <p className="setup-hint inline" role="note">Kdo zná odkaz, uvidí jména, ošetření a telefony klientek. Nikomu ho neposílejte. Když se dostane k někomu dalšímu, vytvořte nový odkaz a starý přestane fungovat.</p>
+      <div className="form-actions">
+        <button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'calendar', action: 'off'}), 'Kalendář v telefonu je vypnutý.')}>Vypnout</button>
+        <button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'calendar', action: 'reset'}), 'Nový odkaz je připravený, starý už nefunguje. Kalendář v telefonu přidejte znovu.')}>Vytvořit nový odkaz</button>
+      </div>
+    </>}
   </section>;
 }
 

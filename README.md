@@ -191,6 +191,17 @@ Brána se nastaví v `.env.selfhost` a pak `docker compose up -d`:
 
 Po spuštění je v logu `SMS připomínky přes: …`. Chyby odeslání (např. došlý kredit) jsou v `docker compose logs salon`.
 
+## Kalendář v telefonu
+
+V Nastavení → Kalendář v telefonu se zapne tajný odkaz `/kalendar/<kód>.ics`. Telefon ho odebírá jako kalendář
+(iPhone: tlačítko Přidat do iPhonu nebo Nastavení → Kalendář → Účty → Přidat odebíraný kalendář; Android:
+calendar.google.com → Další kalendáře → Z adresy URL) a změny si stahuje sám (Google jen několikrát denně).
+
+- V kalendáři jsou rezervace od 60 dní zpět do roku dopředu, bez zrušených a nedorazivších. Blokace času jsou tam taky.
+- U rezervace je jen jméno, ošetření a telefon; poznámky a údaje z karty klientky do kalendáře nejdou.
+- Odkaz je dostupný i bez přihlášení, na veřejné adrese rezervací (`SALON_PUBLIC_ORIGIN`), aby fungoval i mimo domácí síť.
+  Chrání ho jen tajný kód: „Vytvořit nový odkaz“ starý okamžitě zneplatní, „Vypnout“ kalendář zruší.
+
 ## Účtenky
 
 - U rezervace v kalendáři tlačítko **Dokončit**: předvyplní ošetření, přidáte produkty ze seznamu (Nastavení → Produkty k prodeji) nebo vlastní položku, slevu v % nebo Kč a zvolíte platbu QR / hotově / kartou.
