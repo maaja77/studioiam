@@ -366,3 +366,11 @@ dd .voucher-state.expiring{background:#fdf6e8}dd .voucher-state.expired{backgrou
 .stock-history td small{color:var(--muted)}.stock-history .minus{color:#b4532a}.stock-history .plus{color:var(--teal)}
 .stock-form{margin-bottom:14px}.stock-warn{grid-column:1/-1;color:#b4532a;font-size:13px}
 @media(max-width:640px){.stock-count{align-items:flex-start}.stock-row{gap:8px}}
+/* Platby z banky */
+.bank .pb-back{margin-bottom:6px}
+.bank-upload{gap:12px}.bank-upload-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}.bank-upload-row label.primary{cursor:pointer;display:inline-flex;align-items:center;gap:8px}.bank-upload-row label.disabled{opacity:.6;pointer-events:none}
+.bank-how summary{cursor:pointer;font-weight:600;font-size:14px}.bank-how ol{margin:8px 0 0;padding-left:20px;font-size:14px;color:var(--muted)}.bank-how li{margin-bottom:4px}
+.bank-result{background:#f3f9f7;border:1px solid #d3e8e3;border-radius:10px;padding:12px 14px;font-size:14px}.bank-result p{margin:0 0 4px}.bank-result ul{list-style:none;margin:6px 0 0;padding:0}.bank-result li{display:flex;align-items:center;gap:6px;padding:2px 0}.bank-result li.matched svg{color:var(--teal)}.bank-result li.mismatch{color:#9a5a14}
+.bank-list select{border:1px solid #cad8d6;border-radius:7px;padding:7px 8px;font-size:14px;max-width:260px;background:white;color:var(--ink)}
+.bank-list li.mismatch{background:#fffaf2}.bank-warn{color:#9a5a14!important}
+@media(max-width:640px){.bank-list select{max-width:100%;flex:1 1 100%}}

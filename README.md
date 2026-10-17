@@ -226,6 +226,18 @@ calendar.google.com → Další kalendáře → Z adresy URL) a změny si stahuj
 - Záložka **Účtenky**: přehled za měsíc, nezaplacené účtenky a prodej bez rezervace. Tisk přes tlačítko Tisk (účtenka je připravená na úzký papír 80 mm i A4).
 - Údaje na účtence (název, provozovatel, adresa, IČO, neplátce DPH) se nastaví v Nastavení.
 
+### Platby z banky (párování převodů)
+
+Účtenky → **Platby z banky**: nahrajete výpis pohybů z internetového bankovnictví (ČSOB: Pohyby na účtu → Export → CSV)
+a aplikace podle variabilního symbolu a částky sama označí jako zaplacené kauce u rezervací (rezervace čekající na kauci
+se potvrdí), objednávky poukazů z webu (poukaz začne platit a kupující dostane e-mail s odkazem) a QR účtenky.
+
+- Bere jen příchozí platby. Každá platba se uloží s ID transakce z banky, takže výpisy se mohou překrývat a nic se nezdvojí.
+- Když přijde méně, než se čeká, platba se nespáruje sama a ukáže se v seznamu **K vyřízení**. Tam jde platbu ručně
+  přiřadit (třeba když klientka zapomněla variabilní symbol) nebo skrýt (platby kartou z terminálu, platby mimo aplikaci).
+- Výpis z jiného účtu, než je v Nastavení, se nahraje jen po potvrzení.
+- Nahraný výpis obsahuje osobní údaje plátců. Soubor po nahrání smažte a do GitHubu ho nikdy nedávejte.
+
 ## Sklad produktů
 
 Záložka Sklad: produkty k prodeji (prodejní a nepovinně nákupní cena) a u těch se zapnutým sledováním počet kusů.

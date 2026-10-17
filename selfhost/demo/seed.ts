@@ -148,6 +148,10 @@ export async function seedDemo(run: Run, put: Put) {
     if (balance < value) run('INSERT INTO voucher_uses (id,voucher_id,receipt_id,date,amount_cents,note,created) VALUES (?,?,?,?,?,?,?)', ['vu-' + id, id, null, day(issuedOffset + 30), value - balance, 'Uplatněno při ošetření', now]);
   }
 
+  // Platba kauce z dřívějšího výpisu banky, spárovaná podle variabilního symbolu.
+  run("INSERT INTO bank_payments (id,date,amount_cents,vs,account,name,message,operation,status,match_kind,match_id,match_label,imported) VALUES ('demo-bp-1',?,70000,?,'1234567890/0800','HORÁKOVÁ LUCIE','Kauce','Příchozí úhrada okamžitá','matched','deposit','b-7',?,?)",
+    [day(-2), kStart.slice(2, 10).replace(/-/g, '') + '1042', `Kauce: Lucie Horáková, 3D Architect ${kStart.slice(0, 10).split('-').reverse().map(Number).join('. ')}`, now]);
+
   // Objednávka poukazu z webu, která čeká na platbu.
   run('INSERT INTO vouchers (id,code,kind,service_name,value_cents,balance_cents,buyer_name,buyer_contact,recipient_name,note,issued,valid_until,status,receipt_id,source,buyer_email,delivery,vs,pay_due,token,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
     ['v-7', 'C5NA-3RTY', 'value', '', 200000, 200000, 'Ondřej Svoboda', '777 000 222, ondrej@example.cz', 'Hana', 'K narozeninám', day(-1), day(182), 'pending', null, 'online', 'ondrej@example.cz', 'email', '9' + day(-1).slice(2).replace(/-/g, '') + '417', day(4), 'd'.repeat(40), now]);

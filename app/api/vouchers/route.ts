@@ -28,6 +28,30 @@ async function saleReceipt(db: DB, v: {id: string; code: string; serviceName: st
     db.prepare('UPDATE vouchers SET receipt_id=? WHERE id=?').bind(receiptId, v.id)]};
 }
 
+/**
+ * Platba za poukaz objednaný na webu dorazila: poukaz začne platit ode dneška, vznikne zaplacená účtenka
+ * a kupující dostane e-mailem odkaz na poukaz. Používá ruční potvrzení i párování z výpisu banky.
+ */
+export async function markVoucherPaid(db: DB, v: Voucher, origin: string) {
+  const today = salonNow().slice(0, 10);
+  const settings = parseSettings((await db.prepare("SELECT value FROM settings WHERE key='booking'").first<{value: string}>())?.value);
+  const validUntil = addMonths(today, settings.voucherMonths);
+  const sale = await saleReceipt(db, v, 'qr', true);
+  await db.batch([db.prepare("UPDATE vouchers SET status='active',issued=?,valid_until=?,reminder_stage=0 WHERE id=? AND status='pending'").bind(today, validUntil, v.id), ...sale.statements]);
+  if (v.buyerEmail) {
+    const token = (await db.prepare('SELECT token FROM vouchers WHERE id=?').bind(v.id).first<{token: string | null}>())?.token;
+    const link = token ? `${publicOrigin(origin)}/poukaz?t=${token}` : '';
+    notifyClient(v.buyerEmail, `Dárkový poukaz – ${salonName(settings)}`, [
+      'Dobrý den,', '', `děkujeme, platba dorazila. Dárkový poukaz ${v.kind === 'service' ? 'na ošetření ' + v.serviceName : 'v hodnotě ' + formatRevenue(v.valueCents)} je platný do ${dateText(validUntil)}.`,
+      link ? `Poukaz si můžete zobrazit, vytisknout nebo uložit jako PDF zde: ${link}` : '',
+      v.delivery === 'pickup' ? 'Tištěný poukaz pro vás připravíme v salonu.' : '', '',
+      `Kód poukazu: ${v.code}. Při objednání stačí nahlásit kód nebo poukaz přinést s sebou.`,
+      settings.businessPhone ? `Objednat se lze na tel. ${settings.businessPhone}.` : '', '', `Děkujeme, ${salonName(settings)}`,
+    ].join('\n').replace(/\n{3,}/g, '\n\n'));
+  }
+  return sale.receiptId;
+}
+
 export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams, db = database();
@@ -87,22 +111,7 @@ export async function POST(request: Request) {
     // Platba za poukaz objednaný na webu dorazila: poukaz začne platit ode dneška, vznikne účtenka a kupující dostane odkaz.
     if (body.action === 'paid') {
       if (v.status !== 'pending') return json({error: 'Poukaz už není objednávka čekající na platbu.'}, 409);
-      const settings = parseSettings((await db.prepare("SELECT value FROM settings WHERE key='booking'").first<{value: string}>())?.value);
-      const validUntil = addMonths(today, settings.voucherMonths);
-      const sale = await saleReceipt(db, v, 'qr', true);
-      await db.batch([db.prepare("UPDATE vouchers SET status='active',issued=?,valid_until=?,reminder_stage=0 WHERE id=? AND status='pending'").bind(today, validUntil, id), ...sale.statements]);
-      if (v.buyerEmail) {
-        const token = (await db.prepare('SELECT token FROM vouchers WHERE id=?').bind(id).first<{token: string | null}>())?.token;
-        const link = token ? `${publicOrigin(new URL(request.url).origin)}/poukaz?t=${token}` : '';
-        notifyClient(v.buyerEmail, `Dárkový poukaz – ${salonName(settings)}`, [
-          'Dobrý den,', '', `děkujeme, platba dorazila. Dárkový poukaz ${v.kind === 'service' ? 'na ošetření ' + v.serviceName : 'v hodnotě ' + formatRevenue(v.valueCents)} je platný do ${dateText(validUntil)}.`,
-          link ? `Poukaz si můžete zobrazit, vytisknout nebo uložit jako PDF zde: ${link}` : '',
-          v.delivery === 'pickup' ? 'Tištěný poukaz pro vás připravíme v salonu.' : '', '',
-          `Kód poukazu: ${v.code}. Při objednání stačí nahlásit kód nebo poukaz přinést s sebou.`,
-          settings.businessPhone ? `Objednat se lze na tel. ${settings.businessPhone}.` : '', '', `Děkujeme, ${salonName(settings)}`,
-        ].join('\n').replace(/\n{3,}/g, '\n\n'));
-      }
-      return json({ok: true, receiptId: sale.receiptId});
+      return json({ok: true, receiptId: await markVoucherPaid(db, v, new URL(request.url).origin)});
     }
     if (body.action === 'update') {
       await db.prepare('UPDATE vouchers SET buyer_name=?,buyer_contact=?,recipient_name=?,note=? WHERE id=?').bind(field('buyerName', 120), field('buyerContact', 120), field('recipientName', 120), field('note', 500), id).run();
