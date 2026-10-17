@@ -226,6 +226,14 @@ calendar.google.com → Další kalendáře → Z adresy URL) a změny si stahuj
 - Záložka **Účtenky**: přehled za měsíc, nezaplacené účtenky a prodej bez rezervace. Tisk přes tlačítko Tisk (účtenka je připravená na úzký papír 80 mm i A4).
 - Údaje na účtence (název, provozovatel, adresa, IČO, neplátce DPH) se nastaví v Nastavení.
 
+## Klientky, které dlouho nepřišly
+
+Karty klientů → Dlouho nebyly: klientky, jejichž poslední návštěva (zápis v kartě, proběhlý termín v kalendáři nebo
+účtenka) je starší než zvolená doba (6 týdnů až rok) a které nemají objednaný další termín. Zablokované klientky se
+neukazují. U každé je SMS s připraveným textem (otevře se v telefonu), hovor, zkopírování textu a odkaz na kartu.
+Oslovené se přesunou do záložky Oslovené, dokud znovu nepřijdou; klientky, které zprávy nechtějí, se označí Nechce zprávy.
+Text SMS se ukládá do nastavení; jako obchodní sdělení musí nabízet možnost další zprávy odmítnout.
+
 ## Dárkové poukazy
 
 Záložka Poukazy: prodej poukazu na částku nebo na ošetření (s účtenkou, takže se započítá do tržeb v den prodeje),

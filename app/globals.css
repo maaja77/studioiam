@@ -343,3 +343,13 @@ dd .voucher-state.expiring{background:#fdf6e8}dd .voucher-state.expired{backgrou
 .voucher-preview{display:flex;flex-direction:column;gap:6px}.voucher-preview .voucher-card{max-width:440px;width:100%}
 .voucher-buyer{display:flex;flex-direction:column;gap:14px}
 .voucher-ready{gap:14px}.voucher-ready .voucher-card{max-width:460px;width:100%}
+/* Dlouho nebyly */
+.heading-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.lapsed .pb-back{margin-bottom:6px}
+.inline-field{display:flex;flex-direction:row;align-items:center;gap:8px}.inline-field span{white-space:nowrap}
+.lapsed-list{list-style:none;margin:0;padding:0}
+.lapsed-list li{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:14px 4px;border-bottom:1px solid var(--line)}
+.lapsed-list li:last-child{border-bottom:0}
+.lapsed-who{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 280px}.lapsed-who small{color:var(--muted)}.lapsed-note{color:var(--teal)!important}
+.lapsed-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.lapsed-actions .secondary{min-height:36px;padding:6px 10px;display:inline-flex;align-items:center;gap:5px;font-size:14px}
+.lapsed-text{margin-top:14px}.lapsed-text summary{cursor:pointer;font-weight:600}.lapsed-text textarea{width:100%;margin-top:8px}

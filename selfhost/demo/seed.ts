@@ -36,6 +36,11 @@ export async function seedDemo(run: Run, put: Put) {
     ['demo-2', 'Lucie Horáková', '+420 602 345 678', '', 'Suchá, dehydratovaná pleť, jemné vrásky kolem očí.', '', 'Zájem o anti-age péči.', 0],
     ['demo-3', 'Markéta Dvořáková', '+420 603 456 789', 'marketa@example.cz', 'Mastná pleť se sklonem k akné.', 'Užívá isotretinoin, zatím bez peelingů.', '', 0],
     ['demo-4', 'Petra Svobodová', '+420 604 567 890', '', 'Normální pleť.', 'Alergie na latex.', 'Dárkový poukaz od dcery.', 0],
+    // Klientky, které dlouho nepřišly (přehled Dlouho nebyly).
+    ['demo-5', 'Veronika Černá', '+420 605 111 222', '', 'Smíšená pleť.', '', '', 0],
+    ['demo-6', 'Kristýna Malá', '+420 606 333 444', 'kristyna@example.cz', 'Citlivá pleť, kuperóza.', '', 'Chodila pravidelně na masáže.', 0],
+    ['demo-7', 'Hana Pokorná', '+420 607 555 666', '', 'Zralá pleť.', '', '', 0],
+    ['demo-8', 'Jitka Royová', '+420 608 777 888', '', 'Normální pleť.', '', '', 0],
   ];
   for (const c of clients) run('INSERT INTO clients (id,name,phone,email,skin,cautions,notes,created,clean_skin_active) VALUES (?,?,?,?,?,?,?,?,?)', [...c.slice(0, 7), now, c[7]] as (string | number)[]);
 
@@ -45,7 +50,14 @@ export async function seedDemo(run: Run, put: Put) {
     ['v-3', 'demo-2', day(-14), 'Hydratační ošetření s maskou', 'Hyaluronové sérum, alginátová maska', 'Doporučena domácí hydratace.', 115000, 0, null, null],
     ['v-4', 'demo-3', day(-5), 'Konzultace a jemné čištění', 'Enzymatický peeling', 'Bez mechanického čištění kvůli léčbě.', 60000, 0, null, null],
     ['v-5', 'demo-4', day(-40), 'Lifting řas a laminace obočí', '', '', 90000, 0, null, null],
+    ['v-6', 'demo-5', day(-110), 'Čištění pleti', '', '', 89000, 0, null, null],
+    ['v-7', 'demo-6', day(-250), 'Kosmetická masáž + gelová maska', '', '', 59000, 0, null, null],
+    ['v-8', 'demo-6', day(-160), 'Kosmetická masáž + gelová maska', '', '', 59000, 0, null, null],
+    ['v-9', 'demo-6', day(-125), 'Mandelic Forte Peel', '', '', 129000, 0, null, null],
+    ['v-10', 'demo-7', day(-200), 'Hyaluron Collagen 3D Lift', '', '', 149000, 0, null, null],
+    ['v-11', 'demo-8', day(-95), 'Laminace obočí', '', '', 69000, 0, null, null],
   ];
+  run("UPDATE clients SET contacted_at=? WHERE id='demo-7'", [day(-6)]);
   for (const v of visits) run('INSERT INTO visits (id,client_id,date,treatment,products,notes,revenue_cents,clean_skin,program_price_cents,program_step) VALUES (?,?,?,?,?,?,?,?,?,?)', v);
 
   PRICE_LIST.forEach(([category, name, minutes, price, extra], i) => run('INSERT INTO services (id,name,duration_min,price_cents,active,sort,category,description,color,sessions,prepay,created) VALUES (?,?,?,?,1,?,?,?,?,?,?,?)', ['s-' + i, name, minutes, price * 100, i, category, DESCRIPTIONS[name] || '', CATEGORY_COLORS[category] || '', extra?.sessions ?? 1, extra?.prepay ? 1 : 0, now]));
