@@ -4,7 +4,7 @@ import initSqlJs from 'sql.js/dist/sql-asm.js';
 import {seedDemo} from './seed';
 
 type Value = string | number | null;
-const DB_KEY = 'studioiam-demo-db-v23', PHOTO_KEY = 'studioiam-demo-photos-v23';
+const DB_KEY = 'studioiam-demo-db-v34', PHOTO_KEY = 'studioiam-demo-photos-v34';
 const migrations = import.meta.glob('../../drizzle/*.sql', {query: '?raw', import: 'default', eager: true}) as Record<string, string>;
 
 function toBase64(bytes: Uint8Array) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); }

@@ -3,6 +3,7 @@ import {CATEGORY_COLORS, PRICE_LIST} from '../../lib/price-list';
 import {DEFAULT_SETTINGS} from '../../lib/booking';
 import {consentText, INTAKE_QUESTIONS, PHOTO_CONSENT} from '../../lib/intake';
 import {DEMO_SIGNATURE} from './demo-signature';
+import {ALL_SERVICES, STARTER_SUPPLIES} from '../../lib/supplies';
 
 // Ukázkové popisy pro náhled; skutečné popisy si salon doplní v Nastavení.
 const DESCRIPTIONS: Record<string, string> = {
@@ -58,7 +59,19 @@ export async function seedDemo(run: Run, put: Put) {
     ['v-11', 'demo-8', day(-95), 'Laminace obočí', '', '', 69000, 0, null, null],
   ];
   run("UPDATE clients SET contacted_at=? WHERE id='demo-7'", [day(-6)]);
+  // Narozeniny (vymyšlená data): Tereza má narozeniny dnes, Lucie za 3 dny, Markéta před 2 dny (ještě nepopřáno).
+  const born = (offset: number, age: number) => { const d = day(offset); return `${Number(d.slice(0, 4)) - age}${d.slice(4)}`; };
+  run("UPDATE clients SET birth_date=? WHERE id='demo-1'", [born(0, 29)]);
+  run("UPDATE clients SET birth_date=? WHERE id='demo-2'", [born(3, 34)]);
+  run("UPDATE clients SET birth_date=? WHERE id='demo-3'", [born(-2, 41)]);
+  run("UPDATE clients SET birth_date=? WHERE id='demo-6'", [born(40, 52)]);
   for (const v of visits) run('INSERT INTO visits (id,client_id,date,treatment,products,notes,revenue_cents,clean_skin,program_price_cents,program_step) VALUES (?,?,?,?,?,?,?,?,?,?)', v);
+  // Programy Studia I AM (stejně jako migrace u skutečné instalace): Čistá pleť a Hydratovaná pleť.
+  run("INSERT INTO programs (id,name,treatment,price_cents,discounts,interval_days,active,sort,created) VALUES ('clean-skin','Čistá pleť','A-QS Hacker',129000,'[0,5,10]',28,1,0,?),('hydration','Hydratovaná pleť','Derma Collage',179000,'[0,5,10]',28,1,1,?)", [now, now]);
+  run("INSERT INTO client_programs (client_id,program_id,created) SELECT id,'clean-skin',? FROM clients WHERE clean_skin_active=1", [now]);
+  run("UPDATE visits SET program_id='clean-skin' WHERE clean_skin=1", []);
+  run("INSERT INTO client_programs (client_id,program_id,created) VALUES ('demo-3','hydration',?)", [now]);
+  run("INSERT INTO visits (id,client_id,date,treatment,products,notes,revenue_cents,clean_skin,program_id,program_price_cents,program_step) VALUES ('v-h1','demo-3',?,'Derma Collage','','Hydratovaná pleť, první ošetření série.',179000,0,'hydration',179000,1)", [day(-20)]);
   // Přípravky u návštěv: místo volného textu seznam s množstvím (u v-1 a v-2 zůstává ukázka staršího textového zápisu).
   const used: [string, string, string][] = [['v-3', 'Hydratační sérum s kyselinou hyaluronovou', '3 ml'], ['v-3', 'Alginátová maska', '1 sáček'], ['v-4', 'Enzymatický peeling', '2 ml'],
     ['v-5', 'Lash lifting set', ''], ['v-5', 'Barva na řasy černá', ''], ['v-6', 'Čisticí gel pro citlivou pleť', ''], ['v-6', 'Enzymatický peeling', '2 ml'], ['v-9', 'Mandelic Forte Peel', '1 vrstva'], ['v-10', 'Hyaluron Collagen 3D ampule', '1 ampule']];
@@ -117,6 +130,17 @@ export async function seedDemo(run: Run, put: Put) {
       run("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,note,created) VALUES (?,?,?,'use',-1,?,'Tester',?)", ['sm-c' + i, 'p-' + i, day(-7) + 'T10:00', stock, now]);
     }
   });
+  // Faktury za zboží (vymyšlení dodavatelé): první naskladnila gel a krém, druhá čeká na zaplacení.
+  run("INSERT INTO invoices (id,supplier,number,date,due,total_cents,paid,note,created) VALUES ('inv-1','Kosmetika Ukázka s.r.o.','FV2026-0412',?,?,192000,1,'',?)", [day(-3), day(11), now]);
+  run("INSERT INTO invoices (id,supplier,number,date,due,total_cents,paid,note,created) VALUES ('inv-2','Salon Supply Demo','2026/118',?,?,84500,0,'Rukavice a vatové tampony',?)", [day(-24), day(-10), now]);
+  for (const [id, inv, pid, name, qty, cost, stocked] of [['ii-1', 'inv-1', 'p-0', 'Čisticí gel pro citlivou pleť', 2, 32000, 1], ['ii-2', 'inv-1', 'p-2', 'Krém s SPF 50', 3, 41000, 1], ['ii-3', 'inv-1', null, 'Doprava', 1, 9000, 0],
+    ['ii-4', 'inv-2', null, 'Nitrilové rukavice M, 100 ks', 3, 18500, 0], ['ii-5', 'inv-2', null, 'Vatové tampony', 2, 14500, 0]] as const) {
+    run('INSERT INTO invoice_items (id,invoice_id,sort,product_id,name,qty,unit_cost_cents,stocked,created) VALUES (?,?,0,?,?,?,?,?,?)', [id, inv, pid, name, qty, cost, stocked, now]);
+    if (pid) {
+      run('UPDATE products SET stock=stock+? WHERE id=?', [qty, pid]);
+      run("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,invoice_id,note,created) SELECT ?,id,?,'delivery',?,stock,'inv-1','Faktura FV2026-0412 (Kosmetika Ukázka s.r.o.)',? FROM products WHERE id=?", ['sm-i' + id, day(-3) + 'T11:00', qty, now, pid]);
+    }
+  }
   const year = Number(day(0).slice(0, 4)), dna = service('DNA Glow Rebirth');
   const receipt = (seq: number, bookingId: string | null, clientId: string | null, clientName: string, issued: string, items: {name: string; qty: number; unitCents: number; kind: string}[], method: string, paid: number) => {
     const total = items.reduce((a, x) => a + x.qty * x.unitCents, 0);
@@ -144,6 +168,31 @@ export async function seedDemo(run: Run, put: Put) {
         ['rh-' + n, y, seq, `${y}/${String(seq).padStart(4, '0')}`, id, null, who, end, JSON.stringify(items), total, total, ['cash', 'card', 'qr'][k % 3], `${y}${String(seq).padStart(4, '0')}`, 'issued', '', discount, discount ? '10 %' : '', now]);
     }
   }
+  // Produkty na ošetření (kabinetní balení, vymyšlené ceny): sklad v kusech, spotřeba se odepisuje ručně.
+  ([['Enzymatický peeling, kabinetní 250 ml', 2, 1, 89000], ['Hyaluronové sérum, kabinetní 500 ml', 1, 1, 145000], ['Alginátová maska 1 kg', 3, 1, 52000], ['Čisticí gel, kabinetní 1 l', 0, 1, 98000]] as const).forEach(([name, stock, min, cost], i) =>
+    run("INSERT INTO products (id,name,price_cents,active,sort,stock,min_stock,cost_cents,kind,created) VALUES (?,?,0,1,?,?,?,?,'pro',?)", ['pro-' + i, name, 10 + i, stock, min, cost, now]));
+  // Ukázková nespolehlivá klientka s pevnou kaucí 500 Kč.
+  run("UPDATE clients SET unreliable=1,deposit_required=1,deposit_rule='k:50000' WHERE id='demo-2'", []);
+  // Oblíbená klientka (hvězdička) bez kauce, vymyšlená dovolená příští týden a ošetření se speciální kaucí, pauzou, dny a fotkou.
+  run("UPDATE clients SET vip=1 WHERE id='demo-1'", []);
+  const nextMonday = [1, 2, 3, 4, 5, 6, 7].find(k => new Date(day(k) + 'T12:00:00Z').getUTCDay() === 1)!, awayFrom = day(nextMonday + 2), awayTo = day(nextMonday + 4);
+  run("INSERT INTO absences (id,start_at,end_at,reason,note,created) VALUES ('abs-1',?,?,'Dovolená','',?)", [awayFrom + 'T00:00', awayTo + 'T23:59', now]);
+  run('UPDATE services SET deposit_cents=50000,pause_min=15,photo=1 WHERE id=?', [service('Mikrojehličkování – PDRN Multipeptide').id]);
+  run('UPDATE services SET photo=1 WHERE id=?', [service('Nevím, jaké ošetření vybrat').id]);
+  run("UPDATE services SET weekdays='24' WHERE id=?", [service('Laminace obočí').id]);
+  // Řady produktů (ukázkové): domácí péče i kabinetní produkty podle linií; vzorek masky zůstává bez řady.
+  ([['p-0', 'Neuro Cannabis'], ['p-1', 'PDRN'], ['p-2', 'C-Fusion'], ['pro-0', 'A-QS Hacker'], ['pro-1', 'PDRN'], ['pro-2', 'Derma Collage'], ['pro-3', 'Neuro Gaba & Nana']] as const).forEach(([id, line]) => run('UPDATE products SET line=? WHERE id=?', [line, id]));
+  // Spotřební materiál (vymyšlené ceny za balení) s výchozí spotřebou na klientku a odpisem podle účtenek za posledních 30 dní.
+  const supplyStock = [180, 64, 150, 9, 70, 40, 60, 30], supplyCost = [8900, 4500, 3900, 12900, 21900, 18900, 15900, 4900];
+  STARTER_SUPPLIES.forEach((x, i) => {
+    run("INSERT INTO products (id,name,price_cents,active,sort,stock,min_stock,cost_cents,kind,pack_size,created) VALUES (?,?,0,1,?,?,?,?,'supply',?,?)", ['sup-' + i, x.name, 20 + i, supplyStock[i], x.pack / 2, supplyCost[i], x.pack, now]);
+    if (!x.only) {
+      run('INSERT INTO service_supplies (id,service_key,product_id,qty,created) VALUES (?,?,?,?,?)', ['ss-' + i, ALL_SERVICES, 'sup-' + i, x.perClient, now]);
+      run("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,receipt_id,note,created) SELECT 'smh-' || ? || '-' || id,?,issued,'supply',?,NULL,id,'Ošetření, účtenka ' || number,? FROM receipts WHERE issued>=? AND items LIKE '%\"service\"%'", [i, 'sup-' + i, -x.perClient, now, day(-30)]);
+    } else PRICE_LIST.forEach(([, name], k) => { if (x.only!.test(name)) run('INSERT INTO service_supplies (id,service_key,product_id,qty,created) VALUES (?,?,?,?,?)', [`ss-${i}-${k}`, 's-' + k, 'sup-' + i, x.perClient, now]); });
+  });
+  // Lash lifting a laminace bez Perlanu a vyšetřovacího papíru.
+  PRICE_LIST.forEach(([category], k) => { if (category === 'Laminace a Lash Lifting') for (const i of [4, 5]) run('INSERT INTO service_supplies (id,service_key,product_id,qty,created) VALUES (?,?,?,0,?)', [`ss-l${i}-${k}`, 's-' + k, 'sup-' + i, now]); });
   // Dárkové poukazy (vymyšlená jména): platné, brzy vyprší, prošlý, částečně a úplně vyčerpaný, na ošetření.
   const vouchers: [string, string, 'value' | 'service', string, number, number, string, string, number, number][] = [
     ['v-1', 'KQ4M-7XPA', 'value', '', 150000, 150000, 'Tereza Malá', 'Jana Malá', -20, 163],
@@ -172,6 +221,8 @@ export async function seedDemo(run: Run, put: Put) {
     ['v-7', 'C5NA-3RTY', 'value', '', 200000, 200000, 'Ondřej Svoboda', '777 000 222, ondrej@example.cz', 'Hana', 'K narozeninám', day(-1), day(182), 'pending', null, 'online', 'ondrej@example.cz', 'email', '9' + day(-1).slice(2).replace(/-/g, '') + '417', day(4), 'd'.repeat(40), now]);
 
   const bookingSettings = {...DEFAULT_SETTINGS, smsReminders: true, voucherOnline: true, account: '331122037/0300', accountName: 'STUDIO I AM', businessName: 'STUDIO I AM', businessOwner: 'Andrea Marešová', businessAddress: 'Nerudova 884/11, 500 02 Hradec Králové', businessId: '73975052', businessPhone: '775 963 462', programEnabled: true, reviewUrl: 'https://g.page/r/ukazka-recenze/review'};
+  const short = (d: string) => d.slice(8).replace(/^0/, '') + '. ' + d.slice(5, 7).replace(/^0/, '') + '.';
+  Object.assign(bookingSettings, {depositVipFree: true, depositForfeitHours: 12, bookingNotice: `Od ${short(awayFrom)} do ${short(awayTo)} máme dovolenou. Termíny po ní už můžete rezervovat.`, bookingNoticeUntil: awayTo});
   run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify(bookingSettings)]);
   // Ukázkové dotazníky: Tereza vyplnila (s upozorněním), Lucie má odkaz, který čeká na vyplnění.
   const answers = Object.fromEntries(INTAKE_QUESTIONS.map(q => [q.id, {yes: q.id === 'allergy' || q.id === 'lenses', detail: q.id === 'allergy' ? 'parfemace, lanolin' : ''}]));

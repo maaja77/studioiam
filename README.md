@@ -7,8 +7,11 @@ Webová aplikace pro kosmetický salon Studio I AM, provozovaná na vlastním se
 - **Kartotéka klientek** (hotovo): karty s kontakty, typem pleti a upozorněními, historie návštěv
   (datum, ošetření, použité přípravky jako seznam s množstvím a tlačítkem „Jako minule“, poznámky, tržba), fotky (nahrání i focení z telefonu, porovnání před/po s koláží ke stažení),
   přehled tržeb za měsíc a celkem.
-- **Program Čistá pleť** (hotovo): série ošetření A-QS Hacker za 1 290 Kč, 2. návštěva −5 %,
-  3. a další −10 %, při odstupu nad 28 dní začíná série znovu. Cena se předvyplní do tržby.
+- **Programy** (hotovo): série jednoho ošetření se slevou podle pořadí návštěvy, spravované v Nastavení → Programy
+  (název, ošetření, cena, slevy po návštěvách, nejdelší odstup). Studio I AM má Čistou pleť (A-QS Hacker za 1 290 Kč,
+  2. návštěva −5 %, 3. a další −10 %) a Hydratovanou pleť (Derma Collage za 1 790 Kč, stejné slevy); při odstupu nad 28 dní
+  začíná série znovu. Klientka může být ve více programech; na kartě se zařadí, cena se při zápisu návštěvy předvyplní do tržby.
+  Program s návštěvami jde jen vypnout, historie zůstane.
 - **Poukazy** (plánováno).
 
 Aplikace vznikla v ChatGPT a 13. 10. 2026 byla exportována pro vlastní provoz
@@ -133,9 +136,9 @@ Dokud chybí název nebo číslo účtu, administrace na to upozorní (bez účt
 
 `SALON_PROFILE` v `.env.selfhost` určuje, co je navíc:
 
-- `studioiam` – Studio I AM: logo studia, tlačítko „Vložit ceník z MyFoxu“, program Čistá pleť zapnutý
+- `studioiam` – Studio I AM: logo studia, tlačítko „Vložit ceník z MyFoxu“, programy Čistá pleť a Hydratovaná pleť
   a při prvním spuštění se do prázdných polí doplní údaje studia (účet, adresa, telefon, IČO).
-- `generic` – jakýkoli další salon: prázdné údaje, neutrální logo, bez ceníku a programu (ten lze zapnout v Nastavení).
+- `generic` – jakýkoli další salon: prázdné údaje, neutrální logo, bez ceníku a programů (vlastní programy si salon založí v Nastavení).
 
 Bez `SALON_PROFILE` se profil zvolí při prvním spuštění sám: instalace, která už má klientky, je Studio I AM,
 nová prázdná je `generic`. Volba se uloží do databáze.
@@ -164,6 +167,12 @@ Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potře
 - Vpravo **Čeká na vyřízení**: nezaplacené kauce, proběhlé termíny bez účtenky, nezaplacené účtenky, poukazy z webu čekající na platbu a docházející produkty. Kliknutím se otevře příslušná část.
 - **Ranní e-mail** (zapíná se zaškrtnutím v části Dnes, potřebuje `SMTP_*` a `SALON_NOTIFY_EMAIL`): jednou denně mezi 7:00 a 12:00 přijde salonu přehled s časy, ošetřeními a jmény. Zdravotní údaje ani text upozornění v něm nejsou, jen poznámka „upozornění v kartě“.
 
+### Narozeniny
+
+- Datum narození se zapisuje v kartě klientky (Upravit kartu); když tam není, použije se datum z vyplněného dotazníku.
+- V části **Dnes** je panel **Narozeniny**: kdo má narozeniny dnes a v příštích dvou týdnech, kolik slaví a tlačítko **Popřát SMS** (otevře se v telefonu). Po popřání klientka z přehledu zmizí do příštího roku. Klientky „Nechce zprávy“ se zobrazí bez SMS.
+- U dnešních termínů je štítek „Dnes má narozeniny“, ranní e-mail uvádí dnešní narozeniny. Text přání jde upravit; když přidáte slevu nebo dárek, nechte v textu možnost další zprávy odmítnout.
+
 ### Prosba o hodnocení
 
 - V části **Dnes** je panel **Požádat o hodnocení** s klientkami, které byly v salonu v posledních 7 dnech. Každá se žádá jen jednou; klientky označené „Nechce zprávy“ a klientky s blokovanými rezervacemi se nenabízejí.
@@ -174,12 +183,28 @@ Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potře
 
 - Administrace: záložky **Rezervace** (týdenní kalendář s časovou osou, ošetření barevně podle kategorie, kliknutím do volného místa nová rezervace; ruční rezervace, blokace času, stav Proběhlo / Nepřišla / Zrušeno, založení karty z rezervace) a **Nastavení** (ceník ošetření s kategoriemi, popisy a barvami, výchozí ceník převzatý z MyFoxu, otevírací doba, předstih, kód pro web).
 - Veřejná stránka `/rezervace` (bez hesla) s volnými termíny; rezervace se potvrdí sama. Bez hesla je dostupné jen `/rezervace`, `/assets/*` a `/api/public` (max. 20 odeslání za hodinu z jedné IP).
+- **Fotka salonu:** v Nastavení → Rezervace na vašem webu jde nahrát fotku (PNG, JPG nebo WebP; prohlížeč ji zmenší na 1600 px). Zobrazí se nahoře na rezervační stránce nad výběrem ošetření a server ji vrací bez hesla na `/cover.jpg`.
 - Klientka se zablokovanými online rezervacemi (karta klientky nebo „Nepřišla“ v kalendáři) se pozná podle telefonu nebo e-mailu a online se neobjedná.
 - E-mail o nové rezervaci: v `.env.selfhost` vyplňte `SMTP_*` a `SALON_NOTIFY_EMAIL` (Seznam: `smtp.seznam.cz`, port 465, přihlášení celým e-mailem).
 - Na reverse proxy zveřejněte pro internet jen adresu rezervace (např. `rezervace.studioiam.cz`) a nastavte ji do `SALON_PUBLIC_ORIGIN`; na této adrese server vrací jen rezervační stránku, administrace tam odpoví 404. Administraci nechte za VPN nebo heslem. `SALON_BOOKING_FRAME_ANCESTORS` určuje weby, které smí stránku vložit do iframe.
 - **Kauce:** v Nastavení → Kauce a platby se zadá číslo účtu, hranice ceny (výchozí 2 000 Kč), procento (30 %, zaokrouhleno na stovky) a lhůta (24 h). Kauci lze zapnout i jednotlivé klientce na kartě. Rezervace pak čeká na kauci, klientka dostane QR platbu, v kalendáři se kauce označí jako zaplacená / vrácená / propadlá. Nezaplacená rezervace se po lhůtě sama zruší.
+- **Kauce u jednotlivé klientky:** na kartě klientky (Upravit kauci) jde zapnout kauci u všech rezervací a nastavit její výši: podle nastavení salonu, vlastní procento, pevná částka (nejvýš do ceny ošetření) nebo celá cena předem. Výše platí pro každou její kauci, i u dražších ošetření.
+- **Nespolehlivé klientky:** tlačítkem Označit jako nespolehlivou na kartě klientka platí kauci vždy (ve výši nastavené u ní). V seznamu klientek, v kalendáři i v přehledu Dnes je u ní upozornění. Rezervaci jde v kalendáři zrušit, nebo úplně smazat (Smazat rezervaci; ne s vystavenou účtenkou). Klientce se nic neposílá.
 - **Balíčky a programy:** u ošetření lze nastavit počet ošetření v balíčku a platbu předem. Klientka online rezervuje 1. termín a hned dostane QR platbu na celou částku; termín čeká na platbu stejně jako u kauce. Další termíny balíčku domluví salon.
+- **Pohledy kalendáře:** Den, Pracovní dny (dny s otevírací dobou nebo s rezervacemi) a Týden; prohlížeč si volbu pamatuje. Políčkem s datem se dá skočit na libovolný den.
+- **Nepřítomnost:** tlačítkem Nepřítomnost v kalendáři se zadá dovolená, nemoc, školení nebo technické důvody (celé dny, nebo od–do s časem). V tu dobu se online nenabízí žádné termíny; v kalendáři je období šrafované a odejde i do kalendáře v telefonu. Rezervace, které v tom období už jsou, zůstanou a aplikace na ně upozorní.
+- **Nastavení u ošetření:** speciální kauce (pevná částka, kterou při online rezervaci platí každá klientka), pauza po ošetření (blokuje čas na úklid, klientka ji nevidí), dny v týdnu, kdy jde ošetření rezervovat online, a fotka od klientky (nežádat, nabídnout, vyžadovat).
+- **Pravidla kauce:** v Nastavení → Kauce a platby jde kauci vyžadovat od všech klientek, od nových klientek (bez návštěvy v kartotéce a bez proběhlé rezervace) a oblíbené klientky (★ na kartě) od kauce osvobodit. Kauce na kartě klientky a nespolehlivé klientky mají přednost. Lhůta „kauce propadá při zrušení méně než X h předem“ označí zaplacenou kauci jako propadlou, když klientka nepřijde nebo se termín zruší pozdě; klientky lhůtu vidí na rezervační stránce a v e-mailu.
+- **Oznámení na rezervační stránce:** v Nastavení → Rezervace na vašem webu jde napsat krátký text (např. o dovolené) a datum, do kdy se má ukazovat.
+- **Fotky od klientky:** u ošetření s fotkou klientka přiloží až 3 fotky (prohlížeč je zmenší na 1600 px). Uloží se k rezervaci mezi ostatní fotky na serveru (`data/objects`), ne do Gitu; v detailu rezervace se dají zvětšit a uložit na kartu klientky. Smazáním rezervace se smažou i fotky.
 - **Změna termínu klientkou:** po rezervaci (a e-mailem, pokud ho vyplní) dostane klientka tajný odkaz `/rezervace?t=…`, přes který termín zruší nebo přesune, nejpozději 24 h předem (nastavitelné). Salon dostane e-mail a do poznámky rezervace se zapíše, co klientka změnila. V administraci jde termín změnit kdykoliv.
+
+## Barevný vzhled
+
+V Nastavení → Barevný vzhled kartotéky si vyberete barvu celé administrace (tyrkysová, zlatá, pudrová, levandulová, šalvějová,
+modrá, vínová, grafitová) nebo vlastní barvu. Z jedné barvy se odvodí tlačítka, nabídka, podklady i rámečky (CSS `--accent`,
+odstíny přes relativní barvy `oklch(from …)`). Příliš světlou vlastní barvu aplikace nepřijme, bílý text na tlačítkách by nebyl čitelný.
+Barva platí pro všechna zařízení; rezervační stránka a stránky pro klientky mají vlastní barvy.
 
 ## SMS připomínky
 
@@ -238,6 +263,16 @@ calendar.google.com → Další kalendáře → Z adresy URL) a změny si stahuj
 - Záložka **Účtenky**: přehled za měsíc, nezaplacené účtenky a prodej bez rezervace. Tisk přes tlačítko Tisk (účtenka je připravená na úzký papír 80 mm i A4).
 - Údaje na účtence (název, provozovatel, adresa, IČO, neplátce DPH) se nastaví v Nastavení.
 
+### Tržby podle položek
+
+V **Statistikách** je pro zvolený měsíc, rok nebo celou historii přehled tržeb podle položek účtenek (ošetření, produkty, poukazy) s podílem na celku; tlačítko Stáhnout pro Excel uloží tabulku jako CSV (středník, UTF-8).
+
+### Podklady pro účetní
+
+- Účtenky → **Pro účetní**: souhrn vybraného měsíce podle způsobu platby (hotově, kartou, QR / převod, kauce zaplacené předem) a podle druhu (ošetření, produkty, prodej dárkových poukazů), seznam účtenek včetně storen, nezaplacené QR účtenky a propadlé kauce.
+- **Stáhnout CSV** uloží soubor pro Excel (středník, UTF-8), **Vytisknout / PDF** vytiskne přehled nebo ho uloží jako PDF.
+- Část účtenky uhrazená dárkovým poukazem se do tržeb nepočítá, tržba je v měsíci prodeje poukazu. Jména klientek v podkladech nejsou.
+
 ### Platby z banky (párování převodů)
 
 Účtenky → **Platby z banky**: nahrajete výpis pohybů z internetového bankovnictví (ČSOB: Pohyby na účtu → Export → CSV)
@@ -265,6 +300,31 @@ Prodej produktu na účtence kusy odečte (ručně dopsaná položka se spáruje
 Ručně se zapisuje naskladnění (s nákupní cenou), spotřeba v salonu (testery, ošetření) a inventura (skutečný počet).
 U každého produktu je historie pohybů a odhad, na jak dlouho zásoba vystačí podle prodejů za 90 dní. Když počet klesne
 na nastavené minimum, ukáže se upozornění a odznak u záložky; na účtence se zobrazí, kolik kusů je skladem.
+
+Sklad má tři druhy produktů, každý na své záložce:
+- **Domácí péče**: produkty k prodeji klientkám. Jen ty se nabízejí na účtence a v doporučení domácí péče.
+- **Na ošetření**: profesionální (kabinetní) balení, která se používají v salonu a neprodávají. Zadává se nákupní cena za kus,
+  ukáže se hodnota zásoby. Objeví se ve výběru produktů použitých při návštěvě; spotřebu odepíšete tlačítkem Spotřeba.
+- **Spotřební materiál**: viz níže.
+
+Produkty domácí péče i na ošetření jde zařadit do **řady** (třeba A-QS Hacker, PDRN, C-Fusion). Řada se píše v úpravě produktu
+(nabízí už použité řady), seznam se podle řad seskupí a nahoře jde vybrat jen jednu řadu. Na účtence jsou produkty v nabídce
+rozdělené podle řad.
+
+Druh produktu se mění v jeho úpravě (třeba když produkt omylem skončil mezi domácí péčí). Dosavadní produkty zůstávají v Domácí péči.
+
+### Spotřební materiál
+
+- Sklad → **Spotřební materiál**: tampony, kapesníky, rukavice a další materiál, který se neprodává. Cena se zadává za balení s počtem kusů, sklad se počítá v kusech a naskladňuje po baleních. Tlačítko **Založit materiál** založí běžný seznam.
+- Sklad → **Spotřeba na ošetření**: kolik kusů čeho se použije na jednu klientku. Výchozí spotřeba platí pro každé ošetření, u jednotlivých ošetření jde upravit (třeba nitrilové rukavice jen u mikrojehličkování). U každého ošetření je cena materiálu na klientku a průměr za posledních 30 dní.
+- Materiál se ze skladu odečte při vystavení účtenky s ošetřením (podle názvu ošetření v ceníku), storno účtenky ho vrátí. Když materiál dochází, ukáže se to ve Skladu i v přehledu Dnes.
+
+### Faktury za zboží
+
+- Sklad → **Faktury za zboží**: dodavatel, číslo, datum, splatnost, částka, stav zaplacení a soubor faktury (PDF nebo fotka, nejvýše 10 MB; ukládá se na server vedle fotek a zálohuje se s nimi).
+- Položka propojená s produktem ve Skladu se při uložení naskladní a produktu se uloží nákupní cena. Položku jde založit i jako nový produkt, nebo jen zapsat (doprava, spotřební materiál).
+- E-faktura **ISDOC** (.isdoc) vyplní dodavatele, data, částku i položky sama a položky se podle názvu přiřadí k produktům.
+- Smazání faktury naskladnění vrátí. Faktury daného měsíce jsou i v Podkladech pro účetní.
 
 ## Klientky, které dlouho nepřišly
 

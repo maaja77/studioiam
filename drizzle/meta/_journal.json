@@ -134,6 +134,55 @@
       "when": 1792253786712,
       "tag": "0018_review_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1792254766032,
+      "tag": "0019_supplier_invoices",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1792256383787,
+      "tag": "0020_supplies",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1792259153213,
+      "tag": "0021_birthdays",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1792262974092,
+      "tag": "0022_product_lines",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1792265012621,
+      "tag": "0023_client_deposit",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1792265711400,
+      "tag": "0024_programs",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1792266704957,
+      "tag": "0025_myfox_ideas",
+      "breakpoints": true
     }
   ]
 }

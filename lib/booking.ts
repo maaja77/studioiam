@@ -1,7 +1,9 @@
 // Pravidla online rezervací: otevírací doba, volné termíny a porovnání telefonů.
+import {checkTheme, DEFAULT_THEME} from './theme';
 import {czIban} from './payment';
 import {DEFAULT_SMS_TEMPLATE} from './sms';
 import {parseAmounts} from './vouchers';
+import {DEFAULT_BIRTHDAY_TEXT} from './birthdays';
 // Časy se ukládají jako místní čas salonu (Europe/Prague) ve tvaru YYYY-MM-DDTHH:MM.
 
 /** Výchozí SMS klientce, která dlouho nepřišla. Obchodní sdělení musí dát možnost odmítnout další zprávy. */
@@ -14,9 +16,10 @@ export type Hours = Record<string, [string, string] | null>; // klíč 0 = nedě
 export type BookingSettings = {hours: Hours; leadHours: number; horizonDays: number; stepMinutes: number;
   depositFromKc: number; depositPercent: number; depositHoldHours: number; account: string; accountName: string; changeLimitHours: number;
   businessName: string; businessOwner: string; businessAddress: string; businessId: string; businessPhone: string; businessEmail: string;
-  programEnabled: boolean; logoVersion: number; voucherMonths: number;
+  programEnabled: boolean; logoVersion: number; coverVersion: number; voucherMonths: number;
   smsReminders: boolean; smsTime: string; smsTemplate: string; smsAscii: boolean; intakeOnline: boolean;
-  voucherOnline: boolean; voucherAmounts: string; voucherMinKc: number; voucherServices: boolean; lapsedText: string; morningMail: boolean; reviewUrl: string; reviewText: string};
+  voucherOnline: boolean; voucherAmounts: string; voucherMinKc: number; voucherServices: boolean; lapsedText: string; morningMail: boolean; reviewUrl: string; reviewText: string; birthdayText: string; themeColor: string;
+  depositAll: boolean; depositNew: boolean; depositVipFree: boolean; depositForfeitHours: number; bookingNotice: string; bookingNoticeUntil: string};
 export type BusyRange = {start: string; end: string};
 
 export const DEFAULT_SETTINGS: BookingSettings = {
@@ -37,7 +40,7 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   businessPhone: '',
   businessEmail: '',
   programEnabled: false,
-  logoVersion: 0,
+  logoVersion: 0, coverVersion: 0,
   voucherMonths: 6,
   smsReminders: false,
   smsTime: '10:00',
@@ -50,8 +53,10 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   voucherServices: true,
   lapsedText: DEFAULT_LAPSED_TEXT,
   morningMail: false,
-  reviewUrl: '',
+  reviewUrl: '', themeColor: '',
   reviewText: DEFAULT_REVIEW_TEXT,
+  birthdayText: DEFAULT_BIRTHDAY_TEXT,
+  depositAll: false, depositNew: false, depositVipFree: false, depositForfeitHours: 0, bookingNotice: '', bookingNoticeUntil: '',
 };
 /** Jméno salonu pro nadpisy a e-maily, dokud ho salon nevyplní v Nastavení. */
 export const salonName = (s: Pick<BookingSettings, 'businessName'>) => s.businessName.trim() || 'Salon';
@@ -126,21 +131,35 @@ export function validateSettings(v: unknown): BookingSettings | string {
   if (voucherOnline && !voucherAmounts && !voucherMinKc && !voucherServices) return 'Nabídněte na webu aspoň jednu částku nebo poukazy na ošetření.';
   const reviewUrl = text('reviewUrl', 300);
   if (reviewUrl && !/^https:\/\/[^\s<>"]+\.[^\s<>"]+$/.test(reviewUrl)) return 'Odkaz na hodnocení musí začínat https:// (zkopírujte ho z Google profilu firmy).';
-  return {businessName: text('businessName', 80), businessOwner: text('businessOwner', 80), businessAddress: text('businessAddress', 160), businessId, businessPhone, businessEmail,
+  const themeColor = text('themeColor', 7).toLowerCase(), themeError = checkTheme(themeColor);
+  if (themeError) return themeError;
+  const forfeit = Number(raw.depositForfeitHours ?? 0), bookingNotice = text('bookingNotice', 600), bookingNoticeUntil = text('bookingNoticeUntil', 10);
+  if (!Number.isInteger(forfeit) || forfeit < 0 || forfeit > 336) return 'Lhůta pro propadnutí kauce musí být 0–336 hodin (0 = rozhodujete sama).';
+  if (bookingNoticeUntil && !isDate(bookingNoticeUntil)) return 'Zkontrolujte datum, do kdy se má oznámení zobrazovat.';
+  return {depositAll: raw.depositAll === true, depositNew: raw.depositNew === true, depositVipFree: raw.depositVipFree === true, depositForfeitHours: forfeit, bookingNotice, bookingNoticeUntil: bookingNotice ? bookingNoticeUntil : '',
+    themeColor: themeColor === DEFAULT_THEME ? '' : themeColor, businessName: text('businessName', 80), businessOwner: text('businessOwner', 80), businessAddress: text('businessAddress', 160), businessId, businessPhone, businessEmail,
     programEnabled: raw.programEnabled === true, voucherMonths,
-    smsReminders: raw.smsReminders === true, smsTime, smsTemplate, smsAscii: raw.smsAscii !== false, intakeOnline: raw.intakeOnline !== false, voucherOnline, voucherAmounts, voucherMinKc, voucherServices, lapsedText: text('lapsedText', 480) || DEFAULT_LAPSED_TEXT, morningMail: raw.morningMail === true, reviewUrl, reviewText: text('reviewText', 480) || DEFAULT_REVIEW_TEXT, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0,
+    smsReminders: raw.smsReminders === true, smsTime, smsTemplate, smsAscii: raw.smsAscii !== false, intakeOnline: raw.intakeOnline !== false, voucherOnline, voucherAmounts, voucherMinKc, voucherServices, lapsedText: text('lapsedText', 480) || DEFAULT_LAPSED_TEXT, morningMail: raw.morningMail === true, reviewUrl, reviewText: text('reviewText', 480) || DEFAULT_REVIEW_TEXT, birthdayText: text('birthdayText', 480) || DEFAULT_BIRTHDAY_TEXT, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0, coverVersion: Number.isInteger(raw.coverVersion) ? raw.coverVersion as number : 0,
     hours, leadHours: lead, horizonDays: horizon, stepMinutes: step, depositFromKc: depositFrom, depositPercent: percent, depositHoldHours: hold, account, accountName, changeLimitHours: change};
 }
 
-/** Volné začátky termínů pro ošetření dané délky v daný den. */
-export function freeSlots(date: string, durationMin: number, settings: BookingSettings, busy: BusyRange[], now: string) {
+/** Oznámení na rezervační stránce, pokud je vyplněné a ještě nevypršelo. */
+export const activeNotice = (s: Pick<BookingSettings, 'bookingNotice' | 'bookingNoticeUntil'>, today: string) => s.bookingNotice && (!s.bookingNoticeUntil || s.bookingNoticeUntil >= today) ? s.bookingNotice : '';
+
+/** Omezení ošetření pro online rezervaci: pauza po ošetření (úklid, příprava) a dny v týdnu ('' = všechny, jinak číslice 0–6, 0 = neděle). */
+export type SlotRules = {pauseMin?: number; weekdays?: string};
+
+/** Volné začátky termínů pro ošetření dané délky v daný den. Pauza po ošetření musí být volná také, smí ale přesáhnout zavírací dobu. */
+export function freeSlots(date: string, durationMin: number, settings: BookingSettings, busy: BusyRange[], now: string, rules: SlotRules = {}) {
   const h = settings.hours[String(weekday(date))];
   if (!h || durationMin <= 0) return [];
+  if (rules.weekdays && !rules.weekdays.includes(String(weekday(date)))) return [];
+  const pause = Math.max(0, rules.pauseMin || 0);
   const earliest = addMinutes(now, settings.leadHours * 60), latest = addDays(now.slice(0, 10), settings.horizonDays);
   if (date > latest) return [];
   const out: string[] = [];
   for (let m = toMinutes(h[0]); m + durationMin <= toMinutes(h[1]); m += settings.stepMinutes) {
-    const start = `${date}T${fromMinutes(m)}`, end = addMinutes(start, durationMin);
+    const start = `${date}T${fromMinutes(m)}`, end = addMinutes(start, durationMin + pause);
     if (start < earliest) continue;
     if (busy.some(b => b.start < end && start < b.end)) continue;
     out.push(fromMinutes(m));

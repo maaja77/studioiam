@@ -4,8 +4,10 @@ import {CalendarDays, Copy, ImageUp, MessageSquare, Pencil, Plus, Trash2, X} fro
 import {addDays, DEFAULT_SETTINGS, salonName, salonNow, WEEKDAYS, type BookingSettings} from '../lib/booking';
 import {DEFAULT_SMS_TEMPLATE, renderSms, SMS_PLACEHOLDERS, smsParts} from '../lib/sms';
 import {czIban} from '../lib/payment';
-import {logoSrc} from './logo';
+import {coverSrc, logoSrc} from './logo';
 import {formatRevenue} from '../lib/revenue';
+import ProgramSettings from './program-settings';
+import {applyTheme, checkTheme, DEFAULT_THEME, THEMES} from '../lib/theme';
 import {CATEGORY_COLORS, PRICE_LIST, serviceColor} from '../lib/price-list';
 import type {Service} from './bookings';
 
@@ -17,13 +19,13 @@ async function post(body: unknown) {
 const ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 /** Zmenší obrázek na nejvýš 256 px, aby logo bylo malé a ostré na účtence i v hlavičce. */
-function shrinkImage(file: File): Promise<string> {
+function shrinkImage(file: File, max = 256, type = 'image/png'): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file), img = new Image();
     img.onload = () => {
-      const scale = Math.min(1, 256 / Math.max(img.width, img.height)), canvas = document.createElement('canvas');
+      const scale = Math.min(1, max / Math.max(img.width, img.height)), canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(img.width * scale)); canvas.height = Math.max(1, Math.round(img.height * scale));
-      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height); URL.revokeObjectURL(url); resolve(canvas.toDataURL('image/png'));
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height); URL.revokeObjectURL(url); resolve(canvas.toDataURL(type, 0.85));
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Obrázek se nepodařilo načíst. Zkuste PNG nebo JPG.')); };
     img.src = url;
@@ -65,10 +67,10 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
         <h3>{category || 'Bez kategorie'} <small>{list.length}</small></h3>
         <ul className="service-list">{list.map(s => <li key={s.id} className={s.active ? '' : 'inactive'}>
           <span className="color-dot" style={{background: serviceColor(s.color, s.category)}} aria-hidden="true"/>
-          <div><b>{s.name}</b><small>{s.durationMin} min · {s.priceCents ? formatRevenue(s.priceCents) : 'bez ceny'}{s.sessions > 1 && ` · balíček ${s.sessions}×`}{!!s.prepay && ' · platba předem'}{!s.active && ' · skryté na webu'}</small>{s.description && <small className="service-desc">{s.description}</small>}</div>
+          <div><b>{s.name}</b><small>{s.durationMin} min · {s.priceCents ? formatRevenue(s.priceCents) : 'bez ceny'}{s.sessions > 1 && ` · balíček ${s.sessions}×`}{!!s.prepay && ' · platba předem'}{!!s.depositCents && ` · kauce ${formatRevenue(s.depositCents)}`}{!!s.pauseMin && ` · pauza ${s.pauseMin} min`}{!!s.weekdays && ` · online jen ${s.weekdays.split('').map(d => WEEKDAYS[+d].slice(0, 2)).join(', ')}`}{s.photo === 2 ? ' · fotka povinná' : s.photo === 1 ? ' · fotka' : ''}{!s.active && ' · skryté na webu'}</small>{s.description && <small className="service-desc">{s.description}</small>}</div>
           <span className="actions"><button aria-label={'Upravit ' + s.name} onClick={() => setEditing(s)}><Pencil size={16}/></button><button aria-label={'Smazat ' + s.name} disabled={busy} onClick={() => run(() => post({kind: 'service', action: 'delete', data: {id: s.id}}), 'Ošetření bylo smazáno.')}><Trash2 size={16}/></button></span>
         </li>)}</ul></div>)}
-      {editing && <form className="service-form" ref={el => el?.scrollIntoView({block: "nearest", behavior: "smooth"})} onSubmit={e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.currentTarget)); run(() => post({kind: 'service', action: 'save', data: {id: editing.id, name: f.name, category: f.category, sessions: Number(f.sessions), prepay: f.prepay === 'on', description: f.description, color: f.color, durationMin: Number(f.durationMin), price: f.price, active: f.active === 'on', sort: editing.sort ?? services.length}}), 'Ošetření bylo uloženo.'); }}>
+      {editing && <form className="service-form" ref={el => el?.scrollIntoView({block: "nearest", behavior: "smooth"})} onSubmit={e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.currentTarget)); const days = ORDER.filter(d => f['day' + d] === 'on').join(''); if (!days) { setError('Vyberte aspoň jeden den, kdy jde ošetření rezervovat online.'); return; } run(() => post({kind: 'service', action: 'save', data: {id: editing.id, name: f.name, category: f.category, sessions: Number(f.sessions), prepay: f.prepay === 'on', description: f.description, color: f.color, durationMin: Number(f.durationMin), price: f.price, active: f.active === 'on', sort: editing.sort ?? services.length, deposit: f.deposit, pauseMin: Number(f.pauseMin || 0), weekdays: days, photo: Number(f.photo)}}), 'Ošetření bylo uloženo.'); }}>
         <label className="field"><span>Název</span><input name="name" required maxLength={150} defaultValue={editing.name}/></label>
         <div className="field-grid"><label className="field"><span>Kategorie</span><input name="category" list="service-categories" maxLength={80} defaultValue={editing.category} placeholder="Např. Masáže"/></label>
           <label className="field"><span>Barva v kalendáři</span><input name="color" type="color" defaultValue={serviceColor(editing.color, editing.category)}/></label></div>
@@ -78,6 +80,11 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
         <div className="field-grid"><label className="field"><span>Počet ošetření (balíček)</span><input name="sessions" type="number" min={1} max={50} required defaultValue={editing.sessions ?? 1}/></label>
           <label className="check prepay-check"><input type="checkbox" name="prepay" defaultChecked={!!editing.prepay}/> Platí se celé předem (QR platba po rezervaci)</label></div>
         <label className="check"><input type="checkbox" name="active" defaultChecked={editing.active !== 0}/> Nabízet v online rezervaci</label>
+        <div className="field-grid"><label className="field"><span>Speciální kauce (Kč, prázdné = podle pravidel salonu)</span><input name="deposit" inputMode="decimal" placeholder="Např. 500" defaultValue={editing.depositCents ? String(editing.depositCents / 100) : ''}/></label>
+          <label className="field"><span>Pauza po ošetření (min)</span><input name="pauseMin" type="number" min={0} max={240} step={5} defaultValue={editing.pauseMin || 0}/></label></div>
+        <p className="muted-inline">Speciální kauci zaplatí při online rezervaci každá klientka (kromě oblíbených, pokud je v pravidlech kauce osvobodíte). Pauza zablokuje čas po ošetření na úklid a přípravu, klientka ho nevidí.</p>
+        <fieldset className="weekday-pick"><legend>Online jen v tyto dny</legend>{ORDER.map(d => <label key={d} className="check"><input type="checkbox" name={'day' + d} defaultChecked={!editing.weekdays || editing.weekdays.includes(String(d))}/> {WEEKDAYS[d].slice(0, 2)}</label>)}</fieldset>
+        <label className="field"><span>Fotka od klientky při online rezervaci</span><select name="photo" defaultValue={editing.photo || 0}><option value={0}>Nežádat</option><option value={1}>Nabídnout (nepovinná)</option><option value={2}>Vyžadovat</option></select></label>
         <div className="form-actions"><button type="button" className="secondary" onClick={() => setEditing(null)}>Zrušit</button><button className="primary" disabled={busy}>Uložit ošetření</button></div>
       </form>}
     </section>
@@ -101,11 +108,19 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
     <section className="panel">
       <div className="panel-heading"><h2>Kauce a platby</h2></div>
       <p className="muted-inline">Kauci zaplatí klientka QR platbou hned po online rezervaci. Do té doby termín čeká a po lhůtě se sám uvolní. U jednotlivých klientek můžete kauci zapnout na jejich kartě.</p>
+      <fieldset className="deposit-rules"><legend>Kdo platí kauci</legend>
+        <label className="check"><input type="checkbox" checked={settings.depositAll} onChange={e => setSettings({...settings, depositAll: e.target.checked})}/> Všechny klientky u všech ošetření s cenou</label>
+        <label className="check"><input type="checkbox" checked={settings.depositNew} disabled={settings.depositAll} onChange={e => setSettings({...settings, depositNew: e.target.checked})}/> Nové klientky (ještě nebyly na ošetření)</label>
+        <label className="check"><input type="checkbox" checked={settings.depositVipFree} onChange={e => setSettings({...settings, depositVipFree: e.target.checked})}/> Oblíbené klientky (★ na kartě) kauci neplatí</label>
+        <p className="muted-inline">Vždy platí klientky označené jako nespolehlivé nebo se zapnutou kaucí na kartě a ošetření se speciální kaucí. Dražší ošetření podle hranice níže.</p>
+      </fieldset>
       <div className="field-grid three">
-        <label className="field"><span>Kauce od ceny (Kč)</span><input type="number" min={0} step={100} value={settings.depositFromKc} onChange={e => setSettings({...settings, depositFromKc: Number(e.target.value)})}/></label>
+        <label className="field"><span>Kauce od ceny (Kč, 0 = jen podle pravidel výše)</span><input type="number" min={0} step={100} value={settings.depositFromKc} onChange={e => setSettings({...settings, depositFromKc: Number(e.target.value)})}/></label>
         <label className="field"><span>Výše kauce (%)</span><input type="number" min={1} max={100} value={settings.depositPercent} onChange={e => setSettings({...settings, depositPercent: Number(e.target.value)})}/></label>
         <label className="field"><span>Zaplatit do (hodin)</span><input type="number" min={1} max={168} value={settings.depositHoldHours} onChange={e => setSettings({...settings, depositHoldHours: Number(e.target.value)})}/></label>
       </div>
+      <label className="field narrow"><span>Kauce propadá při zrušení méně než (hodin předem, 0 = rozhodujete sama)</span><input type="number" min={0} max={336} value={settings.depositForfeitHours} onChange={e => setSettings({...settings, depositForfeitHours: Number(e.target.value)})}/></label>
+      {settings.depositForfeitHours > 0 && <p className="muted-inline">Zaplacená kauce propadne sama, když klientka nepřijde nebo když termín zrušíte či ona zruší méně než {settings.depositForfeitHours} h předem. Klientky to uvidí na rezervační stránce i v potvrzení.</p>}
       {!czIban(settings.account) && <p className="setup-hint inline" role="note">Vyplňte číslo účtu salonu. Bez něj se nevytvoří QR platby a kauce ani platby předem se po klientkách nebudou vyžadovat.</p>}
       <div className="field-grid">
         <label className="field"><span>Číslo účtu</span><input value={settings.account} placeholder="123456789/0300" onChange={e => setSettings({...settings, account: e.target.value})}/></label>
@@ -148,10 +163,13 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
         <label className="field"><span>Telefon pro klientky</span><input value={settings.businessPhone} type="tel" maxLength={30} placeholder="777 123 456" onChange={e => setSettings({...settings, businessPhone: e.target.value})}/></label>
         <label className="field"><span>E-mail pro odpovědi klientek</span><input value={settings.businessEmail} type="email" maxLength={120} onChange={e => setSettings({...settings, businessEmail: e.target.value})}/></label>
       </div>
-      <label className="check"><input type="checkbox" checked={settings.programEnabled} onChange={e => setSettings({...settings, programEnabled: e.target.checked})}/> Program Čistá pleť (série ošetření A-QS Hacker se sledováním termínů na kartě klientky)</label>
       <p className="muted-inline">Na účtence bude i „neplátce DPH“ a QR kód na účet z části Kauce a platby.</p>
       <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Údaje salonu byly uloženy.')}>Uložit údaje</button></div>
     </section>
+
+    <ProgramSettings services={services} onSaved={onSaved}/>
+
+    <ThemePanel value={settings.themeColor} busy={busy} onPick={color => { const next = {...settings, themeColor: color}; setSettings(next); applyTheme(color); run(() => post({kind: 'settings', data: next}), 'Barva kartotéky byla uložena.'); }}/>
 
     <SmsPanel settings={settings} setSettings={setSettings} provider={features.sms || ''} busy={busy} run={run}/>
 
@@ -164,6 +182,12 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
       <div className="panel-heading"><h2>Rezervace na vašem webu</h2></div>
       <p>Rezervační stránka má vlastní adresu <b>{bookingUrl}</b>. Na webu stačí, aby na ni vedlo tlačítko „Objednat se“. Pokud ji chcete mít přímo uvnitř stránky na WordPressu, vložte blok <b>Vlastní HTML</b> s tímto kódem:</p>
       <pre className="embed-code">{embed}</pre>
+      <CoverPicker version={settings.coverVersion} busy={busy} onPick={image => run(() => post({kind: 'cover', data: {image}}), image ? 'Fotka salonu byla nahrána.' : 'Fotka salonu byla odebrána.')} onError={setError}/>
+      <div className="notice-settings">
+        <label className="field"><span>Oznámení na rezervační stránce (např. dovolená, nová ošetření)</span><textarea rows={2} maxLength={600} value={settings.bookingNotice} placeholder="Např. Od 1. do 14. 8. máme dovolenou, termíny po ní už můžete rezervovat." onChange={e => setSettings({...settings, bookingNotice: e.target.value})}/></label>
+        <div className="notice-row"><label className="field"><span>Zobrazovat do (prázdné = stále)</span><input type="date" value={settings.bookingNoticeUntil} onChange={e => setSettings({...settings, bookingNoticeUntil: e.target.value})}/></label>
+          <button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), settings.bookingNotice.trim() ? 'Oznámení se zobrazuje na rezervační stránce.' : 'Oznámení bylo odebráno.')}>Uložit oznámení</button></div>
+      </div>
       <div className="form-actions"><a className="secondary" href={bookingUrl} target="_blank" rel="noreferrer">Otevřít rezervační stránku</a><button className="secondary" onClick={() => navigator.clipboard.writeText(embed).then(() => setCopied(true), () => setCopied(false))}><Copy size={16}/> {copied ? 'Zkopírováno' : 'Zkopírovat kód'}</button></div>
     </section>
   </div>;
@@ -176,6 +200,32 @@ function LogoPicker({version, busy, onPick, onError}: {version: number; busy: bo
       <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) shrinkImage(f).then(onPick, err => onError((err as Error).message)); }}/></label>
     {!!version && <button type="button" className="link-button" disabled={busy} onClick={() => onPick(null)}>Odebrat logo</button>}
     <small className="muted-inline">PNG, JPG nebo WebP, ideálně čtvercové.</small>
+  </div>;
+}
+
+/** Barevný motiv celé administrace: hotové barvy nebo vlastní; uloží se hned po výběru. */
+function ThemePanel({value, busy, onPick}: {value: string; busy: boolean; onPick: (color: string) => void}) {
+  const current = value || DEFAULT_THEME, [custom, setCustom] = useState(current), customError = checkTheme(custom);
+  return <section className="panel theme-panel">
+    <div className="panel-heading"><h2>Barevný vzhled kartotéky</h2></div>
+    <p className="muted-inline">Barva tlačítek, nabídky a podkladů v celé administraci. Rezervační stránka pro klientky zůstává ve své barvě.</p>
+    <div className="theme-swatches" role="radiogroup" aria-label="Barva kartotéky">{THEMES.map(([label, color]) =>
+      <button type="button" key={color} role="radio" aria-checked={current === color} className={current === color ? 'active' : ''} disabled={busy} onClick={() => { setCustom(color); onPick(color === DEFAULT_THEME ? '' : color); }}>
+        <span className="theme-dot" style={{background: color}}/>{label}</button>)}</div>
+    <div className="theme-custom"><label><span>Vlastní barva</span><input type="color" value={custom} onChange={e => setCustom(e.target.value)}/></label>
+      <button type="button" className="secondary" disabled={busy || !!customError || custom === current} onClick={() => onPick(custom)}>Použít vlastní barvu</button>
+      {customError && custom !== current && <small className="error-inline">{customError}</small>}</div>
+  </section>;
+}
+
+/** Fotka salonu nahoře na rezervační stránce; zmenší se na 1600 px a uloží jako JPEG. */
+function CoverPicker({version, busy, onPick, onError}: {version: number; busy: boolean; onPick: (image: string | null) => void; onError: (message: string) => void}) {
+  return <div className="cover-picker">
+    <b>Fotka salonu na rezervační stránce</b>
+    {version ? <img src={coverSrc(version)} alt="Fotka salonu"/> : <p className="muted-inline">Klientky ji uvidí nahoře na rezervační stránce, nad výběrem ošetření. Nejlépe vypadá fotka na šířku.</p>}
+    <div className="form-actions"><label className={'secondary' + (busy ? ' disabled' : '')}><ImageUp size={16}/> {version ? 'Změnit fotku' : 'Nahrát fotku'}
+      <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) shrinkImage(f, 1600, 'image/jpeg').then(onPick, err => onError((err as Error).message)); }}/></label>
+      {!!version && <button type="button" className="link-button" disabled={busy} onClick={() => onPick(null)}>Odebrat fotku</button>}</div>
   </div>;
 }
 

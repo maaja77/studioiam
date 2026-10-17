@@ -1,17 +1,18 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
-import {Banknote, Check, Landmark, Copy, CreditCard, Gift, Mail, MessageSquare, Plus, Printer, QrCode as QrIcon, Receipt as ReceiptIcon, Share2, Trash2, X} from 'lucide-react';
+import {Banknote, Check, Landmark, Copy, CreditCard, FileSpreadsheet, Gift, Mail, MessageSquare, Plus, Printer, QrCode as QrIcon, Receipt as ReceiptIcon, Share2, Trash2, X} from 'lucide-react';
 import {formatRevenue, parseRevenue} from '../lib/revenue';
 import {czIban, formatIban, spdPayload} from '../lib/payment';
 import {DEFAULT_SETTINGS, salonName, salonNow, type BookingSettings} from '../lib/booking';
 import {QrCode} from './qr-payment';
 import BankPayments from './bank';
+import Accounting from './accounting';
 import {voucherCover, voucherState, type Voucher} from '../lib/vouchers';
 import {logoSrc} from './logo';
 
 export type ReceiptItem = {name: string; qty: number; unitCents: number; kind: 'service' | 'product' | 'voucher' | 'other'; productId?: string};
 export type Receipt = {id: string; number: string; bookingId: string | null; clientId: string | null; clientName: string; issued: string; items: ReceiptItem[]; totalCents: number; prepaidCents: number; dueCents: number; method: string; paid: number; vs: string; status: string; note: string; discountCents?: number; discountLabel?: string; voucherCents?: number; voucherCode?: string | null};
-export type Product = {id: string; name: string; priceCents: number; active: number; sort: number; stock?: number | null};
+export type Product = {id: string; name: string; priceCents: number; active: number; sort: number; stock?: number | null; line?: string};
 /** Podklad pro novou účtenku, např. z rezervace v kalendáři. */
 export type ReceiptDraft = {bookingId?: string; clientId?: string | null; clientName?: string; items: ReceiptItem[]; prepaidCents?: number; prepaidLabel?: string};
 type Client = {id: string; name: string};
@@ -110,7 +111,11 @@ function ReceiptForm({draft, products, clients, busy, onSubmit, onCancel}: {draf
       </div>
       <div className="receipt-add">
         <select aria-label="Přidat produkt" value="" onChange={e => { const p = products.find(x => x.id === e.target.value); if (p) setItems([...items, {name: p.name, qty: 1, unitCents: p.priceCents, price: String(p.priceCents / 100).replace('.', ','), kind: 'product', productId: p.id}]); }}>
-          <option value="">+ Přidat produkt…</option>{products.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name} · {formatRevenue(p.priceCents)}{p.stock != null && ` · skladem ${p.stock} ks`}</option>)}
+          <option value="">+ Přidat produkt…</option>{(() => { const offered = products.filter(p => p.active), option = (p: Product) => <option key={p.id} value={p.id}>{p.name} · {formatRevenue(p.priceCents)}{p.stock != null && ` · skladem ${p.stock} ks`}</option>;
+            // Produkty seskupené podle řad ze Skladu; bez řad zůstane obyčejný seznam.
+            if (!offered.some(p => p.line)) return offered.map(option);
+            const lines = [...new Set(offered.map(p => p.line || ''))];
+            return lines.map(l => <optgroup key={l} label={l || 'Bez řady'}>{offered.filter(p => (p.line || '') === l).map(option)}</optgroup>); })()}
         </select>
         <button type="button" className="secondary" onClick={() => setItems([...items, {name: '', qty: 1, unitCents: 0, price: '', kind: 'other'}])}><Plus size={16}/> Vlastní položka</button>
       </div>
@@ -190,17 +195,19 @@ export function ReceiptDialog({draft, receiptId, clients, onClose, onChanged}: {
 /** Přehled účtenek za měsíc a prodej bez rezervace. */
 export default function Receipts({clients}: {clients: Client[]}) {
   const [month, setMonth] = useState(() => salonNow().slice(0, 7)), [list, setList] = useState<Receipt[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState('');
-  const [open, setOpen] = useState<{draft?: ReceiptDraft; id?: string} | null>(null), [bank, setBank] = useState(false);
+  const [open, setOpen] = useState<{draft?: ReceiptDraft; id?: string} | null>(null), [bank, setBank] = useState(false), [accounting, setAccounting] = useState(false);
   async function load() {
     try { const r = await fetch(`/api/receipts?month=${month}`, {cache: 'no-store'}); const d = await r.json() as {receipts?: Receipt[]; error?: string}; if (!d.receipts) throw new Error(d.error); setList(d.receipts); setError(''); }
     catch (e) { setError((e as Error).message || 'Účtenky se nepodařilo načíst.'); } finally { setLoading(false); }
   }
   useEffect(() => { load(); }, [month]); // eslint-disable-line react-hooks/exhaustive-deps
   if (bank) return <BankPayments onBack={() => { setBank(false); load(); }}/>;
+  if (accounting) return <Accounting month={month} onBack={() => setAccounting(false)}/>;
   const valid = list.filter(r => r.status === 'issued'), sum = valid.reduce((s, r) => s + r.totalCents, 0), unpaid = valid.filter(r => !r.paid && r.dueCents > 0);
   return <div className="receipts">
     <div className="heading"><div><p className="eyebrow">OŠETŘENÍ A PRODEJ</p><h1>Účtenky</h1><p>Účtenku vystavíte u rezervace v kalendáři, prodej produktů i tady.</p></div>
       <div className="heading-actions"><button className="secondary" onClick={() => setBank(true)}><Landmark size={17}/> Platby z banky</button>
+        <button className="secondary" onClick={() => setAccounting(true)}><FileSpreadsheet size={17}/> Pro účetní</button>
         <button className="primary" onClick={() => setOpen({draft: {items: []}})}><Plus size={18}/> Nová účtenka</button></div></div>
     {error && <div className="error" role="alert">{error}</div>}
     <section className="revenue-overview receipts-overview">

@@ -1,12 +1,15 @@
 'use client';
 // Statistiky: kolik jakého ošetření, tržby za měsíc, rok a průběžně.
 import {useEffect, useState} from 'react';
-import {ChevronLeft, ChevronRight} from 'lucide-react';
+import {ChevronLeft, ChevronRight, Download} from 'lucide-react';
 import {formatRevenue} from '../lib/revenue';
 import {salonNow} from '../lib/booking';
 
 type Treatment = {name: string; category: string; color: string; count: number; revenueCents: number};
+type Item = {name: string; kind: string; qty: number; cents: number};
+const KIND: Record<string, string> = {service: 'ošetření', product: 'produkt', voucher: 'poukaz', other: 'ostatní'};
 type Stats = {
+  items?: Item[];
   period: {year: string; month: string; all: boolean; today: string};
   revenue: {totalCents: number; receiptsCents: number; visitsCents: number; servicesCents: number; productsCents: number; vouchersSoldCents: number; voucherUsedCents: number; otherCents: number; discountsCents: number; receipts: number};
   treatments: Treatment[]; count: number; noShows: number; cancelled: number;
@@ -17,6 +20,7 @@ type Mode = 'month' | 'year' | 'all';
 const MONTHS = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
 const SHORT = ['led', 'úno', 'bře', 'dub', 'kvě', 'čvn', 'čvc', 'srp', 'zář', 'říj', 'lis', 'pro'];
 const shift = (ym: string, by: number) => { const d = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + by, 1)); return d.toISOString().slice(0, 7); };
+const query = (mode: Mode, ym: string) => mode === 'all' ? 'period=all' : mode === 'year' ? `year=${ym.slice(0, 4)}` : `year=${ym.slice(0, 4)}&month=${ym.slice(5, 7)}`;
 const plural = (n: number, one: string, few: string, many: string) => n === 1 ? one : n >= 2 && n <= 4 ? few : many;
 
 export default function StatsView() {
@@ -24,7 +28,7 @@ export default function StatsView() {
   const [mode, setMode] = useState<Mode>('month'), [ym, setYm] = useState(now);
   const [data, setData] = useState<Stats | null>(null), [error, setError] = useState(''), [hover, setHover] = useState<number | null>(null);
   useEffect(() => {
-    const q = mode === 'all' ? 'period=all' : mode === 'year' ? `year=${ym.slice(0, 4)}` : `year=${ym.slice(0, 4)}&month=${ym.slice(5, 7)}`;
+    const q = query(mode, ym);
     setError('');
     fetch('/api/stats?' + q, {cache: 'no-store'}).then(async r => { const d = await r.json() as Stats & {error?: string}; if (!r.ok) throw new Error(d.error); setData(d); }).catch(e => setError((e as Error).message || 'Statistiky se nepodařilo načíst.'));
   }, [mode, ym]);
@@ -70,6 +74,8 @@ export default function StatsView() {
         </table>}
       </section>
 
+      <ItemsPanel items={data.items || []} title={title} csvUrl={'/api/stats?format=csv&' + query(mode, ym)} fileName={`trzby-polozky-${mode === 'all' ? 'celkem' : mode === 'year' ? ym.slice(0, 4) : ym}.csv`}/>
+
       <section className="panel stats-panel">
         <div className="panel-heading"><h2>Tržby po měsících · {data.period.year}</h2><span className="muted-inline">Průběžně od začátku roku <b>{formatRevenue(data.period.year === now.slice(0, 4) ? ytd : data.months.reduce((s, m) => s + m.revenueCents, 0))}</b> · celkem za salon <b>{formatRevenue(data.allTimeCents)}</b></span></div>
         <div className="month-chart" role="img" aria-label={`Tržby po měsících roku ${data.period.year}`} onMouseLeave={() => setHover(null)}>
@@ -89,4 +95,39 @@ export default function StatsView() {
       </section>
     </>}
   </div>;
+}
+
+/** Tržby podle položek účtenek (ošetření, produkty, poukazy): největších 8 a zbytek jako Ostatní, export do Excelu (CSV). */
+function ItemsPanel({items, title, csvUrl, fileName}: {items: Item[]; title: string; csvUrl: string; fileName: string}) {
+  const [all, setAll] = useState(false), [error, setError] = useState('');
+  const total = items.reduce((s, x) => s + x.cents, 0), top = all ? items : items.slice(0, 8), rest = all ? [] : items.slice(8);
+  const rows = rest.length ? [...top, {name: `Ostatní (${rest.length} ${plural(rest.length, 'položka', 'položky', 'položek')})`, kind: '', qty: rest.reduce((s, x) => s + x.qty, 0), cents: rest.reduce((s, x) => s + x.cents, 0)}] : top;
+  const max = Math.max(1, ...rows.map(r => r.cents));
+  async function download() {
+    setError('');
+    try {
+      const r = await fetch(csvUrl, {cache: 'no-store'}); if (!r.ok) throw new Error('Export se nepodařilo stáhnout.');
+      const url = URL.createObjectURL(await r.blob()), a = document.createElement('a');
+      a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (e) { setError((e as Error).message); }
+  }
+  return <section className="panel stats-panel">
+    <div className="panel-heading"><h2>Tržby podle položek · {title}</h2><button className="secondary" disabled={!items.length} onClick={download}><Download size={16}/> Stáhnout pro Excel</button></div>
+    {error && <p className="error-inline">{error}</p>}
+    {!items.length ? <p className="muted-inline">V tomto období nejsou žádné účtenky ani tržby zapsané v kartách.</p> : <>
+      <table className="stats-table items-table">
+        <thead><tr><th>Položka</th><th className="num">Počet</th><th className="bar-cell" aria-hidden="true"></th><th className="num">Tržba</th><th className="num">Podíl</th></tr></thead>
+        <tbody>{rows.map(r => <tr key={r.kind + r.name} className={r.kind ? '' : 'other-row'}>
+          <td><div className="t-name"><span><b>{r.name}</b>{r.kind && <small>{KIND[r.kind]}</small>}</span></div></td>
+          <td className="num">{r.qty}×</td>
+          <td className="bar-cell" aria-hidden="true"><span className="bar" style={{width: `${r.cents / max * 100}%`}}/></td>
+          <td className="num"><b>{formatRevenue(r.cents)}</b></td>
+          <td className="num">{(total ? Math.round(r.cents / total * 1000) / 10 : 0).toLocaleString('cs-CZ')} %</td>
+        </tr>)}</tbody>
+        <tfoot><tr><td>Celkem</td><td/><td className="bar-cell"/><td className="num"><b>{formatRevenue(total)}</b></td><td className="num">100 %</td></tr></tfoot>
+      </table>
+      {items.length > 8 && <button type="button" className="link-button" onClick={() => setAll(!all)}>{all ? 'Zobrazit jen největší položky' : `Zobrazit všech ${items.length} položek`}</button>}
+      <p className="muted-inline">Tržba položky je po slevě a bez části zaplacené dárkovým poukazem (ten se počítá při prodeji). Soubor CSV otevřete v Excelu.</p>
+    </>}
+  </section>;
 }

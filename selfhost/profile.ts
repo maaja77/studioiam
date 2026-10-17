@@ -29,6 +29,9 @@ export function applyProfile(db: DatabaseSync, wanted = process.env.SALON_PROFIL
     const filled: Record<string, unknown> = {...saved};
     for (const [k, v] of Object.entries(STUDIO_IAM)) if (typeof saved[k] !== 'string' || !(saved[k] as string).trim()) filled[k] = v;
     if (saved.programEnabled === undefined) filled.programEnabled = true;
+    // Programy Studia I AM (u instalace, která je už měla, je doplnila migrace 0024).
+    const now = new Date().toISOString();
+    db.prepare("INSERT OR IGNORE INTO programs (id,name,treatment,price_cents,discounts,interval_days,active,sort,created) VALUES ('clean-skin','Čistá pleť','A-QS Hacker',129000,'[0,5,10]',28,1,0,?),('hydration','Hydratovaná pleť','Derma Collage',179000,'[0,5,10]',28,1,1,?)").run(now, now);
     if (JSON.stringify(filled) !== JSON.stringify(saved)) db.prepare("INSERT INTO settings (key,value) VALUES ('booking',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(filled));
   }
   return profile;

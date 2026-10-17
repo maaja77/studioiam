@@ -19,6 +19,10 @@ import * as bankApi from '../../app/api/bank/route';
 import * as careApi from '../../app/api/care/route';
 import * as todayApi from '../../app/api/today/route';
 import * as reviewsApi from '../../app/api/reviews/route';
+import * as accountingApi from '../../app/api/accounting/route';
+import * as invoicesApi from '../../app/api/invoices/route';
+import * as birthdaysApi from '../../app/api/birthdays/route';
+import * as programsApi from '../../app/api/programs/route';
 import PublicCare from '../../app/public-care';
 import * as records from '../../app/api/records/route';
 import * as photos from '../../app/api/photos/route';
@@ -41,11 +45,16 @@ async function handle(url: URL, request: Request) {
   if (url.pathname === '/api/vouchers') return m === 'GET' ? vouchersApi.GET(request) : vouchersApi.POST(request);
   if (url.pathname === '/api/intake') return m === 'GET' ? intakeApi.GET(request) : intakeApi.POST(request);
   if (url.pathname === '/api/lapsed') return m === 'GET' ? lapsedApi.GET(request) : lapsedApi.POST(request);
+  if (url.pathname === '/api/birthdays') return m === 'GET' ? birthdaysApi.GET() : birthdaysApi.POST(request);
+  if (url.pathname === '/api/programs') return m === 'GET' ? programsApi.GET() : programsApi.POST(request);
+  if (url.pathname === '/api/invoices') return m === 'GET' ? invoicesApi.GET(request) : invoicesApi.POST(request);
+  if (url.pathname === '/api/accounting') return accountingApi.GET(request);
   if (url.pathname === '/api/reviews') return m === 'GET' ? reviewsApi.GET() : reviewsApi.POST(request);
   if (url.pathname === '/api/today') return m === 'GET' ? todayApi.GET() : todayApi.POST(request);
   if (url.pathname === '/api/care') return m === 'GET' ? careApi.GET(request) : careApi.POST(request);
   if (url.pathname === '/api/bank') return m === 'GET' ? bankApi.GET() : bankApi.POST(request);
   if (url.pathname === '/api/stock') return m === 'GET' ? stockApi.GET(request) : stockApi.POST(request);
+  if (url.pathname === '/api/demo-cover') { const o = await env.BUCKET.get('branding/cover'); return o ? new Response(o.body as BodyInit, {headers: {'Content-Type': 'image/jpeg'}}) : new Response(null, {status: 404}); }
   if (url.pathname === '/api/demo-logo') { const o = await env.BUCKET.get('branding/logo'); return o ? new Response(o.body as BodyInit, {headers: {'Content-Type': 'image/png'}}) : new Response(null, {status: 404}); }
   if (url.pathname === '/api/account') return Response.json({error: 'V ukázce se heslo nemění. Na serveru tu změníte heslo do administrace.'}, {status: 400});
   if (url.pathname === '/api/public') return m === 'GET' ? publicApi.GET(request) : publicApi.POST(request);
@@ -87,6 +96,7 @@ async function swap(img: HTMLImageElement) {
   const src = img.getAttribute('src') || '';
   // Logo salonu vrací server na /logo.png; náhled server nemá, ukáže nahrané logo nebo logo Studia I AM.
   if (src.startsWith('/logo.png')) { const r = await window.fetch('/api/demo-logo'); img.setAttribute('src', r.ok ? URL.createObjectURL(await r.blob()) : LOGO); return; }
+  if (src.startsWith('/cover.jpg')) { const r = await window.fetch('/api/demo-cover'); if (r.ok) img.setAttribute('src', URL.createObjectURL(await r.blob())); return; }
   if (!src.startsWith('/api/photos?id=')) return;
   let blob = blobs.get(src);
   if (!blob) { const r = await window.fetch(src); if (!r.ok) return; blob = URL.createObjectURL(await r.blob()); blobs.set(src, blob); }
