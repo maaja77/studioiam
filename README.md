@@ -5,7 +5,7 @@ Webová aplikace pro kosmetický salon Studio I AM, provozovaná na vlastním se
 ## Moduly
 
 - **Kartotéka klientek** (hotovo): karty s kontakty, typem pleti a upozorněními, historie návštěv
-  (datum, ošetření, použité přípravky jako seznam s množstvím a tlačítkem „Jako minule“, poznámky, tržba), fotky (nahrání i focení z telefonu),
+  (datum, ošetření, použité přípravky jako seznam s množstvím a tlačítkem „Jako minule“, poznámky, tržba), fotky (nahrání i focení z telefonu, porovnání před/po s koláží ke stažení),
   přehled tržeb za měsíc a celkem.
 - **Program Čistá pleť** (hotovo): série ošetření A-QS Hacker za 1 290 Kč, 2. návštěva −5 %,
   3. a další −10 %, při odstupu nad 28 dní začíná série znovu. Cena se předvyplní do tržby.
