@@ -278,6 +278,14 @@ Ručně se zapisuje naskladnění (s nákupní cenou), spotřeba v salonu (teste
 U každého produktu je historie pohybů a odhad, na jak dlouho zásoba vystačí podle prodejů za 90 dní. Když počet klesne
 na nastavené minimum, ukáže se upozornění a odznak u záložky; na účtence se zobrazí, kolik kusů je skladem.
 
+Sklad má tři druhy produktů, každý na své záložce:
+- **Domácí péče**: produkty k prodeji klientkám. Jen ty se nabízejí na účtence a v doporučení domácí péče.
+- **Na ošetření**: profesionální (kabinetní) balení, která se používají v salonu a neprodávají. Zadává se nákupní cena za kus,
+  ukáže se hodnota zásoby. Objeví se ve výběru produktů použitých při návštěvě; spotřebu odepíšete tlačítkem Spotřeba.
+- **Spotřební materiál**: viz níže.
+
+Druh produktu se mění v jeho úpravě (třeba když produkt omylem skončil mezi domácí péčí). Dosavadní produkty zůstávají v Domácí péči.
+
 ### Spotřební materiál
 
 - Sklad → **Spotřební materiál**: tampony, kapesníky, rukavice a další materiál, který se neprodává. Cena se zadává za balení s počtem kusů, sklad se počítá v kusech a naskladňuje po baleních. Tlačítko **Založit materiál** založí běžný seznam.

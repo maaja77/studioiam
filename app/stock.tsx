@@ -8,7 +8,10 @@ import Invoices from './invoices';
 import SupplyRecipes, {type SupplyData} from './supplies';
 
 type Action = {id: string; kind: 'delivery' | 'use' | 'count' | 'history'};
-type Section = 'sale' | 'supply' | 'recipes';
+type Section = 'sale' | 'pro' | 'supply' | 'recipes';
+// Druhy zboží: domácí péče (prodej klientkám), produkty na ošetření (kabinetní kosmetika) a spotřební materiál.
+const KINDS = [['sale', 'Domácí péče'], ['pro', 'Na ošetření'], ['supply', 'Spotřební materiál']] as const;
+const kindOf = (p: {kind?: string}) => p.kind === 'supply' || p.kind === 'pro' ? p.kind : 'sale';
 const KIND_LABEL: Record<string, string> = {supply: 'Ošetření', sale: 'Prodej', delivery: 'Naskladnění', use: 'Spotřeba', count: 'Inventura', start: 'Počáteční stav', return: 'Storno prodeje'};
 const fold = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const pcs = (n: number) => `${n} ks`;
@@ -46,7 +49,7 @@ export default function Stock({onChanged}: {onChanged?: () => void}) {
   if (products && invoices) return <Invoices products={products} onBack={() => setInvoices(false)} onChanged={() => { load(); onChanged?.(); }}/>;
   if (!products) return error ? <p className="error" role="alert">{error}</p> : <p className="muted">Načítám…</p>;
 
-  const supply = section === 'supply', inSection = products.filter(p => (p.kind === 'supply') === supply);
+  const supply = section === 'supply', pro = section === 'pro', inSection = products.filter(p => kindOf(p) === section);
   const tracked = inSection.filter(p => p.stock !== null), low = inSection.filter(isLow);
   const value = tracked.reduce((s, p) => s + Math.max(0, p.stock!) * p.priceCents, 0), costValue = tracked.every(p => p.costCents != null || !p.stock) ? tracked.reduce((s, p) => s + Math.max(0, p.stock!) * (p.costCents || 0), 0) : null;
   const q = fold(query.trim()), shown = inSection.filter(p => (!q || fold(p.name).includes(q)) && (!onlyLow || isLow(p)));
@@ -54,16 +57,16 @@ export default function Stock({onChanged}: {onChanged?: () => void}) {
   return <div className="stock">
     <div className="heading"><div><p className="eyebrow">PRODUKTY</p><h1>Sklad</h1><p>Produkty k prodeji a spotřební materiál. Prodej na účtence i materiál použitý při ošetření se ze skladu odečtou samy.</p></div>
       <div className="heading-actions"><button className="secondary" onClick={() => setInvoices(true)}><FileText size={17}/> Faktury za zboží</button>
-        {section !== 'recipes' && <button className="primary" onClick={() => { setAction(null); setEditing({active: 1, stock: null, kind: supply ? 'supply' : 'sale'}); }}><Plus size={18}/> {supply ? 'Přidat materiál' : 'Přidat produkt'}</button>}</div></div>
+        {section !== 'recipes' && <button className="primary" onClick={() => { setAction(null); setEditing({active: 1, stock: null, kind: section}); }}><Plus size={18}/> {supply ? 'Přidat materiál' : 'Přidat produkt'}</button>}</div></div>
     {error && <div className="error" role="alert">{error}</div>}
-    <div className="stock-tabs segmented-mini" role="tablist" aria-label="Část skladu">{([['sale', 'K prodeji'], ['supply', 'Spotřební materiál'], ['recipes', 'Spotřeba na ošetření']] as const).map(([k, l]) => {
-      const n = k === 'recipes' ? 0 : products.filter(p => (p.kind === 'supply') === (k === 'supply') && isLow(p)).length;
+    <div className="stock-tabs segmented-mini" role="tablist" aria-label="Část skladu">{([...KINDS, ['recipes', 'Spotřeba na ošetření']] as const).map(([k, l]) => {
+      const n = k === 'recipes' ? 0 : products.filter(p => kindOf(p) === k && isLow(p)).length;
       return <button type="button" key={k} role="tab" aria-selected={section === k} className={section === k ? 'active' : ''} onClick={() => { setSection(k); setEditing(null); setAction(null); setOnlyLow(false); setQuery(''); }}>{l}{n > 0 && <span className="tab-badge">{n}</span>}</button>; })}</div>
     {section === 'recipes' ? <SupplyRecipes products={products} data={extra} onOpenSupplies={() => setSection('supply')} onSaved={() => { load(); onChanged?.(); }}/> : <>
     {low.length > 0 && <div className="setup-hint" role="note"><span><AlertTriangle size={16}/> Dochází: {low.map(p => p.name).join(', ')}.</span>{!onlyLow && <button className="secondary" onClick={() => setOnlyLow(true)}>Zobrazit</button>}</div>}
     {tracked.length > 0 && <section className="stat-tiles" aria-label="Souhrn skladu">
-      <div className="stat-tile main"><span>Na skladě</span><strong>{tracked.reduce((s, p) => s + Math.max(0, p.stock!), 0)} ks</strong><small>{tracked.length} {supply ? (tracked.length === 1 ? 'druh materiálu' : 'druhy materiálu') : tracked.length === 1 ? 'produkt' : tracked.length < 5 ? 'produkty' : 'produktů'} se sledovaným skladem</small></div>
-      {supply ? <div className="stat-tile"><span>Hodnota v nákupních cenách</span><strong>{formatRevenue(Math.round(tracked.reduce((s, p) => s + Math.max(0, p.stock!) * ((p.costCents || 0) / Math.max(1, p.packSize || 1)), 0)))}</strong><small>{tracked.every(p => p.costCents != null) ? 'podle ceny za balení' : 'doplňte ceny, hodnota je neúplná'}</small></div>
+      <div className="stat-tile main"><span>Na skladě</span><strong>{tracked.reduce((s, p) => s + Math.max(0, p.stock!), 0)} ks</strong><small>{tracked.length} {supply ? (tracked.length === 1 ? 'druh materiálu' : 'druhy materiálu') : pro ? (tracked.length === 1 ? 'produkt na ošetření' : 'produkty na ošetření') : tracked.length === 1 ? 'produkt' : tracked.length < 5 ? 'produkty' : 'produktů'} se sledovaným skladem</small></div>
+      {supply || pro ? <div className="stat-tile"><span>Hodnota v nákupních cenách</span><strong>{formatRevenue(Math.round(tracked.reduce((s, p) => s + Math.max(0, p.stock!) * ((p.costCents || 0) / Math.max(1, p.packSize || 1)), 0)))}</strong><small>{!tracked.every(p => p.costCents != null) ? 'doplňte ceny, hodnota je neúplná' : supply ? 'podle ceny za balení' : 'podle nákupní ceny za kus'}</small></div>
       : <div className="stat-tile"><span>Hodnota v prodejních cenách</span><strong>{formatRevenue(value)}</strong><small>{costValue !== null ? `nákupní cena ${formatRevenue(costValue)}` : 'doplňte nákupní ceny, uvidíte i nákupní hodnotu'}</small></div>}
       <div className="stat-tile"><span>Dochází</span><strong>{low.length}</strong><small>na minimu nebo pod ním</small></div>
     </section>}
@@ -74,10 +77,10 @@ export default function Stock({onChanged}: {onChanged?: () => void}) {
     {editing && <ProductForm product={editing} busy={busy} sort={products.length} onCancel={() => setEditing(null)} onSave={data => run('save', data)}/>}
     {supply && !inSection.length && <div className="setup-hint" role="note"><span>Založte běžný spotřební materiál jedním kliknutím: tampony, kapesníky, vatové tyčinky, ručníky, vyšetřovací papír, Perlan přířezy a rukavice. Ceny a počty pak doplníte.</span>
       <button className="secondary" disabled={busy} onClick={() => run('starter', {})}>Založit materiál</button></div>}
-    <div className="panel"><ul className="stock-list">{!inSection.length ? <li className="muted">{supply ? 'Zatím žádný spotřební materiál.' : 'Zatím žádné produkty. Přidejte kosmetiku, kterou prodáváte, a na účtence ji pak jen vyberete.'}</li> : !shown.length ? <li className="muted">Nic tu není.</li>
+    <div className="panel"><ul className="stock-list">{!inSection.length ? <li className="muted">{supply ? 'Zatím žádný spotřební materiál.' : pro ? 'Zatím žádné produkty na ošetření. Přidejte kabinetní kosmetiku (séra, masky, peelingy), kterou používáte při ošetření. U návštěvy ji pak vyberete v přípravcích.' : 'Zatím žádné produkty. Přidejte kosmetiku, kterou prodáváte, a na účtence ji pak jen vyberete.'}</li> : !shown.length ? <li className="muted">Nic tu není.</li>
     : shown.map(p => { const lowNow = isLow(p), open = action?.id === p.id ? action.kind : null; return <li key={p.id} className={p.active ? '' : 'inactive'}>
       <div className="stock-row">
-        <div className="stock-name"><b>{p.name}</b><small>{p.kind === 'supply' ? (p.costCents != null ? `${formatRevenue(p.costCents)} za balení${p.packSize ? ` po ${p.packSize} ks` : ''}` : 'bez nákupní ceny') + (extra.used30[p.id] ? ` · za 30 dní spotřebováno ${extra.used30[p.id]} ks` : '')
+        <div className="stock-name"><b>{p.name}</b><small>{p.kind === 'pro' ? (p.costCents != null ? `nákup ${formatRevenue(p.costCents)}` : 'bez nákupní ceny') : p.kind === 'supply' ? (p.costCents != null ? `${formatRevenue(p.costCents)} za balení${p.packSize ? ` po ${p.packSize} ks` : ''}` : 'bez nákupní ceny') + (extra.used30[p.id] ? ` · za 30 dní spotřebováno ${extra.used30[p.id]} ks` : '')
           : <>{formatRevenue(p.priceCents)}{p.costCents != null && ` · nákup ${formatRevenue(p.costCents)}`}</>}{!p.active && ' · skryté na účtence'}{p.stock !== null && lastsText(p, sold[p.id] || 0) && ` · ${lastsText(p, sold[p.id] || 0)}`}</small></div>
         {p.stock !== null ? <div className={'stock-count' + (lowNow ? ' low' : '')}><strong>{pcs(p.stock)}</strong>{lowNow ? <small><AlertTriangle size={13}/> dochází{p.minStock ? ` (min. ${p.minStock})` : ''}</small> : p.minStock ? <small>min. {p.minStock}</small> : null}</div>
           : <div className="stock-count off"><small>sklad nesledován</small></div>}
@@ -98,22 +101,24 @@ export default function Stock({onChanged}: {onChanged?: () => void}) {
 }
 
 function ProductForm({product, busy, sort, onSave, onCancel}: {product: Partial<StockProduct>; busy: boolean; sort: number; onSave: (data: Record<string, unknown>) => void; onCancel: () => void}) {
-  const [track, setTrack] = useState(product.stock != null || !product.id), started = product.stock != null, supply = product.kind === 'supply';
+  const [track, setTrack] = useState(product.stock != null || !product.id), started = product.stock != null, [kind, setKind] = useState(kindOf(product)), supply = kind === 'supply', pro = kind === 'pro';
   return <form className="panel service-form stock-form" ref={el => el?.scrollIntoView({block: 'nearest', behavior: 'smooth'})} onSubmit={e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.currentTarget));
-    onSave({id: product.id, kind: supply ? 'supply' : 'sale', name: f.name, price: f.price, cost: f.cost, packSize: f.packSize, active: f.active === 'on', track, stock: f.stock, minStock: f.minStock, sort: product.sort ?? sort}); }}>
+    onSave({id: product.id, kind, name: f.name, price: f.price, cost: f.cost, packSize: f.packSize, active: f.active === 'on', track, stock: f.stock, minStock: f.minStock, sort: product.sort ?? sort}); }}>
     <div className="panel-heading"><h2>{supply ? (product.id ? 'Upravit materiál' : 'Nový spotřební materiál') : product.id ? 'Upravit produkt' : 'Nový produkt'}</h2><button type="button" className="icon-btn" aria-label="Zavřít" onClick={onCancel}><X size={18}/></button></div>
     <label className="field"><span>{supply ? 'Název materiálu' : 'Název produktu'}</span><input name="name" required maxLength={150} defaultValue={product.name}/></label>
+    <div className="segmented-mini" role="radiogroup" aria-label="Druh">{KINDS.map(([k, l]) => <button type="button" key={k} role="radio" aria-checked={kind === k} className={kind === k ? 'active' : ''} onClick={() => setKind(k)}>{l}</button>)}</div>
     {supply ? <div className="field-grid"><label className="field"><span>Kusů v balení</span><input name="packSize" type="number" min={1} max={100000} defaultValue={product.packSize ?? 1}/></label>
       <label className="field"><span>Nákupní cena za balení (Kč)</span><input name="cost" inputMode="decimal" defaultValue={moneyInput(product.costCents)}/></label></div>
+    : pro ? <div className="field-grid"><label className="field"><span>Nákupní cena za kus (Kč, nepovinné)</span><input name="cost" inputMode="decimal" defaultValue={moneyInput(product.costCents)}/></label></div>
     : <div className="field-grid"><label className="field"><span>Prodejní cena (Kč)</span><input name="price" inputMode="decimal" required defaultValue={moneyInput(product.priceCents)}/></label>
       <label className="field"><span>Nákupní cena za kus (Kč, nepovinné)</span><input name="cost" inputMode="decimal" defaultValue={moneyInput(product.costCents)}/></label></div>}
-    <label className="check"><input type="checkbox" checked={track} onChange={e => setTrack(e.target.checked)}/> {supply ? 'Hlídat sklad (spotřeba při ošetření se odečte podle účtenky)' : 'Sledovat sklad (prodej na účtence odečte kusy)'}</label>
+    <label className="check"><input type="checkbox" checked={track} onChange={e => setTrack(e.target.checked)}/> {supply ? 'Hlídat sklad (spotřeba při ošetření se odečte podle účtenky)' : pro ? 'Hlídat sklad (spotřebu odepíšete tlačítkem Spotřeba, třeba když otevřete nové balení)' : 'Sledovat sklad (prodej na účtence odečte kusy)'}</label>
     {track && <div className="field-grid">
       {!started && <label className="field"><span>Kolik kusů máte teď{supply ? ' (jednotlivých kusů)' : ''}</span><input name="stock" type="number" min={0} max={99999} required defaultValue={0}/></label>}
       <label className="field"><span>Upozornit, když zbude (ks)</span><input name="minStock" type="number" min={0} max={9999} defaultValue={product.minStock ?? (supply && product.packSize ? product.packSize : 1)}/></label>
     </div>}
     {!track && started && <p className="setup-hint inline" role="note">Po vypnutí se smaže historie skladu tohoto produktu.</p>}
-    {!supply && <label className="check"><input type="checkbox" name="active" defaultChecked={product.active !== 0}/> Nabízet na účtence</label>}
+    {kind === 'sale' && <label className="check"><input type="checkbox" name="active" defaultChecked={product.active !== 0}/> Nabízet na účtence</label>}
     <div className="form-actions"><button type="button" className="secondary" onClick={onCancel}>Zrušit</button><button className="primary" disabled={busy}>{supply ? 'Uložit materiál' : 'Uložit produkt'}</button></div>
   </form>;
 }

@@ -1,6 +1,7 @@
 // Produkty a sklad: ceník produktů, stav zásob, naskladnění, spotřeba v salonu, inventura a historie pohybů.
 // Prodej na účtence odečítá sklad v API účtenek, stejně jako spotřební materiál podle ošetření na účtence.
-// Spotřební materiál (kind='supply') se neprodává; jeho nákupní cena je za balení po pack_size kusech.
+// Druhy: domácí péče k prodeji (kind='sale'), produkty na ošetření ('pro', jen sklad a přípravky u návštěv)
+// a spotřební materiál ('supply', nákupní cena za balení po pack_size kusech). Jen 'sale' se nabízí na účtence.
 import {database} from '../../../db/raw';
 import {salonNow} from '../../../lib/booking';
 import {parseRevenue} from '../../../lib/revenue';
@@ -47,9 +48,9 @@ export async function POST(request: Request) {
     if (body.action === 'recipe') return saveRecipe(db, field('serviceKey', 64), d.items, now);
     if (body.action === 'starter') return starter(db, now);
     if (body.action === 'save') {
-      const name = field('name', 150), supply = d.kind === 'supply';
+      const name = field('name', 150), supply = d.kind === 'supply', kind = supply || d.kind === 'pro' ? d.kind as string : 'sale';
       if (!name) return json({error: supply ? 'Vyplňte název materiálu.' : 'Vyplňte název produktu.'}, 400);
-      const price = supply ? 0 : money('price'), cost = money('cost'), pack = supply ? count('packSize') : null;
+      const price = kind !== 'sale' ? 0 : money('price'), cost = money('cost'), pack = supply ? count('packSize') : null;
       if (price === undefined || price === null) return json({error: 'Zadejte prodejní cenu v Kč, například 590 nebo 590,50.'}, 400);
       if (pack !== null && (Number.isNaN(pack) || pack < 1 || pack > 100000)) return json({error: 'Počet kusů v balení musí být celé číslo 1–100 000.'}, 400);
       if (cost === undefined) return json({error: 'Zadejte nákupní cenu v Kč, nebo ji nechte prázdnou.'}, 400);
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
       const startTracking = track && (old?.stock === null || old?.stock === undefined);
       if (startTracking && (start === null || Number.isNaN(start) || start < 0 || start > 99999)) return json({error: 'Zadejte, kolik kusů máte teď na skladě.'}, 400);
       const statements = [db.prepare('INSERT INTO products (id,name,price_cents,active,sort,stock,min_stock,cost_cents,kind,pack_size,created) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,price_cents=excluded.price_cents,active=excluded.active,sort=excluded.sort,stock=CASE WHEN excluded.stock IS NULL THEN NULL WHEN products.stock IS NULL THEN excluded.stock ELSE products.stock END,min_stock=excluded.min_stock,cost_cents=excluded.cost_cents,kind=excluded.kind,pack_size=excluded.pack_size')
-        .bind(id, name, price, supply || d.active !== false ? 1 : 0, Number.isInteger(d.sort) ? d.sort as number : 0, !track ? null : startTracking ? start : old!.stock, track ? minStock : null, cost, supply ? 'supply' : 'sale', pack, now)];
+        .bind(id, name, price, kind !== 'sale' || d.active !== false ? 1 : 0, Number.isInteger(d.sort) ? d.sort as number : 0, !track ? null : startTracking ? start : old!.stock, track ? minStock : null, cost, kind, pack, now)];
       if (startTracking) statements.push(db.prepare("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,receipt_id,note,created) VALUES (?,?,?,'start',?,?,NULL,?,?)").bind(crypto.randomUUID(), id, salonNow(), start, start, MOVE_NOTES.start, now));
       if (!track) statements.push(db.prepare('DELETE FROM stock_moves WHERE product_id=?').bind(id));
       await db.batch(statements);

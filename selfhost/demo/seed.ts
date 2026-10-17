@@ -162,6 +162,9 @@ export async function seedDemo(run: Run, put: Put) {
         ['rh-' + n, y, seq, `${y}/${String(seq).padStart(4, '0')}`, id, null, who, end, JSON.stringify(items), total, total, ['cash', 'card', 'qr'][k % 3], `${y}${String(seq).padStart(4, '0')}`, 'issued', '', discount, discount ? '10 %' : '', now]);
     }
   }
+  // Produkty na ošetření (kabinetní balení, vymyšlené ceny): sklad v kusech, spotřeba se odepisuje ručně.
+  ([['Enzymatický peeling, kabinetní 250 ml', 2, 1, 89000], ['Hyaluronové sérum, kabinetní 500 ml', 1, 1, 145000], ['Alginátová maska 1 kg', 3, 1, 52000], ['Čisticí gel, kabinetní 1 l', 0, 1, 98000]] as const).forEach(([name, stock, min, cost], i) =>
+    run("INSERT INTO products (id,name,price_cents,active,sort,stock,min_stock,cost_cents,kind,created) VALUES (?,?,0,1,?,?,?,?,'pro',?)", ['pro-' + i, name, 10 + i, stock, min, cost, now]));
   // Spotřební materiál (vymyšlené ceny za balení) s výchozí spotřebou na klientku a odpisem podle účtenek za posledních 30 dní.
   const supplyStock = [180, 64, 150, 9, 70, 40, 60, 30], supplyCost = [8900, 4500, 3900, 12900, 21900, 18900, 15900, 4900];
   STARTER_SUPPLIES.forEach((x, i) => {
