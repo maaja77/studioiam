@@ -238,6 +238,14 @@ se potvrdí), objednávky poukazů z webu (poukaz začne platit a kupující dos
 - Výpis z jiného účtu, než je v Nastavení, se nahraje jen po potvrzení.
 - Nahraný výpis obsahuje osobní údaje plátců. Soubor po nahrání smažte a do GitHubu ho nikdy nedávejte.
 
+## Domácí péče po ošetření
+
+U každé návštěvy v kartě je tlačítko **Domácí péče pro klientku**: napíšete doporučení (řádek s pomlčkou = odrážka)
+a vyberete doporučené produkty ze Skladu (předvyberou se ty, které jste při ošetření použila). Klientce se pošle
+tajný odkaz `/pece?t=…` SMS z telefonu nebo e-mailem (potřebuje SMTP); na stránce vidí doporučení, produkty s cenou,
+telefon salonu a odkaz na objednání. Text se příště sám nabídne u stejného ošetření. Do doporučení se nikdy
+automaticky nedávají údaje z dotazníku ani poznámky z karty.
+
 ## Sklad produktů
 
 Záložka Sklad: produkty k prodeji (prodejní a nepovinně nákupní cena) a u těch se zapnutým sledováním počet kusů.

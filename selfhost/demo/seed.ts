@@ -64,6 +64,10 @@ export async function seedDemo(run: Run, put: Put) {
     ['v-5', 'Lash lifting set', ''], ['v-5', 'Barva na řasy černá', ''], ['v-6', 'Čisticí gel pro citlivou pleť', ''], ['v-6', 'Enzymatický peeling', '2 ml'], ['v-9', 'Mandelic Forte Peel', '1 vrstva'], ['v-10', 'Hyaluron Collagen 3D ampule', '1 ampule']];
   used.forEach(([visitId, name, amount], i) => run('INSERT INTO visit_products (id,visit_id,sort,product_id,name,amount,created) VALUES (?,?,?,?,?,?,?)', ['vp-' + i, visitId, i, null, name, amount, now]));
   run("UPDATE visits SET products='' WHERE id IN ('v-3','v-4')", []);
+  // Doporučení domácí péče odeslané po poslední návštěvě Terezy.
+  run("INSERT INTO care_notes (id,visit_id,client_id,token,text,products,sent_at,sent_via,created) VALUES ('cn-1','v-2','demo-1',?,?,?,?,'sms',?)", ['f'.repeat(40),
+    'Prvních 24 hodin prosím nepoužívejte make-up a nechoďte do sauny.\n- Ráno a večer čistěte pleť jemným gelem.\n- Přes den vždy krém s SPF 50.\n- Na noc jen lehká hydratace, žádné kyseliny ani peelingy.\nPokud by pleť pálila nebo se loupala víc než 3 dny, ozvěte se mi prosím.',
+    JSON.stringify([{id: 'p-0', name: 'Čisticí gel pro citlivou pleť', priceCents: 59000, note: ''}, {id: 'p-2', name: 'Krém s SPF 50', priceCents: 79000, note: ''}]), day(-9) + 'T18:00:00.000Z', now]);
 
   PRICE_LIST.forEach(([category, name, minutes, price, extra], i) => run('INSERT INTO services (id,name,duration_min,price_cents,active,sort,category,description,color,sessions,prepay,created) VALUES (?,?,?,?,1,?,?,?,?,?,?,?)', ['s-' + i, name, minutes, price * 100, i, category, DESCRIPTIONS[name] || '', CATEGORY_COLORS[category] || '', extra?.sessions ?? 1, extra?.prepay ? 1 : 0, now]));
   const service = (name: string) => { const i = PRICE_LIST.findIndex(x => x[1] === name); return {id: 's-' + i, name, minutes: PRICE_LIST[i][2], price: PRICE_LIST[i][3] * 100}; };

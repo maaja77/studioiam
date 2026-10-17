@@ -16,6 +16,8 @@ import * as intakeApi from '../../app/api/intake/route';
 import * as lapsedApi from '../../app/api/lapsed/route';
 import * as stockApi from '../../app/api/stock/route';
 import * as bankApi from '../../app/api/bank/route';
+import * as careApi from '../../app/api/care/route';
+import PublicCare from '../../app/public-care';
 import * as records from '../../app/api/records/route';
 import * as photos from '../../app/api/photos/route';
 import {env, resetDemo} from './runtime';
@@ -37,6 +39,7 @@ async function handle(url: URL, request: Request) {
   if (url.pathname === '/api/vouchers') return m === 'GET' ? vouchersApi.GET(request) : vouchersApi.POST(request);
   if (url.pathname === '/api/intake') return m === 'GET' ? intakeApi.GET(request) : intakeApi.POST(request);
   if (url.pathname === '/api/lapsed') return m === 'GET' ? lapsedApi.GET(request) : lapsedApi.POST(request);
+  if (url.pathname === '/api/care') return m === 'GET' ? careApi.GET(request) : careApi.POST(request);
   if (url.pathname === '/api/bank') return m === 'GET' ? bankApi.GET() : bankApi.POST(request);
   if (url.pathname === '/api/stock') return m === 'GET' ? stockApi.GET(request) : stockApi.POST(request);
   if (url.pathname === '/api/demo-logo') { const o = await env.BUCKET.get('branding/logo'); return o ? new Response(o.body as BodyInit, {headers: {'Content-Type': 'image/png'}}) : new Response(null, {status: 404}); }
@@ -125,16 +128,18 @@ function DemoLogin({onLogin}: {onLogin: () => void}) {
 function Demo() {
   const [view, setView] = React.useState<View>(() => location.hash === '#rezervace' ? 'public' : location.hash === '#poukaz' ? 'voucher' : location.hash === '#prihlaseni' ? 'login' : 'admin');
   // Odkaz na účtenku pro klientku v náhledu neotevře novou stránku, ale ukáže ji tady.
-  const [receipt, setReceipt] = React.useState(''), [intake, setIntake] = React.useState(''), [order, setOrder] = React.useState('');
+  const [receipt, setReceipt] = React.useState(''), [intake, setIntake] = React.useState(''), [order, setOrder] = React.useState(''), [care, setCare] = React.useState('');
   React.useEffect(() => {
     const on = (e: MouseEvent) => {
-      const a = (e.target as HTMLElement).closest?.('a'), m = a?.href.match(/\/uctenka\?t=([0-9a-f-]{36})/), q = a?.href.match(/\/dotaznik\?t=([0-9a-f]{40})/), o = a?.href.match(/\/poukaz(?:\?t=([0-9a-f]{40}))?$/);
+      const a = (e.target as HTMLElement).closest?.('a'), m = a?.href.match(/\/uctenka\?t=([0-9a-f-]{36})/), q = a?.href.match(/\/dotaznik\?t=([0-9a-f]{40})/), o = a?.href.match(/\/poukaz(?:\?t=([0-9a-f]{40}))?$/), c = a?.href.match(/\/pece\?t=([0-9a-f]{40})/);
+      if (c) { e.preventDefault(); setCare(c[1]); window.scrollTo(0, 0); }
       if (m) { e.preventDefault(); setReceipt(m[1]); }
       if (q) { e.preventDefault(); setIntake(q[1]); window.scrollTo(0, 0); }
       if (o) { e.preventDefault(); if (o[1]) setOrder(o[1]); else setView('voucher'); window.scrollTo(0, 0); }
     };
     document.addEventListener('click', on, true); return () => document.removeEventListener('click', on, true);
   }, []);
+  if (care) return <><div className="demo-bar" role="note"><span><strong>Ukázka:</strong> takhle doporučení domácí péče uvidí klientka po otevření odkazu.</span><button type="button" onClick={() => setCare('')}>Zpět do administrace</button></div><PublicCare token={care}/></>;
   if (order) return <><div className="demo-bar" role="note"><span><strong>Ukázka:</strong> takhle objednávku poukazu uvidí kupující po otevření odkazu z e-mailu.</span><button type="button" onClick={() => setOrder('')}>Zpět</button></div><PublicVoucher key={order} token={order}/></>;
   if (intake) return <><div className="demo-bar" role="note"><span><strong>Ukázka:</strong> takhle dotazník uvidí klientka po otevření odkazu (v telefonu nebo na tabletu v salonu).</span><button type="button" onClick={() => setIntake('')}>Zpět</button></div><PublicIntake token={intake}/></>;
   if (receipt) return <><div className="demo-bar" role="note"><span><strong>Ukázka:</strong> takhle účtenku uvidí klientka po otevření odkazu.</span><button type="button" onClick={() => setReceipt('')}>Zpět do administrace</button></div><PublicReceipt token={receipt}/></>;

@@ -120,6 +120,13 @@
       "when": 1792244050803,
       "tag": "0016_visit_products",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1792248076160,
+      "tag": "0017_care_notes",
+      "breakpoints": true
     }
   ]
 }
