@@ -164,6 +164,12 @@ Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potře
 - Vpravo **Čeká na vyřízení**: nezaplacené kauce, proběhlé termíny bez účtenky, nezaplacené účtenky, poukazy z webu čekající na platbu a docházející produkty. Kliknutím se otevře příslušná část.
 - **Ranní e-mail** (zapíná se zaškrtnutím v části Dnes, potřebuje `SMTP_*` a `SALON_NOTIFY_EMAIL`): jednou denně mezi 7:00 a 12:00 přijde salonu přehled s časy, ošetřeními a jmény. Zdravotní údaje ani text upozornění v něm nejsou, jen poznámka „upozornění v kartě“.
 
+### Narozeniny
+
+- Datum narození se zapisuje v kartě klientky (Upravit kartu); když tam není, použije se datum z vyplněného dotazníku.
+- V části **Dnes** je panel **Narozeniny**: kdo má narozeniny dnes a v příštích dvou týdnech, kolik slaví a tlačítko **Popřát SMS** (otevře se v telefonu). Po popřání klientka z přehledu zmizí do příštího roku. Klientky „Nechce zprávy“ se zobrazí bez SMS.
+- U dnešních termínů je štítek „Dnes má narozeniny“, ranní e-mail uvádí dnešní narozeniny. Text přání jde upravit; když přidáte slevu nebo dárek, nechte v textu možnost další zprávy odmítnout.
+
 ### Prosba o hodnocení
 
 - V části **Dnes** je panel **Požádat o hodnocení** s klientkami, které byly v salonu v posledních 7 dnech. Každá se žádá jen jednou; klientky označené „Nechce zprávy“ a klientky s blokovanými rezervacemi se nenabízejí.

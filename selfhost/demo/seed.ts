@@ -59,6 +59,12 @@ export async function seedDemo(run: Run, put: Put) {
     ['v-11', 'demo-8', day(-95), 'Laminace obočí', '', '', 69000, 0, null, null],
   ];
   run("UPDATE clients SET contacted_at=? WHERE id='demo-7'", [day(-6)]);
+  // Narozeniny (vymyšlená data): Tereza má narozeniny dnes, Lucie za 3 dny, Markéta před 2 dny (ještě nepopřáno).
+  const born = (offset: number, age: number) => { const d = day(offset); return `${Number(d.slice(0, 4)) - age}${d.slice(4)}`; };
+  run("UPDATE clients SET birth_date=? WHERE id='demo-1'", [born(0, 29)]);
+  run("UPDATE clients SET birth_date=? WHERE id='demo-2'", [born(3, 34)]);
+  run("UPDATE clients SET birth_date=? WHERE id='demo-3'", [born(-2, 41)]);
+  run("UPDATE clients SET birth_date=? WHERE id='demo-6'", [born(40, 52)]);
   for (const v of visits) run('INSERT INTO visits (id,client_id,date,treatment,products,notes,revenue_cents,clean_skin,program_price_cents,program_step) VALUES (?,?,?,?,?,?,?,?,?,?)', v);
   // Přípravky u návštěv: místo volného textu seznam s množstvím (u v-1 a v-2 zůstává ukázka staršího textového zápisu).
   const used: [string, string, string][] = [['v-3', 'Hydratační sérum s kyselinou hyaluronovou', '3 ml'], ['v-3', 'Alginátová maska', '1 sáček'], ['v-4', 'Enzymatický peeling', '2 ml'],
