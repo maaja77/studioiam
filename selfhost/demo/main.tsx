@@ -9,6 +9,7 @@ import * as bookings from '../../app/api/bookings/route';
 import * as publicApi from '../../app/api/public/route';
 import * as receiptsApi from '../../app/api/receipts/route';
 import * as statsApi from '../../app/api/stats/route';
+import * as vouchersApi from '../../app/api/vouchers/route';
 import * as records from '../../app/api/records/route';
 import * as photos from '../../app/api/photos/route';
 import {env, resetDemo} from './runtime';
@@ -27,6 +28,7 @@ async function handle(url: URL, request: Request) {
   if (url.pathname === '/api/bookings') return m === 'GET' ? bookings.GET(request) : bookings.POST(request);
   if (url.pathname === '/api/receipts') return m === 'GET' ? receiptsApi.GET(request) : receiptsApi.POST(request);
   if (url.pathname === '/api/stats') return statsApi.GET(request);
+  if (url.pathname === '/api/vouchers') return m === 'GET' ? vouchersApi.GET(request) : vouchersApi.POST(request);
   if (url.pathname === '/api/demo-logo') { const o = await env.BUCKET.get('branding/logo'); return o ? new Response(o.body as BodyInit, {headers: {'Content-Type': 'image/png'}}) : new Response(null, {status: 404}); }
   if (url.pathname === '/api/account') return Response.json({error: 'V ukázce se heslo nemění. Na serveru tu změníte heslo do administrace.'}, {status: 400});
   if (url.pathname === '/api/public') return m === 'GET' ? publicApi.GET(request) : publicApi.POST(request);

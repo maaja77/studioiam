@@ -83,7 +83,7 @@ export async function GET(request: Request) {
     // Účtenka pro klientku přes tajný odkaz (bez údajů z kartotéky).
     if (params.has('receipt')) {
       const token = params.get('receipt') || '';
-      const r = /^[0-9a-f-]{36}$/.test(token) ? await database().prepare("SELECT number,client_name AS clientName,issued,items,total_cents AS totalCents,prepaid_cents AS prepaidCents,due_cents AS dueCents,discount_cents AS discountCents,discount_label AS discountLabel,method,paid,vs,status FROM receipts WHERE token=?").bind(token).first<Record<string, unknown> & {items: string}>() : null;
+      const r = /^[0-9a-f-]{36}$/.test(token) ? await database().prepare("SELECT number,client_name AS clientName,issued,items,total_cents AS totalCents,prepaid_cents AS prepaidCents,due_cents AS dueCents,discount_cents AS discountCents,discount_label AS discountLabel,voucher_cents AS voucherCents,(SELECT code FROM vouchers WHERE vouchers.id=receipts.voucher_id) AS voucherCode,method,paid,vs,status FROM receipts WHERE token=?").bind(token).first<Record<string, unknown> & {items: string}>() : null;
       if (!r) return json({error: 'Účtenka nebyla nalezena. Zkontrolujte prosím odkaz.'}, 404);
       const {businessName, businessOwner, businessAddress, businessId, businessPhone, account, accountName, logoVersion} = settings;
       return json({receipt: {...r, id: '', bookingId: null, clientId: null, note: '', items: JSON.parse(r.items)}, settings: {businessName, businessOwner, businessAddress, businessId, businessPhone, account, accountName, logoVersion}});

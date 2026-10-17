@@ -6,7 +6,7 @@ export type Hours = Record<string, [string, string] | null>; // klíč 0 = nedě
 export type BookingSettings = {hours: Hours; leadHours: number; horizonDays: number; stepMinutes: number;
   depositFromKc: number; depositPercent: number; depositHoldHours: number; account: string; accountName: string; changeLimitHours: number;
   businessName: string; businessOwner: string; businessAddress: string; businessId: string; businessPhone: string; businessEmail: string;
-  programEnabled: boolean; logoVersion: number};
+  programEnabled: boolean; logoVersion: number; voucherMonths: number};
 export type BusyRange = {start: string; end: string};
 
 export const DEFAULT_SETTINGS: BookingSettings = {
@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   businessEmail: '',
   programEnabled: false,
   logoVersion: 0,
+  voucherMonths: 12,
 };
 /** Jméno salonu pro nadpisy a e-maily, dokud ho salon nevyplní v Nastavení. */
 export const salonName = (s: Pick<BookingSettings, 'businessName'>) => s.businessName.trim() || 'Salon';
@@ -87,11 +88,13 @@ export function validateSettings(v: unknown): BookingSettings | string {
   const raw = s as unknown as Record<string, unknown>, text = (k: keyof BookingSettings, max: number) => typeof raw[k] === 'string' ? (raw[k] as string).trim().slice(0, max) : String(DEFAULT_SETTINGS[k]);
   const businessId = text('businessId', 12);
   if (businessId && !/^\d{8}$/.test(businessId)) return 'IČO musí mít 8 číslic.';
+  const voucherMonths = Number(raw.voucherMonths ?? DEFAULT_SETTINGS.voucherMonths);
+  if (!Number.isInteger(voucherMonths) || voucherMonths < 1 || voucherMonths > 60) return 'Platnost poukazů musí být 1–60 měsíců.';
   const businessPhone = text('businessPhone', 30), businessEmail = text('businessEmail', 120);
   if (businessPhone && !/^\+?[\d ]{9,20}$/.test(businessPhone)) return 'Zkontrolujte telefon salonu (např. 777 123 456).';
   if (businessEmail && !/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(businessEmail)) return 'Zkontrolujte e-mail salonu.';
   return {businessName: text('businessName', 80), businessOwner: text('businessOwner', 80), businessAddress: text('businessAddress', 160), businessId, businessPhone, businessEmail,
-    programEnabled: raw.programEnabled === true, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0,
+    programEnabled: raw.programEnabled === true, voucherMonths, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0,
     hours, leadHours: lead, horizonDays: horizon, stepMinutes: step, depositFromKc: depositFrom, depositPercent: percent, depositHoldHours: hold, account, accountName, changeLimitHours: change};
 }
 

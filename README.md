@@ -143,6 +143,13 @@ Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potře
 - Záložka **Účtenky**: přehled za měsíc, nezaplacené účtenky a prodej bez rezervace. Tisk přes tlačítko Tisk (účtenka je připravená na úzký papír 80 mm i A4).
 - Údaje na účtence (název, provozovatel, adresa, IČO, neplátce DPH) se nastaví v Nastavení.
 
+## Dárkové poukazy
+
+Záložka Poukazy: prodej poukazu na částku nebo na ošetření (s účtenkou, takže se započítá do tržeb v den prodeje),
+přehled s hlídáním platnosti (upozornění a odznak u záložky, když poukaz vyprší do 30 dnů), tisk poukazu (A6, PDF),
+ruční čerpání, prodloužení platnosti a storno. Výchozí platnost (12 měsíců) se mění v Nastavení → Kauce a platby.
+Poukaz se uplatní na účtence zadáním kódu; uhrazená část se do tržeb znovu nepočítá a storno účtenky ji vrátí na poukaz.
+
 ## Náhled s ukázkovými daty
 
 `pnpm run demo:build` sestaví verzi, která běží celá v prohlížeči: skutečné API handlery

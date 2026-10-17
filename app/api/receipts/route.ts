@@ -4,11 +4,13 @@ import {database, mailEnabled, notifyClient, publicOrigin} from '../../../db/raw
 import {receiptMessage} from '../../../lib/receipt-message';
 import {parseSettings, salonName, salonNow} from '../../../lib/booking';
 import {parseRevenue} from '../../../lib/revenue';
+import {normalizeCode, voucherCover, voucherState, type Voucher} from '../../../lib/vouchers';
+import {VOUCHER_COLUMNS} from '../vouchers/route';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
 export const METHODS = ['cash', 'card', 'qr'];
-export type ReceiptItem = {name: string; qty: number; unitCents: number; kind: 'service' | 'product' | 'other'};
-const RECEIPT_COLUMNS = 'id,number,booking_id AS bookingId,client_id AS clientId,client_name AS clientName,issued,items,total_cents AS totalCents,prepaid_cents AS prepaidCents,due_cents AS dueCents,method,paid,vs,status,note,discount_cents AS discountCents,discount_label AS discountLabel';
+export type ReceiptItem = {name: string; qty: number; unitCents: number; kind: 'service' | 'product' | 'voucher' | 'other'};
+const RECEIPT_COLUMNS = 'id,number,booking_id AS bookingId,client_id AS clientId,client_name AS clientName,issued,items,total_cents AS totalCents,prepaid_cents AS prepaidCents,due_cents AS dueCents,method,paid,vs,status,note,discount_cents AS discountCents,discount_label AS discountLabel,voucher_cents AS voucherCents,(SELECT code FROM vouchers WHERE vouchers.id=receipts.voucher_id) AS voucherCode';
 type Row = Record<string, unknown> & {items: string};
 const decode = (r: Row) => ({...r, items: JSON.parse(r.items) as ReceiptItem[]});
 
@@ -80,9 +82,16 @@ export async function POST(request: Request) {
     }
 
     if (body.action === 'cancel') {
-      const r = await db.prepare("SELECT booking_id AS bookingId,prepaid_cents AS prepaidCents FROM receipts WHERE id=? AND status='issued'").bind(id).first<{bookingId: string | null; prepaidCents: number}>();
+      const r = await db.prepare("SELECT booking_id AS bookingId,prepaid_cents AS prepaidCents,voucher_id AS voucherId,voucher_cents AS voucherCents FROM receipts WHERE id=? AND status='issued'").bind(id).first<{bookingId: string | null; prepaidCents: number; voucherId: string | null; voucherCents: number}>();
       if (!r) return json({error: 'Účtenka nebyla nalezena nebo už je stornovaná.'}, 404);
+      const sold = await db.prepare("SELECT id,balance_cents AS balanceCents,value_cents AS valueCents FROM vouchers WHERE receipt_id=? AND status='active'").bind(id).first<{id: string; balanceCents: number; valueCents: number}>();
+      if (sold && sold.balanceCents < sold.valueCents) return json({error: 'Poukaz z této účtenky už byl čerpán, účtenku proto stornovat nejde.'}, 409);
       const statements = [db.prepare("UPDATE receipts SET status='cancelled' WHERE id=?").bind(id)];
+      // Storno vrátí čerpanou částku na poukaz; storno prodeje poukazu stornuje i poukaz.
+      if (r.voucherId && r.voucherCents) statements.push(
+        db.prepare('DELETE FROM voucher_uses WHERE receipt_id=?').bind(id),
+        db.prepare("UPDATE vouchers SET balance_cents=CASE WHEN kind='service' THEN value_cents ELSE min(value_cents,balance_cents+?) END WHERE id=?").bind(r.voucherCents, r.voucherId));
+      if (sold) statements.push(db.prepare("UPDATE vouchers SET status='cancelled' WHERE id=?").bind(sold.id));
       // Započtená kauce se po stornu znovu ukáže jako zaplacená, aby šla použít na nové účtence.
       if (r.bookingId && r.prepaidCents) statements.push(db.prepare("UPDATE bookings SET deposit_status='paid' WHERE id=? AND deposit_status='used'").bind(r.bookingId));
       await db.batch(statements);
@@ -97,7 +106,7 @@ export async function POST(request: Request) {
       if (!name) return json({error: 'Každá položka potřebuje název.'}, 400);
       if (!Number.isInteger(qty) || qty < 1 || qty > 99) return json({error: `Počet u položky „${name}“ musí být 1–99.`}, 400);
       if (!Number.isInteger(unit) || unit < 0 || unit > 99999999) return json({error: `Zkontrolujte cenu u položky „${name}“.`}, 400);
-      items.push({name, qty, unitCents: unit, kind: raw.kind === 'service' || raw.kind === 'product' ? raw.kind : 'other'});
+      items.push({name, qty, unitCents: unit, kind: raw.kind === 'service' || raw.kind === 'product' || raw.kind === 'voucher' ? raw.kind : 'other'});
     }
     const method = METHODS.includes(field('method')) ? field('method') : 'cash';
     const subtotal = items.reduce((sum, x) => sum + x.qty * x.unitCents, 0), discount = Number(d.discountCents || 0);
@@ -109,7 +118,18 @@ export async function POST(request: Request) {
     const booking = bookingId ? await db.prepare('SELECT client_id AS clientId,name,deposit_cents AS depositCents,deposit_status AS depositStatus FROM bookings WHERE id=?').bind(bookingId).first<{clientId: string | null; name: string; depositCents: number | null; depositStatus: string | null}>() : null;
     if (bookingId && !booking) return json({error: 'Rezervace nebyla nalezena.'}, 404);
     const prepaid = booking?.depositStatus === 'paid' && booking.depositCents ? Math.min(booking.depositCents, total) : 0;
-    const due = total - prepaid;
+    // Dárkový poukaz uhradí část nebo celý zbytek; tržba se počítá už při prodeji poukazu.
+    const code = field('voucherCode', 20);
+    const voucher = code ? await db.prepare(`SELECT ${VOUCHER_COLUMNS} FROM vouchers WHERE code=?`).bind(normalizeCode(code)).first<Voucher>() : null;
+    if (code && !voucher) return json({error: 'Poukaz s tímto kódem neexistuje.'}, 404);
+    if (voucher) {
+      const state = voucherState(voucher, salonNow().slice(0, 10));
+      if (state === 'cancelled') return json({error: `Poukaz ${voucher.code} je stornovaný.`}, 409);
+      if (state === 'used') return json({error: `Poukaz ${voucher.code} je už vyčerpaný.`}, 409);
+      if (state === 'expired') return json({error: `Platnost poukazu ${voucher.code} skončila ${voucher.validUntil.split('-').reverse().map(Number).join('. ')}. Platnost můžete prodloužit v části Poukazy.`}, 409);
+    }
+    const covered = voucher ? voucherCover(voucher, items, total - prepaid) : 0;
+    const due = total - prepaid - covered;
     const clientId = field('clientId') || booking?.clientId || null;
     const clientName = field('clientName', 120) || booking?.name || '';
 
@@ -117,8 +137,11 @@ export async function POST(request: Request) {
     const last = await db.prepare('SELECT max(seq) AS seq FROM receipts WHERE year=?').bind(year).first<{seq: number | null}>();
     const seq = (last?.seq || 0) + 1, number = `${year}/${String(seq).padStart(4, '0')}`, vs = `${year}${String(seq).padStart(4, '0')}`;
     const receiptId = crypto.randomUUID();
-    const statements = [db.prepare('INSERT INTO receipts (id,year,seq,number,booking_id,client_id,client_name,issued,items,total_cents,prepaid_cents,due_cents,method,paid,vs,status,note,discount_cents,discount_label,token,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(receiptId, year, seq, number, bookingId, clientId, clientName, issued, JSON.stringify(items), total, prepaid, due, method, method === 'qr' && due > 0 ? 0 : 1, vs, 'issued', field('note', 500), discount, discount ? field('discountLabel', 40) : '', crypto.randomUUID(), new Date().toISOString())];
+    const statements = [db.prepare('INSERT INTO receipts (id,year,seq,number,booking_id,client_id,client_name,issued,items,total_cents,prepaid_cents,due_cents,method,paid,vs,status,note,discount_cents,discount_label,token,voucher_id,voucher_cents,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(receiptId, year, seq, number, bookingId, clientId, clientName, issued, JSON.stringify(items), total, prepaid, due, method, method === 'qr' && due > 0 ? 0 : 1, vs, 'issued', field('note', 500), discount, discount ? field('discountLabel', 40) : '', crypto.randomUUID(), covered ? voucher!.id : null, covered, new Date().toISOString())];
+    if (covered) statements.push(
+      db.prepare('INSERT INTO voucher_uses (id,voucher_id,receipt_id,date,amount_cents,note,created) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(), voucher!.id, receiptId, issued.slice(0, 10), covered, `Účtenka ${number}`, new Date().toISOString()),
+      db.prepare(`UPDATE vouchers SET balance_cents=${voucher!.kind === 'service' ? '0' : 'max(0,balance_cents-?)'} WHERE id=?`).bind(...(voucher!.kind === 'service' ? [voucher!.id] : [covered, voucher!.id])));
     if (booking) statements.push(db.prepare(`UPDATE bookings SET status=CASE WHEN status IN ('confirmed','pending') THEN 'done' ELSE status END${prepaid ? ",deposit_status='used'" : ''} WHERE id=?`).bind(bookingId));
     await db.batch(statements);
     return json({ok: true, id: receiptId, number});

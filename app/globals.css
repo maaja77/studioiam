@@ -278,3 +278,43 @@ dialog[open]{margin:auto}
 .logo-picker small{flex-basis:100%}
 .password-form{display:flex;flex-direction:column;gap:14px;max-width:640px}
 @media(max-width:640px){.password-form .field-grid{grid-template-columns:1fr}}
+
+/* Dárkové poukazy */
+.nav-badge{display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 5px;margin-left:6px;border-radius:10px;background:#b8955a;color:white;font-size:11px;font-weight:700;line-height:1}
+.voucher-tools{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px}
+.voucher-tools .search{margin:0;min-width:240px;background:white}
+.voucher-state{font-weight:600}
+.voucher-state.active{color:var(--teal)}.voucher-state.expiring{color:#9a5a14}.voucher-state.expired{color:#963b30}.voucher-state.used,.voucher-state.cancelled{color:var(--muted)}
+dd .voucher-state{display:inline-block;border-radius:6px;padding:1px 8px;background:#edf3f2;margin-right:4px}
+dd .voucher-state.expiring{background:#fdf6e8}dd .voucher-state.expired{background:#fff1ef}
+.voucher-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;font-weight:600}
+.voucher-row>span{display:inline-flex;align-items:center;gap:6px}
+.voucher-row input{width:170px;border:1px solid #cad8d6;border-radius:7px;padding:8px 10px;font-size:16px;color:var(--ink);text-transform:uppercase}
+.voucher-row input::placeholder{text-transform:none;font-size:14px}
+.voucher-msg{flex-basis:100%;font-weight:400;color:var(--teal)}.voucher-msg.bad{color:#963b30}
+.voucher-kind{align-self:flex-start}
+.voucher-amounts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.voucher-amounts input{flex:1 1 140px;width:auto!important}
+.voucher-amounts .secondary{min-height:40px;padding:8px 10px}
+.field select{width:100%;border:1px solid #cad8d6;border-radius:7px;padding:10px 12px;background:white;font-size:16px;color:var(--ink)}
+.voucher-card{position:relative;border:1px solid #e3d5bb;border-radius:14px;padding:26px 24px 20px;text-align:center;background:linear-gradient(160deg,#fffdf8,#f7f1e6);color:var(--ink)}
+.voucher-card img{width:64px;height:64px;object-fit:contain;display:block;margin:0 auto 6px}
+.voucher-salon{margin:0;font-size:11px;letter-spacing:2.4px;color:#9b7b45;text-transform:uppercase}
+.voucher-card h3{font-family:Georgia,serif;font-weight:400;font-size:30px;margin:8px 0 6px}
+.voucher-value{margin:0 0 6px;font-size:16px}.voucher-value b{font-family:Georgia,serif;font-weight:400;font-size:24px;color:var(--teal)}
+.voucher-for{margin:0 0 12px;color:var(--muted)}.voucher-for b{color:var(--ink);font-weight:600}
+.voucher-meta{display:flex;justify-content:center;gap:8px 22px;flex-wrap:wrap;margin:12px 0 8px;padding-top:12px;border-top:1px dashed #d9c7a4;font-size:14px}
+.voucher-meta b{letter-spacing:1px}
+.voucher-contact{margin:0;font-size:12px;color:var(--muted)}
+.voucher-facts{display:grid;gap:8px;margin:0;font-size:14px}.voucher-facts div{display:grid;grid-template-columns:110px 1fr;gap:10px}
+.voucher-facts dt{color:var(--muted)}.voucher-facts dd{margin:0}.voucher-facts .pre{white-space:pre-wrap}
+.voucher-uses h3{font-size:14px;margin:4px 0 6px}.voucher-uses ul{list-style:none;margin:0;padding:0;font-size:14px}
+.voucher-uses li{display:grid;grid-template-columns:100px 1fr auto;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+.voucher-inline{display:flex;flex-direction:column;gap:12px;border:1px solid var(--line);border-radius:10px;padding:14px;background:#f8faf9}
+.voucher-inline p{margin:0}
+@media(max-width:640px){.voucher-tools .search{min-width:0;flex:1 1 100%}.voucher-facts div{grid-template-columns:1fr;gap:0}.voucher-card h3{font-size:26px}}
+@media print{.voucher-card,.voucher-card *{visibility:visible!important}.voucher-card{position:fixed;left:0;top:0;width:148mm;min-height:105mm;border:1px solid #d9c7a4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ body:has(.receipt-dialog:not(.voucher-dialog)[open]) .voucher-card,body:has(.receipt-dialog:not(.voucher-dialog)[open]) .voucher-card *{visibility:hidden!important}}
+.setup-hint span svg{display:inline;vertical-align:-3px;margin-right:6px}
+.voucher-tools .segmented-mini{max-width:100%;overflow-x:auto}.voucher-tools .segmented-mini button{white-space:nowrap}
+@media(max-width:1440px){.app>header .private{display:none}}
+@media print{.voucher-card{display:flex;flex-direction:column;justify-content:center}}

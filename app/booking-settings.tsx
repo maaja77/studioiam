@@ -109,6 +109,7 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
         <label className="field"><span>Příjemce</span><input value={settings.accountName} maxLength={60} onChange={e => setSettings({...settings, accountName: e.target.value})}/></label>
       </div>
       <p className="muted-inline">Na tento účet chodí kauce, platby předem za balíčky a QR platby z účtenek.</p>
+      <label className="field narrow"><span>Dárkové poukazy platí (měsíců od prodeje)</span><input type="number" min={1} max={60} value={settings.voucherMonths} onChange={e => setSettings({...settings, voucherMonths: Number(e.target.value)})}/></label>
       <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Nastavení kauce bylo uloženo.')}>Uložit kauce a platby</button></div>
     </section>
 

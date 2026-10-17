@@ -1,20 +1,22 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
-import {Banknote, Check, Copy, CreditCard, Mail, MessageSquare, Plus, Printer, QrCode as QrIcon, Receipt as ReceiptIcon, Share2, Trash2, X} from 'lucide-react';
+import {Banknote, Check, Copy, CreditCard, Gift, Mail, MessageSquare, Plus, Printer, QrCode as QrIcon, Receipt as ReceiptIcon, Share2, Trash2, X} from 'lucide-react';
 import {formatRevenue, parseRevenue} from '../lib/revenue';
 import {czIban, formatIban, spdPayload} from '../lib/payment';
 import {DEFAULT_SETTINGS, salonName, salonNow, type BookingSettings} from '../lib/booking';
 import {QrCode} from './qr-payment';
+import {voucherCover, voucherState, type Voucher} from '../lib/vouchers';
 import {logoSrc} from './logo';
 
-export type ReceiptItem = {name: string; qty: number; unitCents: number; kind: 'service' | 'product' | 'other'};
-export type Receipt = {id: string; number: string; bookingId: string | null; clientId: string | null; clientName: string; issued: string; items: ReceiptItem[]; totalCents: number; prepaidCents: number; dueCents: number; method: string; paid: number; vs: string; status: string; note: string; discountCents?: number; discountLabel?: string};
+export type ReceiptItem = {name: string; qty: number; unitCents: number; kind: 'service' | 'product' | 'voucher' | 'other'};
+export type Receipt = {id: string; number: string; bookingId: string | null; clientId: string | null; clientName: string; issued: string; items: ReceiptItem[]; totalCents: number; prepaidCents: number; dueCents: number; method: string; paid: number; vs: string; status: string; note: string; discountCents?: number; discountLabel?: string; voucherCents?: number; voucherCode?: string | null};
 export type Product = {id: string; name: string; priceCents: number; active: number; sort: number};
 /** Podklad pro novou účtenku, např. z rezervace v kalendáři. */
 export type ReceiptDraft = {bookingId?: string; clientId?: string | null; clientName?: string; items: ReceiptItem[]; prepaidCents?: number; prepaidLabel?: string};
 type Client = {id: string; name: string};
 
 export const METHOD_LABEL: Record<string, string> = {cash: 'Hotově', card: 'Kartou', qr: 'QR platba / převod'};
+const dateText = (s: string) => s.split('-').reverse().map(Number).join('. ');
 const issuedText = (s: string) => new Date(s + ':00').toLocaleString('cs-CZ', {day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'});
 
 async function post(body: unknown) {
@@ -45,7 +47,8 @@ export function ReceiptPaper({receipt, settings}: {receipt: Receipt; settings: B
         {!!receipt.discountCents && <><tr><td>Mezisoučet</td><td>{formatRevenue(receipt.totalCents + receipt.discountCents)}</td></tr><tr><td>Sleva{receipt.discountLabel && ' ' + receipt.discountLabel}</td><td>−{formatRevenue(receipt.discountCents)}</td></tr></>}
         <tr><th>Celkem</th><th>{formatRevenue(receipt.totalCents)}</th></tr>
         {receipt.prepaidCents > 0 && <tr><td>Zaplaceno předem (kauce / platba předem)</td><td>−{formatRevenue(receipt.prepaidCents)}</td></tr>}
-        {receipt.prepaidCents > 0 && <tr><th>Doplatek</th><th>{formatRevenue(receipt.dueCents)}</th></tr>}
+        {!!receipt.voucherCents && <tr><td>Uhrazeno dárkovým poukazem {receipt.voucherCode}</td><td>−{formatRevenue(receipt.voucherCents)}</td></tr>}
+        {(receipt.prepaidCents > 0 || !!receipt.voucherCents) && <tr><th>Doplatek</th><th>{formatRevenue(receipt.dueCents)}</th></tr>}
       </tfoot>
     </table>
     <p className="receipt-meta">Platba: {METHOD_LABEL[receipt.method] || receipt.method}{receipt.dueCents > 0 && (receipt.paid ? ' · zaplaceno' : ' · čeká na zaplacení')}</p>
@@ -66,13 +69,27 @@ function ReceiptForm({draft, products, clients, busy, onSubmit, onCancel}: {draf
   const discountCents = Math.max(0, Math.min(subtotal, Math.round(discountKind === '%' ? subtotal * Math.min(discountNumber, 100) / 100 : discountNumber * 100)));
   const discountLabel = discountCents ? (discountKind === '%' ? `${discountNumber.toLocaleString('cs-CZ')} %` : '') : '';
   const total = subtotal - discountCents, prepaid = Math.min(draft.prepaidCents || 0, total);
+  const [voucherInput, setVoucherInput] = useState(''), [voucher, setVoucher] = useState<{v: Voucher; today: string} | null>(null), [voucherError, setVoucherError] = useState('');
+  const voucherProblem = voucher ? ({cancelled: 'je stornovaný', used: 'je už vyčerpaný', expired: `prošel ${dateText(voucher.v.validUntil)}`} as Record<string, string>)[voucherState(voucher.v, voucher.today)] : '';
+  const covered = voucher && !voucherProblem ? voucherCover(voucher.v, items.map((x, i) => ({name: x.name, qty: x.qty, unitCents: priced[i] || 0})), total - prepaid) : 0;
+  async function findVoucher() {
+    setVoucherError(''); setVoucher(null);
+    if (!voucherInput.trim()) return;
+    try {
+      const r = await fetch('/api/vouchers?code=' + encodeURIComponent(voucherInput.trim()), {cache: 'no-store'});
+      const d = await r.json() as {voucher?: Voucher; today?: string; error?: string};
+      if (!d.voucher) throw new Error(d.error); setVoucher({v: d.voucher, today: d.today!}); setVoucherInput(d.voucher.code);
+    } catch (e) { setVoucherError((e as Error).message || 'Poukaz se nepodařilo najít.'); }
+  }
   const update = (i: number, patch: Partial<ReceiptItem & {price: string}>) => setItems(items.map((x, j) => j === i ? {...x, ...patch} : x));
 
   function submit(e: React.FormEvent) {
     e.preventDefault(); setError('');
     if (!items.length) return setError('Přidejte alespoň jednu položku.');
     if (priced.some(p => Number.isNaN(p))) return setError('Zkontrolujte ceny položek (např. 590 nebo 590,50).');
-    onSubmit({bookingId: draft.bookingId, clientId: clientId || null, clientName, method, discountCents, discountLabel, items: items.map((x, i) => ({name: x.name, qty: x.qty, unitCents: priced[i], kind: x.kind}))});
+    if (voucherInput.trim() && !voucher) return setError('Poukaz nejdřív ověřte tlačítkem Použít, nebo kód smažte.');
+    if (voucherProblem) return setError(`Poukaz ${voucher!.v.code} ${voucherProblem}. Smažte kód, nebo poukazu prodlužte platnost v části Poukazy.`);
+    onSubmit({bookingId: draft.bookingId, clientId: clientId || null, clientName, method, discountCents, discountLabel, voucherCode: covered ? voucher!.v.code : '', items: items.map((x, i) => ({name: x.name, qty: x.qty, unitCents: priced[i], kind: x.kind}))});
   }
 
   return <form onSubmit={submit}>
@@ -101,10 +118,19 @@ function ReceiptForm({draft, products, clients, busy, onSubmit, onCancel}: {draf
         <span className="segmented-mini" role="radiogroup" aria-label="Sleva v">{(['%', 'Kč'] as const).map(k => <button type="button" key={k} role="radio" aria-checked={discountKind === k} className={discountKind === k ? 'active' : ''} onClick={() => setDiscountKind(k)}>{k}</button>)}</span>
         <span className="discount-quick">{[5, 10, 15, 20].map(p => <button type="button" key={p} className="secondary" onClick={() => { setDiscountKind('%'); setDiscount(String(p)); }}>{p} %</button>)}</span>
       </div>
+      <div className="voucher-row">
+        <span><Gift size={16}/> Dárkový poukaz</span>
+        <input aria-label="Kód dárkového poukazu" placeholder="Kód, např. ABCD-EF23" value={voucherInput} maxLength={20} autoCapitalize="characters" onChange={e => { setVoucherInput(e.target.value); setVoucher(null); setVoucherError(''); }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); findVoucher(); } }}/>
+        <button type="button" className="secondary" disabled={!voucherInput.trim()} onClick={findVoucher}>Použít</button>
+        {voucher && <button type="button" className="link-button" onClick={() => { setVoucher(null); setVoucherInput(''); }}>Nepoužít</button>}
+        {voucherError && <small className="voucher-msg bad">{voucherError}</small>}
+        {voucher && <small className={'voucher-msg' + (voucherProblem ? ' bad' : '')}>{voucher.v.kind === 'service' ? `Na ošetření ${voucher.v.serviceName}` : `Zůstatek ${formatRevenue(voucher.v.balanceCents)}`} · platí do {dateText(voucher.v.validUntil)}{voucher.v.recipientName && ` · pro ${voucher.v.recipientName}`}{voucherProblem && ` · poukaz ${voucherProblem}`}</small>}
+      </div>
       <div className="receipt-sum">
         {discountCents > 0 && <span>Mezisoučet {formatRevenue(subtotal)} · sleva −{formatRevenue(discountCents)}</span>}
         <span>Celkem <b>{formatRevenue(total)}</b></span>
-        {prepaid > 0 && <span>{draft.prepaidLabel || 'Zaplaceno předem'} −{formatRevenue(prepaid)} · doplatek <b>{formatRevenue(total - prepaid)}</b></span>}
+        {prepaid > 0 && <span>{draft.prepaidLabel || 'Zaplaceno předem'} −{formatRevenue(prepaid)}{!covered && <> · doplatek <b>{formatRevenue(total - prepaid)}</b></>}</span>}
+        {covered > 0 && <span>Dárkový poukaz −{formatRevenue(covered)} · doplatek <b>{formatRevenue(total - prepaid - covered)}</b></span>}
       </div>
       <fieldset className="method"><legend>Platba</legend>
         {([['cash', Banknote], ['card', CreditCard], ['qr', QrIcon]] as const).map(([k, Icon]) => <label key={k} className={method === k ? 'active' : ''}><input type="radio" name="method" value={k} checked={method === k} onChange={() => setMethod(k)}/><Icon size={16}/> {METHOD_LABEL[k]}</label>)}

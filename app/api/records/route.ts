@@ -1,13 +1,14 @@
 import { database, deleteClientPhotos } from '../../../db/raw';
 import { parseRevenue } from '../../../lib/revenue';
-import {parseSettings,salonName} from '../../../lib/booking';
+import {addDays,parseSettings,salonName,salonNow} from '../../../lib/booking';
+import {EXPIRING_DAYS} from '../../../lib/vouchers';
 import {czIban} from '../../../lib/payment';
 import {programQuote,PROGRAM_TREATMENT,type ProgramVisit} from '../../../lib/clean-skin';
 export const dynamic='force-dynamic';
 const json=(x:unknown,status=200)=>Response.json(x,{status,headers:{'Cache-Control':'no-store'}});
-export async function GET(){try{const db=database();const [clients,visits,setting]=await db.batch([db.prepare('SELECT *,clean_skin_active AS programActive FROM clients ORDER BY name COLLATE NOCASE'),db.prepare('SELECT id,client_id AS clientId,date,treatment,products,notes,revenue_cents AS revenueCents,clean_skin AS cleanSkin,program_price_cents AS programPriceCents,program_step AS programStep FROM visits ORDER BY date DESC'),db.prepare("SELECT value FROM settings WHERE key='booking'")]);const s=parseSettings((setting.results[0] as {value?:string}|undefined)?.value);
+export async function GET(){try{const db=database();const [clients,visits,setting,expiring]=await db.batch([db.prepare('SELECT *,clean_skin_active AS programActive FROM clients ORDER BY name COLLATE NOCASE'),db.prepare('SELECT id,client_id AS clientId,date,treatment,products,notes,revenue_cents AS revenueCents,clean_skin AS cleanSkin,program_price_cents AS programPriceCents,program_step AS programStep FROM visits ORDER BY date DESC'),db.prepare("SELECT value FROM settings WHERE key='booking'"),db.prepare("SELECT count(*) AS n FROM vouchers WHERE status='active' AND balance_cents>0 AND valid_until>=? AND valid_until<=?").bind(salonNow().slice(0,10),addDays(salonNow().slice(0,10),EXPIRING_DAYS))]);const s=parseSettings((setting.results[0] as {value?:string}|undefined)?.value);
  // Údaje pro hlavičku administrace: jméno a logo salonu, zapnutý program a zda je vyplněný účet pro QR platby.
- return json({clients:clients.results,visits:visits.results,salon:{name:salonName(s),named:!!s.businessName.trim(),logoVersion:s.logoVersion,programEnabled:s.programEnabled,accountSet:!!czIban(s.account)}});}catch(e){console.error(e);return json({error:'Kartotéku se nepodařilo načíst. Zkuste to znovu.'},503);}}
+ return json({clients:clients.results,visits:visits.results,salon:{name:salonName(s),named:!!s.businessName.trim(),logoVersion:s.logoVersion,programEnabled:s.programEnabled,accountSet:!!czIban(s.account),vouchersExpiring:Number((expiring.results[0] as {n?:number}|undefined)?.n||0)}});}catch(e){console.error(e);return json({error:'Kartotéku se nepodařilo načíst. Zkuste to znovu.'},503);}}
 export async function POST(request:Request){try{
  if(request.headers.get('origin')&&request.headers.get('origin')!==new URL(request.url).origin)return json({error:'Nepovolený požadavek.'},403);
  const body=await request.json() as {kind:string;action:string;data?:Record<string,unknown>};if(!body||typeof body!=='object')return json({error:'Neplatný záznam.'},400);const {kind,action}=body,d=body.data||{},db=database();

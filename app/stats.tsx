@@ -8,7 +8,7 @@ import {salonNow} from '../lib/booking';
 type Treatment = {name: string; category: string; color: string; count: number; revenueCents: number};
 type Stats = {
   period: {year: string; month: string; all: boolean; today: string};
-  revenue: {totalCents: number; receiptsCents: number; visitsCents: number; servicesCents: number; productsCents: number; otherCents: number; discountsCents: number; receipts: number};
+  revenue: {totalCents: number; receiptsCents: number; visitsCents: number; servicesCents: number; productsCents: number; vouchersSoldCents: number; voucherUsedCents: number; otherCents: number; discountsCents: number; receipts: number};
   treatments: Treatment[]; count: number; noShows: number; cancelled: number;
   months: {month: string; revenueCents: number; treatments: number}[]; allTimeCents: number;
 };
@@ -52,7 +52,7 @@ export default function StatsView() {
       <section className="stat-tiles" aria-label="Souhrn">
         <div className="stat-tile main"><span>Tržby · {title}</span><strong>{formatRevenue(r.totalCents)}</strong><small>{r.receipts} {plural(r.receipts, 'účtenka', 'účtenky', 'účtenek')}{r.visitsCents > 0 && ` · ${formatRevenue(r.visitsCents)} zapsáno v kartách`}</small></div>
         <div className="stat-tile"><span>Ošetření</span><strong>{data.count}</strong><small>{data.count ? `průměrně ${formatRevenue(Math.round(r.servicesCents / data.count / 100) * 100)}` : 'zatím žádné proběhlé'}</small></div>
-        <div className="stat-tile"><span>Prodej produktů</span><strong>{formatRevenue(r.productsCents)}</strong><small>{r.discountsCents > 0 ? `slevy celkem ${formatRevenue(r.discountsCents)}` : 'bez slev'}</small></div>
+        <div className="stat-tile"><span>Produkty a poukazy</span><strong>{formatRevenue(r.productsCents + r.vouchersSoldCents)}</strong><small>{[r.vouchersSoldCents > 0 && `z toho poukazy ${formatRevenue(r.vouchersSoldCents)}`, r.voucherUsedCents > 0 && `poukazy uplatněné ${formatRevenue(r.voucherUsedCents)}`, r.discountsCents > 0 ? `slevy ${formatRevenue(r.discountsCents)}` : 'bez slev'].filter(Boolean).join(' · ')}</small></div>
         <div className="stat-tile"><span>Nepřišla / zrušeno</span><strong>{data.noShows} / {data.cancelled}</strong><small>rezervací v období</small></div>
       </section>
 

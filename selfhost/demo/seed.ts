@@ -105,6 +105,25 @@ export async function seedDemo(run: Run, put: Put) {
         ['rh-' + n, y, seq, `${y}/${String(seq).padStart(4, '0')}`, id, null, who, end, JSON.stringify(items), total, total, ['cash', 'card', 'qr'][k % 3], `${y}${String(seq).padStart(4, '0')}`, 'issued', '', discount, discount ? '10 %' : '', now]);
     }
   }
+  // Dárkové poukazy (vymyšlená jména): platné, brzy vyprší, prošlý, částečně a úplně vyčerpaný, na ošetření.
+  const vouchers: [string, string, 'value' | 'service', string, number, number, string, string, number, number][] = [
+    ['v-1', 'KQ4M-7XPA', 'value', '', 150000, 150000, 'Tereza Malá', 'Jana Malá', -20, 345],
+    ['v-2', 'H8RT-2NWE', 'value', '', 100000, 100000, 'Lenka Dvořáková', 'Martin Dvořák', -352, 13],
+    ['v-3', 'PZ6C-9LDU', 'service', 'A-QS Hacker', 129000, 129000, 'Eva Horáková', 'Petr Horák', -60, 305],
+    ['v-4', 'M3VB-8KYS', 'value', '', 200000, 70000, 'Klára Benešová', '', -120, 245],
+    ['v-5', 'W7JF-4QHE', 'value', '', 50000, 50000, 'Simona Krejčí', 'Simona Krejčí', -400, -35],
+    ['v-6', 'R2XD-6GNT', 'value', '', 100000, 0, 'Petra Nováková', 'Petra Nováková', -200, 165],
+  ];
+  for (const [id, code, kind, serviceName, value, balance, recipient, buyer, issuedOffset, validOffset] of vouchers) {
+    const issued = day(issuedOffset), y = Number(issued.slice(0, 4)), seq = (seqs.get(y) || 0) + 1; seqs.set(y, seq);
+    const receiptId = 'rv-' + id, items = [{name: `Dárkový poukaz ${code}${serviceName ? ' – ' + serviceName : ''}`, qty: 1, unitCents: value, kind: 'voucher'}];
+    run('INSERT INTO receipts (id,year,seq,number,booking_id,client_id,client_name,issued,items,total_cents,prepaid_cents,due_cents,method,paid,vs,status,note,discount_cents,discount_label,created) VALUES (?,?,?,?,?,?,?,?,?,?,0,?,?,1,?,?,?,0,?,?)',
+      [receiptId, y, seq, `${y}/${String(seq).padStart(4, '0')}`, null, null, buyer, issued + 'T10:00', JSON.stringify(items), value, value, 'card', `${y}${String(seq).padStart(4, '0')}`, 'issued', '', '', now]);
+    run('INSERT INTO vouchers (id,code,kind,service_name,value_cents,balance_cents,buyer_name,buyer_contact,recipient_name,note,issued,valid_until,status,receipt_id,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [id, code, kind, serviceName, value, balance, buyer, buyer ? '777 000 111' : '', recipient, '', issued, day(validOffset), 'active', receiptId, now]);
+    if (balance < value) run('INSERT INTO voucher_uses (id,voucher_id,receipt_id,date,amount_cents,note,created) VALUES (?,?,?,?,?,?,?)', ['vu-' + id, id, null, day(issuedOffset + 30), value - balance, 'Uplatněno při ošetření', now]);
+  }
+
   run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, account: '331122037/0300', accountName: 'STUDIO I AM', businessName: 'STUDIO I AM', businessOwner: 'Andrea Marešová', businessAddress: 'Nerudova 884/11, 500 02 Hradec Králové', businessId: '73975052', businessPhone: '775 963 462', programEnabled: true})]);
 
   const photos: [string, string, string, string, number][] = [
