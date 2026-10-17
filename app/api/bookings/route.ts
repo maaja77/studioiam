@@ -99,6 +99,17 @@ export async function POST(request: Request) {
       return json({ok: true, clientId});
     }
 
+    // Rychlý přesun na jiný den nebo čas; délka termínu zůstane stejná.
+    if (body.action === 'move') {
+      const date = field('date'), time = field('time');
+      if (!isDate(date) || !isTime(time)) return json({error: 'Vyplňte nové datum a čas.'}, 400);
+      const b = await db.prepare('SELECT start_at AS start,end_at AS "end" FROM bookings WHERE id=?').bind(id).first<{start: string; end: string}>();
+      if (!b) return json({error: 'Rezervace nebyla nalezena.'}, 404);
+      const minutes = Math.round((Date.parse(b.end + ':00Z') - Date.parse(b.start + ':00Z')) / 60000), start = `${date}T${time}`;
+      await db.prepare('UPDATE bookings SET start_at=?,end_at=? WHERE id=?').bind(start, addMinutes(start, minutes), id).run();
+      return json({ok: true});
+    }
+
     // Uložení rezervace nebo blokace času zadané v salonu.
     const date = field('date'), time = field('time'), duration = Number(d.durationMin);
     if (!isDate(date) || !isTime(time)) return json({error: 'Vyplňte datum a čas.'}, 400);
