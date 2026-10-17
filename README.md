@@ -90,6 +90,42 @@ git pull
 docker compose up -d --build
 ```
 
+Před větší aktualizací spusťte ruční zálohu (`sudo systemctl start salon-zaloha`, viz níže).
+
+## Automatické zálohy mimo server
+
+Každou noc ve 2:30 se databáze, fotky, logo i `.env.selfhost` zašifrují a odešlou mimo server
+(nástroj restic, běží v Dockeru, nic se neinstaluje). Aplikace se kvůli záloze nezastavuje.
+Uchovává se 14 denních, 8 týdenních a 12 měsíčních záloh. Každý 1. den v měsíci se záloha
+zkušebně obnoví do dočasné složky a zkontroluje (databáze, vazby, všechny fotky).
+
+Úložiště vyberte mimo Proxmox (doporučení: Backblaze B2 v EU regionu, pár korun měsíčně;
+jde i S3 úložiště nebo disk NAS). Nastavení jednou:
+
+```sh
+sudo cp selfhost/zaloha/zaloha.env.example /etc/salon-zaloha.env
+sudo chmod 600 /etc/salon-zaloha.env
+sudo nano /etc/salon-zaloha.env   # heslo záloh, úložiště, klíče, SALON_DIRS = složka s compose.yaml
+sudo selfhost/zaloha/nainstalovat.sh
+sudo systemctl start salon-zaloha && journalctl -u salon-zaloha -n 30   # první záloha hned
+sudo selfhost/zaloha/obnovit.sh --test                                  # zkušební obnova
+```
+
+Heslo záloh (`RESTIC_PASSWORD`) uložte i mimo server, například do správce hesel. Bez něj zálohy
+nejdou otevřít. Selhání záloh hlídá zdarma healthchecks.io (`HEALTHCHECK_URL`):
+když noční záloha neproběhne, přijde e-mail.
+
+Obnova (např. po havárii VM):
+
+```sh
+sudo selfhost/zaloha/obnovit.sh --seznam                 # přehled záloh
+sudo selfhost/zaloha/obnovit.sh studioiam /tmp/obnova    # obnoví a zkontroluje poslední zálohu
+docker compose down && mv data data-stara && sudo mv /tmp/obnova data && docker compose up -d
+```
+
+Název salonu v příkazu je jméno složky instalace (u dalších salonů jejich zkratka). Při stavbě
+nového serveru je v obnovené složce i původní nastavení `env.selfhost-ze-zalohy`.
+
 ## Údaje salonu a profil instalace
 
 Název, adresa, telefon, IČO, e-mail, číslo účtu a logo se vyplňují v Nastavení → Údaje salonu.

@@ -74,4 +74,6 @@ Do Caddyfile doplňte a načtěte (caddy reload):
 $host {
 	reverse_proxy 127.0.0.1:$port
 }
+
+Do zálohování ho přidáte v /etc/salon-zaloha.env: do SALON_DIRS připište $dir
 INFO
