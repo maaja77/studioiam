@@ -366,3 +366,71 @@ dd .voucher-state.expiring{background:#fdf6e8}dd .voucher-state.expired{backgrou
 .stock-history td small{color:var(--muted)}.stock-history .minus{color:#b4532a}.stock-history .plus{color:var(--teal)}
 .stock-form{margin-bottom:14px}.stock-warn{grid-column:1/-1;color:#b4532a;font-size:13px}
 @media(max-width:640px){.stock-count{align-items:flex-start}.stock-row{gap:8px}}
+/* Platby z banky */
+.bank .pb-back{margin-bottom:6px}
+.bank-upload{gap:12px}.bank-upload-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}.bank-upload-row label.primary{cursor:pointer;display:inline-flex;align-items:center;gap:8px}.bank-upload-row label.disabled{opacity:.6;pointer-events:none}
+.bank-how summary{cursor:pointer;font-weight:600;font-size:14px}.bank-how ol{margin:8px 0 0;padding-left:20px;font-size:14px;color:var(--muted)}.bank-how li{margin-bottom:4px}
+.bank-result{background:#f3f9f7;border:1px solid #d3e8e3;border-radius:10px;padding:12px 14px;font-size:14px}.bank-result p{margin:0 0 4px}.bank-result ul{list-style:none;margin:6px 0 0;padding:0}.bank-result li{display:flex;align-items:center;gap:6px;padding:2px 0}.bank-result li.matched svg{color:var(--teal)}.bank-result li.mismatch{color:#9a5a14}
+.bank-list select{border:1px solid #cad8d6;border-radius:7px;padding:7px 8px;font-size:14px;max-width:260px;background:white;color:var(--ink)}
+.bank-list li.mismatch{background:#fffaf2}.bank-warn{color:#9a5a14!important}
+@media(max-width:640px){.bank-list select{max-width:100%;flex:1 1 100%}}
+/* Přípravky u návštěvy */
+.visit-products{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;min-width:0}.visit-products legend{font-size:14px;font-weight:600;margin-bottom:7px;padding:0}
+.visit-product-row{display:flex;gap:6px;align-items:center}.visit-product-row input{flex:1 1 auto;min-width:0;border:1px solid #cad8d6;border-radius:7px;padding:9px 11px;font-size:16px;color:var(--ink);background:white}.visit-product-row input.amount{flex:0 0 120px}
+.visit-product-row button{background:transparent;color:var(--muted);border-radius:6px;padding:7px}.visit-product-row button:hover{background:#eff4f3}
+.visit-product-actions{display:flex;gap:8px;flex-wrap:wrap}.visit-product-actions .secondary{min-height:36px;padding:6px 10px;font-size:14px}
+.visit-products small{color:var(--muted);font-size:12px}
+.visit-product-list{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}.visit-product-list li{background:#eef5f4;border-radius:14px;padding:3px 10px;font-size:14px}.visit-product-list small{color:var(--muted)}
+@media(max-width:640px){.visit-product-row input.amount{flex-basis:92px}}
+.program-picker{display:flex;align-items:center;gap:10px;margin:-6px 0 22px;font-size:14px;color:var(--muted)}.program-picker select{border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:14px;background:white;color:var(--ink)}
+/* Porovnání fotek před/po */
+dialog.photo-compare{width:min(980px,calc(100% - 24px))}
+.compare-body{padding:20px 28px;display:flex;flex-direction:column;gap:14px}
+.compare-pick{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}.compare-pick .field{flex:1 1 200px}.compare-pick select{width:100%;border:1px solid #cad8d6;border-radius:7px;padding:9px 10px;font-size:15px;background:white;color:var(--ink)}
+.compare-pick .segmented-mini button{display:inline-flex;align-items:center;gap:5px}
+.compare-side{display:grid;grid-template-columns:1fr 1fr;gap:10px}.compare-side figure{margin:0;position:relative;aspect-ratio:4/5;background:#eef3f2;border-radius:10px;overflow:hidden}
+.compare-side img{width:100%;height:100%;object-fit:cover;display:block}.compare-side figcaption,.compare-tag{position:absolute;bottom:10px;left:10px;background:#126b66e0;color:white;font-size:13px;font-weight:600;border-radius:14px;padding:3px 10px}
+.compare-loading{display:grid;place-items:center;height:100%;color:var(--muted);font-size:14px}
+.compare-slider{position:relative;aspect-ratio:4/5;max-height:70vh;margin:0 auto;width:100%;max-width:560px;border-radius:10px;overflow:hidden;background:#eef3f2;touch-action:pan-y}
+.compare-slider img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.compare-line{position:absolute;top:0;bottom:0;width:3px;margin-left:-1.5px;background:white;box-shadow:0 0 6px #0005;pointer-events:none}
+.compare-tag.right{left:auto;right:10px}
+.compare-slider input[type=range]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:ew-resize;margin:0}
+.compare-gap{margin:0;text-align:center;font-family:Georgia,serif;font-size:17px}
+@media(max-width:640px){.compare-body{padding:16px}.compare-side{gap:6px}}
+/* Domácí péče */
+.visit-care{margin-top:14px;background:transparent;color:var(--teal);font-size:13px;font-weight:600;padding:6px 10px;border:1px dashed #b9d6d1;border-radius:8px}.visit-care:hover{background:#eef6f4}.visit-care.sent{border-style:solid;background:#eef6f4}
+dialog.care-dialog{width:min(680px,calc(100% - 24px))}
+.care-pick{border:0;padding:0;margin:0;min-width:0}.care-pick legend{font-size:14px;font-weight:600;margin-bottom:7px;padding:0}
+.care-chips{display:flex;flex-wrap:wrap;gap:6px}.care-chips button{background:white;border:1px solid var(--line);border-radius:16px;padding:5px 11px;font-size:14px;color:var(--ink);gap:5px}.care-chips button small{color:var(--muted)}
+.care-chips button.active{border-color:var(--teal);background:#e8f4f2;color:var(--teal);font-weight:600}
+.care-dialog .dialog-footer .link-button{margin-right:auto}
+.public-care main{max-width:620px;margin:0 auto;padding:8px 16px 40px;display:flex;flex-direction:column;gap:16px}
+.care-card{background:white;border:1px solid var(--line);border-radius:14px;padding:22px}.care-card h1{font-size:30px;margin:0 0 10px}.care-card h2{font-size:18px;margin:0 0 10px}
+.care-text p{margin:0 0 10px}.care-text ul{margin:0 0 10px;padding-left:20px}.care-text li{margin-bottom:4px}
+.care-products{list-style:none;margin:0 0 8px;padding:0}.care-products li{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}.care-products li:last-child{border-bottom:0}
+.care-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0}.care-actions a{display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+@media print{.care-actions{display:none}}
+/* Přehled dne */
+.today-layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:20px;align-items:start}
+.today-list ol{list-style:none;margin:0;padding:0}
+.today-list li{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:6px 16px;padding:16px 8px;border-bottom:1px solid var(--line);align-items:start}.today-list li:last-child{border-bottom:0}
+.today-list li.current{background:#eef7f5;border-radius:10px;box-shadow:inset 3px 0 var(--teal)}.today-list li.done{opacity:.7}
+.today-time{font-weight:700;font-size:18px;color:var(--teal);display:flex;flex-direction:column;line-height:1.2}.today-time small{font-weight:400;font-size:13px;color:var(--muted)}
+.today-main{display:flex;flex-direction:column;gap:5px;min-width:0}.today-main b{font-size:17px}.today-service{color:var(--ink);font-size:14px}
+.today-flags{display:flex;flex-wrap:wrap;gap:5px}.today-flag{font-size:12px;border-radius:12px;padding:2px 9px;background:#eef3f2;color:var(--muted)}.today-flag.warn{background:#fdf1df;color:#8a5212}.today-flag.ok{background:#e2f3ed;color:var(--teal)}.today-flag.info{background:#e9eefb;color:#3a4f8f}
+.today-warn{display:flex;gap:8px;background:#fff6e8;border:1px solid #f3dfbd;color:#7a4a10;border-radius:8px;padding:8px 10px;font-size:14px}.today-warn svg{flex-shrink:0;margin-top:2px}.today-warn p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.today-last{color:var(--muted);font-size:13px}
+.today-actions{display:flex;flex-direction:column;gap:6px}.today-actions .secondary{min-height:34px;padding:5px 10px;font-size:13px;display:inline-flex;align-items:center;gap:5px;text-decoration:none}
+.today-block{color:var(--muted)}.today-block div{display:flex;flex-direction:column}.today-block small{font-size:13px}
+.today-calendar{align-self:flex-start;display:inline-flex;align-items:center;gap:5px}
+.today-side{display:flex;flex-direction:column;gap:0}.today-side .panel{gap:10px}
+.today-todo{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.today-todo button{width:100%;justify-content:flex-start;text-align:left;background:#f7faf9;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--teal);gap:10px}.today-todo button:hover{background:#eef6f4}
+.today-todo span{display:flex;flex-direction:column;min-width:0}.today-todo b{color:var(--ink);font-size:14px}.today-todo small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.today-mail .check span{display:inline-flex;align-items:center;gap:6px}
+.reviews h2{display:flex;align-items:center;gap:7px}.reviews h2 svg{color:#c9932b}.reviews>.link-button{align-self:flex-start}.reviews-setup{display:flex;flex-direction:column;gap:10px}.reviews-setup .form-actions{flex-wrap:wrap}
+.reviews-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.reviews-list li{display:flex;flex-direction:column;gap:6px;padding:9px 0;border-top:1px solid var(--line)}.reviews-list li:first-child{border-top:0;padding-top:0}
+.reviews-list li>div:first-child{display:flex;flex-direction:column;min-width:0}.reviews-list small{color:var(--muted);font-size:13px}
+.reviews-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.reviews-actions .secondary{min-height:34px;padding:5px 10px;font-size:13px;display:inline-flex;align-items:center;gap:5px;text-decoration:none}
+@media(max-width:900px){.today-layout{grid-template-columns:1fr}}
+@media(max-width:640px){.today-list li{grid-template-columns:50px minmax(0,1fr);padding:14px 4px}.today-actions{grid-column:2;flex-direction:row}}

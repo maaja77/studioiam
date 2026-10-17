@@ -8,6 +8,7 @@ import {czIban, depositFor, formatIban, spdPayload} from '../../../lib/payment';
 import {intakeGet, intakeSubmit} from './intake';
 import {orderGet, orderSubmit, shopGet} from './vouchers';
 import {createIntake, intakeLink} from '../intake/route';
+import {careGet} from '../care/route';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
 type Service = {id: string; name: string; durationMin: number; priceCents: number; category: string; description: string; sessions: number; prepay: number};
@@ -86,6 +87,7 @@ export async function GET(request: Request) {
     if (params.has('intake')) return intakeGet(params.get('intake') || '');
     if (params.has('voucherShop')) return shopGet();
     if (params.has('voucher')) return orderGet(params.get('voucher') || '');
+    if (params.has('care')) return careGet(params.get('care') || '');
     // Účtenka pro klientku přes tajný odkaz (bez údajů z kartotéky).
     if (params.has('receipt')) {
       const token = params.get('receipt') || '';

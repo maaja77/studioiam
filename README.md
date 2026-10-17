@@ -5,7 +5,7 @@ Webová aplikace pro kosmetický salon Studio I AM, provozovaná na vlastním se
 ## Moduly
 
 - **Kartotéka klientek** (hotovo): karty s kontakty, typem pleti a upozorněními, historie návštěv
-  (datum, ošetření, přípravky, poznámky, tržba), fotky (nahrání i focení z telefonu),
+  (datum, ošetření, použité přípravky jako seznam s množstvím a tlačítkem „Jako minule“, poznámky, tržba), fotky (nahrání i focení z telefonu, porovnání před/po s koláží ke stažení),
   přehled tržeb za měsíc a celkem.
 - **Program Čistá pleť** (hotovo): série ošetření A-QS Hacker za 1 290 Kč, 2. návštěva −5 %,
   3. a další −10 %, při odstupu nad 28 dní začíná série znovu. Cena se předvyplní do tržby.
@@ -158,6 +158,18 @@ Zálohy před aktualizací jsou v `/srv/salony/_zalohy/<salon>-<datum>.tar.gz` (
 Obnova: rozbalit do prázdné složky `data`, přejmenovat `zaloha.sqlite` na `salon.sqlite`, `chown -R 1000:1000 data`.
 Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potřeba ještě šifrovaná záloha mimo server.
 
+## Přehled dne
+
+- Záložka **Dnes** je první a otevře se po přihlášení: dnešní termíny po sobě, u každé klientky upozornění z karty a z vyplněného dotazníku, nezaplacená kauce, nevyplněný dotazník, nová klientka, poslední návštěva a tlačítka Karta a Volat.
+- Vpravo **Čeká na vyřízení**: nezaplacené kauce, proběhlé termíny bez účtenky, nezaplacené účtenky, poukazy z webu čekající na platbu a docházející produkty. Kliknutím se otevře příslušná část.
+- **Ranní e-mail** (zapíná se zaškrtnutím v části Dnes, potřebuje `SMTP_*` a `SALON_NOTIFY_EMAIL`): jednou denně mezi 7:00 a 12:00 přijde salonu přehled s časy, ošetřeními a jmény. Zdravotní údaje ani text upozornění v něm nejsou, jen poznámka „upozornění v kartě“.
+
+### Prosba o hodnocení
+
+- V části **Dnes** je panel **Požádat o hodnocení** s klientkami, které byly v salonu v posledních 7 dnech. Každá se žádá jen jednou; klientky označené „Nechce zprávy“ a klientky s blokovanými rezervacemi se nenabízejí.
+- Odkaz na hodnocení zkopírujte z Google profilu firmy („Požádat o recenze“) a vložte ho do panelu. Text zprávy jde upravit, doplní se `{jmeno}`, `{salon}` a `{odkaz}`.
+- SMS se otevře v telefonu a odešlete ji sama, nic se neposílá automaticky. E-mail jde poslat přímo z aplikace, pokud jsou nastavené `SMTP_*`.
+
 ## Online rezervace
 
 - Administrace: záložky **Rezervace** (týdenní kalendář s časovou osou, ošetření barevně podle kategorie, kliknutím do volného místa nová rezervace; ruční rezervace, blokace času, stav Proběhlo / Nepřišla / Zrušeno, založení karty z rezervace) a **Nastavení** (ceník ošetření s kategoriemi, popisy a barvami, výchozí ceník převzatý z MyFoxu, otevírací doba, předstih, kód pro web).
@@ -225,6 +237,26 @@ calendar.google.com → Další kalendáře → Z adresy URL) a změny si stahuj
 - QR platba (SPD) na doplatek, číslování `RRRR/0001` po letech, VS = číslo účtenky. Storno účtenku nemaže, jen označí.
 - Záložka **Účtenky**: přehled za měsíc, nezaplacené účtenky a prodej bez rezervace. Tisk přes tlačítko Tisk (účtenka je připravená na úzký papír 80 mm i A4).
 - Údaje na účtence (název, provozovatel, adresa, IČO, neplátce DPH) se nastaví v Nastavení.
+
+### Platby z banky (párování převodů)
+
+Účtenky → **Platby z banky**: nahrajete výpis pohybů z internetového bankovnictví (ČSOB: Pohyby na účtu → Export → CSV)
+a aplikace podle variabilního symbolu a částky sama označí jako zaplacené kauce u rezervací (rezervace čekající na kauci
+se potvrdí), objednávky poukazů z webu (poukaz začne platit a kupující dostane e-mail s odkazem) a QR účtenky.
+
+- Bere jen příchozí platby. Každá platba se uloží s ID transakce z banky, takže výpisy se mohou překrývat a nic se nezdvojí.
+- Když přijde méně, než se čeká, platba se nespáruje sama a ukáže se v seznamu **K vyřízení**. Tam jde platbu ručně
+  přiřadit (třeba když klientka zapomněla variabilní symbol) nebo skrýt (platby kartou z terminálu, platby mimo aplikaci).
+- Výpis z jiného účtu, než je v Nastavení, se nahraje jen po potvrzení.
+- Nahraný výpis obsahuje osobní údaje plátců. Soubor po nahrání smažte a do GitHubu ho nikdy nedávejte.
+
+## Domácí péče po ošetření
+
+U každé návštěvy v kartě je tlačítko **Domácí péče pro klientku**: napíšete doporučení (řádek s pomlčkou = odrážka)
+a vyberete doporučené produkty ze Skladu (předvyberou se ty, které jste při ošetření použila). Klientce se pošle
+tajný odkaz `/pece?t=…` SMS z telefonu nebo e-mailem (potřebuje SMTP); na stránce vidí doporučení, produkty s cenou,
+telefon salonu a odkaz na objednání. Text se příště sám nabídne u stejného ošetření. Do doporučení se nikdy
+automaticky nedávají údaje z dotazníku ani poznámky z karty.
 
 ## Sklad produktů
 
