@@ -1,7 +1,8 @@
 'use client';
 import {useEffect, useState} from 'react';
-import {Copy, ImageUp, Pencil, Plus, Trash2, X} from 'lucide-react';
-import {DEFAULT_SETTINGS, salonName, WEEKDAYS, type BookingSettings} from '../lib/booking';
+import {CalendarDays, Copy, ImageUp, MessageSquare, Pencil, Plus, Trash2, X} from 'lucide-react';
+import {addDays, DEFAULT_SETTINGS, salonName, salonNow, WEEKDAYS, type BookingSettings} from '../lib/booking';
+import {DEFAULT_SMS_TEMPLATE, renderSms, SMS_PLACEHOLDERS, smsParts} from '../lib/sms';
 import {czIban} from '../lib/payment';
 import {logoSrc} from './logo';
 import {formatRevenue} from '../lib/revenue';
@@ -32,14 +33,14 @@ function shrinkImage(file: File): Promise<string> {
 
 export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: string; onSaved?: () => void}) {
   const [services, setServices] = useState<Service[]>([]), [settings, setSettings] = useState<BookingSettings>(DEFAULT_SETTINGS);
-  const [editing, setEditing] = useState<Partial<Service> | null>(null), [features, setFeatures] = useState({studioPriceList: false});
+  const [editing, setEditing] = useState<Partial<Service> | null>(null), [features, setFeatures] = useState<{studioPriceList: boolean; sms?: string; calendarUrl?: string}>({studioPriceList: false});
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [copied, setCopied] = useState(false);
   const embed = `<iframe src="${bookingUrl}" title="Rezervace – ${salonName(settings).replace(/"/g, '')}" style="width:100%;min-height:900px;border:0" loading="lazy"></iframe>`;
 
   async function load() {
     try {
       const r = await fetch('/api/bookings?from=2000-01-01&to=2000-01-01', {cache: 'no-store'});
-      const d = await r.json() as {error?: string; services: Service[]; settings: BookingSettings; features?: {studioPriceList: boolean}};
+      const d = await r.json() as {error?: string; services: Service[]; settings: BookingSettings; features?: {studioPriceList: boolean; sms?: string; calendarUrl?: string}};
       if (!r.ok) throw new Error(d.error); setServices(d.services); setSettings(d.settings); if (d.features) setFeatures(d.features);
     } catch (e) { setError((e as Error).message); }
   }
@@ -130,6 +131,10 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
       <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Údaje salonu byly uloženy.')}>Uložit údaje</button></div>
     </section>
 
+    <SmsPanel settings={settings} setSettings={setSettings} provider={features.sms || ''} busy={busy} run={run}/>
+
+    <CalendarPanel url={features.calendarUrl || ''} busy={busy} run={run}/>
+
     <PasswordPanel/>
 
     <ProductsPanel/>
@@ -154,6 +159,61 @@ function LogoPicker({version, busy, onPick, onError}: {version: number; busy: bo
 }
 
 /** Změna hesla do administrace; po změně se odhlásí ostatní zařízení. */
+const SMS_HINTS: Record<string, string> = {jmeno: 'křestní jméno', salon: 'název salonu', kdy: '„zítra“ nebo „dnes“', datum: 'např. pá 18.10.', cas: 'např. 9:30', osetreni: 'název ošetření', telefon: 'telefon salonu'};
+
+/** SMS připomínky den před termínem: zapnutí, čas odeslání, text a zkušební SMS. */
+function SmsPanel({settings, setSettings, provider, busy, run}: {settings: BookingSettings; setSettings: (s: BookingSettings) => void; provider: string; busy: boolean; run: (action: () => Promise<unknown>, message: string) => Promise<void>}) {
+  const [phone, setPhone] = useState(''), [test, setTest] = useState<{busy?: boolean; message?: string; error?: boolean}>({});
+  // Zkušební SMS neukládá nastavení, aby se rozepsaný text neztratil.
+  const sendTest = async () => { setTest({busy: true}); try { await post({kind: 'sms', action: 'test', data: {phone, template: settings.smsTemplate, ascii: settings.smsAscii}}); setTest({message: 'Zkušební SMS byla odeslána.'}); } catch (e) { setTest({message: (e as Error).message, error: true}); } };
+  const sample = renderSms(settings.smsTemplate, {name: 'Jana Nováková', start: addDays(salonNow().slice(0, 10), 1) + 'T09:30', serviceName: 'Hydratační ošetření'}, {name: salonName(settings), phone: settings.businessPhone || '777 123 456'}, settings.smsAscii, salonNow().slice(0, 10));
+  const size = smsParts(sample);
+  return <section className="panel sms-panel">
+    <div className="panel-heading"><h2>SMS připomínky klientkám</h2></div>
+    <p className="muted-inline">Den před termínem dostane klientka SMS. Posílá se potvrzeným rezervacím s číslem mobilu, každému termínu jednou (po přesunu znovu). Rezervace vytvořené méně než den předem se nepřipomínají.</p>
+    {provider ? <p className="muted-inline">SMS odchází přes: <b>{provider}</b>.</p>
+      : <p className="setup-hint inline" role="note">SMS zatím nejsou na serveru nastavené. Správce serveru doplní SMS bránu do .env.selfhost (postup v README, oddíl SMS připomínky). Text si můžete připravit už teď.</p>}
+    <label className="check"><input type="checkbox" checked={settings.smsReminders} onChange={e => setSettings({...settings, smsReminders: e.target.checked})}/> Posílat SMS připomínky den před termínem</label>
+    <label className="field narrow"><span>Odeslat v (čas, kdy SMS odejdou)</span><input type="time" min="07:00" max="20:00" step={900} value={settings.smsTime} onChange={e => setSettings({...settings, smsTime: e.target.value})}/></label>
+    <label className="field"><span>Text zprávy</span><textarea rows={4} maxLength={480} value={settings.smsTemplate} onChange={e => setSettings({...settings, smsTemplate: e.target.value})}/></label>
+    <p className="sms-placeholders">{SMS_PLACEHOLDERS.map(k => <button key={k} type="button" className="secondary" title={SMS_HINTS[k]} onClick={() => setSettings({...settings, smsTemplate: settings.smsTemplate.trimEnd() + ' {' + k + '}'})}>{'{' + k + '}'}</button>)}
+      {settings.smsTemplate !== DEFAULT_SMS_TEMPLATE && <button type="button" className="link-button" onClick={() => setSettings({...settings, smsTemplate: DEFAULT_SMS_TEMPLATE})}>Vrátit původní text</button>}</p>
+    <label className="check"><input type="checkbox" checked={settings.smsAscii} onChange={e => setSettings({...settings, smsAscii: e.target.checked})}/> Poslat bez háčků a čárek (do jedné SMS se vejde 160 znaků místo 70)</label>
+    <div className="sms-preview"><MessageSquare size={16}/><div><p>{sample}</p><small>{size.length} znaků · {size.parts === 1 ? '1 SMS' : `${size.parts} SMS (platí se každá)`}{!settings.businessPhone && settings.smsTemplate.includes('{telefon}') && ' · vyplňte telefon v Údajích salonu'}</small></div></div>
+    {test.message && <p className={test.error ? 'error' : 'notice'} role={test.error ? 'alert' : 'status'}>{test.message}</p>}
+    <div className="form-actions sms-actions">
+      {provider && <span className="sms-test"><input type="tel" aria-label="Číslo pro zkušební SMS" placeholder="Váš mobil" value={phone} onChange={e => setPhone(e.target.value)}/>
+        <button className="secondary" disabled={busy || test.busy || !phone.trim()} onClick={sendTest}>Poslat zkušební SMS</button></span>}
+      <button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Nastavení SMS bylo uloženo.')}>Uložit SMS připomínky</button>
+    </div>
+  </section>;
+}
+
+/** Odběr rezervací v kalendáři telefonu přes tajný odkaz (.ics); telefon si změny stahuje sám. */
+function CalendarPanel({url, busy, run}: {url: string; busy: boolean; run: (action: () => Promise<unknown>, message: string) => Promise<void>}) {
+  const [copied, setCopied] = useState(false);
+  return <section className="panel calendar-panel">
+    <div className="panel-heading"><h2>Kalendář v telefonu</h2></div>
+    <p className="muted-inline">Rezervace se ukážou v kalendáři v telefonu (iPhone i Android) vedle Vašich ostatních událostí a samy se aktualizují. V telefonu jde kalendář jen číst, rezervace se dál upravují tady.</p>
+    {!url ? <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'calendar', action: 'on'}), 'Odkaz na kalendář je připravený.')}><CalendarDays size={17}/> Zapnout kalendář v telefonu</button></div> : <>
+      <label className="field"><span>Tajný odkaz na kalendář</span><input readOnly value={url} onFocus={e => e.currentTarget.select()}/></label>
+      <div className="form-actions calendar-actions">
+        <a className="secondary" href={url.replace(/^https?:/, 'webcal:')}>Přidat do iPhonu</a>
+        <button className="secondary" onClick={() => navigator.clipboard.writeText(url).then(() => setCopied(true), () => setCopied(false))}><Copy size={16}/> {copied ? 'Zkopírováno' : 'Zkopírovat odkaz'}</button>
+      </div>
+      <ul className="calendar-help">
+        <li><b>iPhone:</b> otevřete tuto stránku v telefonu a klepněte na Přidat do iPhonu. Nebo Nastavení → Kalendář → Účty → Přidat účet → Jiný → Přidat odebíraný kalendář a vložte odkaz.</li>
+        <li><b>Android (Google Kalendář):</b> na počítači otevřete calendar.google.com → Další kalendáře → + → Z adresy URL a vložte odkaz. Google změny stahuje jen několikrát denně, iPhone častěji.</li>
+      </ul>
+      <p className="setup-hint inline" role="note">Kdo zná odkaz, uvidí jména, ošetření a telefony klientek. Nikomu ho neposílejte. Když se dostane k někomu dalšímu, vytvořte nový odkaz a starý přestane fungovat.</p>
+      <div className="form-actions">
+        <button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'calendar', action: 'off'}), 'Kalendář v telefonu je vypnutý.')}>Vypnout</button>
+        <button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'calendar', action: 'reset'}), 'Nový odkaz je připravený, starý už nefunguje. Kalendář v telefonu přidejte znovu.')}>Vytvořit nový odkaz</button>
+      </div>
+    </>}
+  </section>;
+}
+
 function PasswordPanel() {
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false);
   async function submit(e: React.FormEvent<HTMLFormElement>) {

@@ -13,7 +13,7 @@ const publicOrigin=process.env.SALON_PUBLIC_ORIGIN?new URL(process.env.SALON_PUB
 const webRoot=path.resolve('dist-selfhost/client');
 const types:Record<string,string>={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.ico':'image/x-icon','.woff2':'font/woff2'};
 // Veřejné jsou jen rezervační stránka, její statické soubory a /api/public; vše ostatní chrání přihlášení.
-const isPublic=(p:string)=>p==='/rezervace'||p==='/rezervace/'||p==='/uctenka'||p.startsWith('/assets/')||p==='/favicon.svg'||p==='/logo.png'||p==='/api/public';
+const isPublic=(p:string)=>p==='/rezervace'||p==='/rezervace/'||p==='/uctenka'||p.startsWith('/assets/')||p==='/favicon.svg'||p==='/logo.png'||p==='/api/public'||/^\/kalendar\/[0-9a-f]{40}\.ics$/.test(p);
 const frameAncestors=process.env.SALON_BOOKING_FRAME_ANCESTORS||'*';
 const hits=new Map<string,number[]>();
 function rateLimited(ip:string){const now=Date.now(),list=(hits.get(ip)||[]).filter(t=>now-t<3600_000);list.push(now);hits.set(ip,list);if(hits.size>5000)hits.clear();return list.length>20;}
@@ -48,6 +48,11 @@ const server=http.createServer(async(req,res)=>{try{
   const fallback=PROFILE==='studioiam'?'logo-studioiam.png':'logo-default.svg';
   res.writeHead(200,{'Content-Type':types[path.extname(fallback)],'Cache-Control':cache,'X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:readFileSync(path.join(webRoot,fallback)));return;
  }
+ // Kalendář rezervací pro telefon: chrání ho tajný odkaz z Nastavení (telefon se nepřihlašuje).
+ if(url.pathname.startsWith('/kalendar/')&&(req.method==='GET'||req.method==='HEAD')){
+  const body=await bookings.calendarFeed(url.pathname.slice(10,-4));if(!body){res.writeHead(404);res.end();return;}
+  res.writeHead(200,{'Content-Type':'text/calendar; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Robots-Tag':'noindex'});res.end(req.method==='HEAD'?undefined:body);return;
+ }
  // Změna hesla přihlášenou uživatelkou: ověří současné heslo, ostatní zařízení se odhlásí (klíč session se odvozuje z hesla).
  if(url.pathname==='/api/account'){
   const reply=(status:number,data:unknown,extra:Record<string,string>={})=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store',...extra});res.end(JSON.stringify(data));};
@@ -80,6 +85,9 @@ const server=http.createServer(async(req,res)=>{try{
 server.listen(Number(process.env.PORT||8787),process.env.HOST||'127.0.0.1',()=>console.log('Salon self-host server ready'));
 // Jednou denně po 8. hodině pošle salonu e-mail o poukazech, které brzy vyprší (každý poukaz 30 a 7 dní předem).
 let remindedOn='';
-async function dailyTasks(){const now=salonNow();if(now.slice(11,13)<'08'||remindedOn===now.slice(0,10))return;remindedOn=now.slice(0,10);
+async function dailyTasks(){const now=salonNow();
+ // SMS připomínky zítřejších termínů: každých 15 minut od nastaveného času, každý termín jen jednou (hlídá databáze).
+ try{const n=await bookings.remindBookings(now);if(n)console.log(`SMS připomínky odeslány (${n}).`);}catch(e){console.error('SMS reminders failed',e instanceof Error?e.message:e);}
+ if(now.slice(11,13)<'08'||remindedOn===now.slice(0,10))return;remindedOn=now.slice(0,10);
  try{const n=await vouchers.remindExpiring(origin+'/');if(n)console.log(`Připomenutí poukazů odesláno (${n}).`);}catch(e){remindedOn='';console.error('Voucher reminder failed',e instanceof Error?e.message:e);}}
 setTimeout(dailyTasks,10_000);setInterval(dailyTasks,15*60_000);

@@ -3,6 +3,7 @@ import {mkdirSync,readFileSync,readdirSync,writeFileSync,renameSync,rmSync,exist
 import path from 'node:path';
 import {mailConfig,sendMail} from './mail';
 import {applyProfile} from './profile';
+import {smsConfig} from './sms';
 export const dataDir=path.resolve(process.env.SALON_DATA_DIR||'data');mkdirSync(dataDir,{recursive:true,mode:0o700});
 const db=new DatabaseSync(path.join(dataDir,'salon.sqlite'));db.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
 db.exec('CREATE TABLE IF NOT EXISTS selfhost_migrations(name TEXT PRIMARY KEY)');
@@ -21,4 +22,5 @@ const mail=mailConfig();if(!mail)console.log('E-mailová upozornění nejsou nas
 function sender(){try{const s=JSON.parse((db.prepare("SELECT value FROM settings WHERE key='booking'").get() as {value?:string}|undefined)?.value||'{}') as {businessName?:string;businessEmail?:string};return {name:s.businessName?.trim()||'Rezervace',replyTo:s.businessEmail?.trim()||''};}catch{return {name:'Rezervace',replyTo:''};}}
 const NOTIFY=mail?(subject:string,text:string,to?:string)=>sendMail(mail,subject,text,to,sender()):undefined;
 const PUBLIC_ORIGIN=process.env.SALON_PUBLIC_ORIGIN?new URL(process.env.SALON_PUBLIC_ORIGIN).origin:process.env.SALON_ORIGIN?new URL(process.env.SALON_ORIGIN).origin:undefined;
-export const env={DB,BUCKET,NOTIFY,PUBLIC_ORIGIN,PROFILE};
+const sms=smsConfig();console.log(sms?`SMS připomínky přes: ${sms.name}.`:'SMS nejsou nastavené (SMS_PROVIDER v .env.selfhost).');
+export const env={DB,BUCKET,NOTIFY,PUBLIC_ORIGIN,PROFILE,SMS:sms?.send,SMS_NAME:sms?.name};

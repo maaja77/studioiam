@@ -4,7 +4,7 @@ import initSqlJs from 'sql.js/dist/sql-asm.js';
 import {seedDemo} from './seed';
 
 type Value = string | number | null;
-const DB_KEY = 'studioiam-demo-db-v13', PHOTO_KEY = 'studioiam-demo-photos-v13';
+const DB_KEY = 'studioiam-demo-db-v14', PHOTO_KEY = 'studioiam-demo-photos-v14';
 const migrations = import.meta.glob('../../drizzle/*.sql', {query: '?raw', import: 'default', eager: true}) as Record<string, string>;
 
 function toBase64(bytes: Uint8Array) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); }
@@ -64,9 +64,10 @@ const BUCKET = {
 };
 
 // V ukázce se e-mail neposílá, jen se zobrazí jeho předmět v horní liště.
-const NOTIFY = async (subject: string, _text: string, to?: string) => { window.dispatchEvent(new CustomEvent('demo-mail', {detail: to ? `klientce (${to}): ${subject}` : subject})); };
+const NOTIFY = async (subject: string, _text: string, to?: string) => { window.dispatchEvent(new CustomEvent('demo-mail', {detail: to ? `e-mail klientce (${to}): ${subject}` : subject})); };
 
 // Náhled ukazuje instalaci Studia I AM (ceník z MyFoxu, program Čistá pleť, vlastní logo).
-export const env = {DB, BUCKET, NOTIFY, PROFILE: 'studioiam'};
+const SMS = async (phone: string, text: string) => { window.dispatchEvent(new CustomEvent('demo-mail', {detail: `SMS na ${phone}: ${text}`})); };
+export const env = {DB, BUCKET, NOTIFY, PROFILE: 'studioiam', SMS, SMS_NAME: 'ukázka (SMS se jen zobrazí, neodešlou)'};
 
 export function resetDemo() { try { localStorage.removeItem(DB_KEY); localStorage.removeItem(PHOTO_KEY); } catch { /* nic */ } location.reload(); }

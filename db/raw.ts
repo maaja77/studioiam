@@ -15,3 +15,8 @@ export const mailEnabled=()=>!!(env as {NOTIFY?:Notify}).NOTIFY;
 export const publicOrigin=(fallback:string)=>(env as {PUBLIC_ORIGIN?:string}).PUBLIC_ORIGIN||fallback;
 /** Profil instalace: 'studioiam' (Studio I AM s vlastním ceníkem a logem) nebo 'generic' pro ostatní salony. */
 export const salonProfile=()=>(env as {PROFILE?:string}).PROFILE||'generic';
+/** Odeslání SMS přes bránu z .env.selfhost (null = SMS nejsou nastavené). */
+type SendSms=(phone:string,text:string)=>Promise<void>;
+export const smsSender=()=>(env as {SMS?:SendSms}).SMS||null;
+/** Název nastavené SMS brány pro Nastavení ('' = žádná). */
+export const smsName=()=>(env as {SMS_NAME?:string}).SMS_NAME||'';
