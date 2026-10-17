@@ -164,6 +164,12 @@ Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potře
 - Vpravo **Čeká na vyřízení**: nezaplacené kauce, proběhlé termíny bez účtenky, nezaplacené účtenky, poukazy z webu čekající na platbu a docházející produkty. Kliknutím se otevře příslušná část.
 - **Ranní e-mail** (zapíná se zaškrtnutím v části Dnes, potřebuje `SMTP_*` a `SALON_NOTIFY_EMAIL`): jednou denně mezi 7:00 a 12:00 přijde salonu přehled s časy, ošetřeními a jmény. Zdravotní údaje ani text upozornění v něm nejsou, jen poznámka „upozornění v kartě“.
 
+### Prosba o hodnocení
+
+- V části **Dnes** je panel **Požádat o hodnocení** s klientkami, které byly v salonu v posledních 7 dnech. Každá se žádá jen jednou; klientky označené „Nechce zprávy“ a klientky s blokovanými rezervacemi se nenabízejí.
+- Odkaz na hodnocení zkopírujte z Google profilu firmy („Požádat o recenze“) a vložte ho do panelu. Text zprávy jde upravit, doplní se `{jmeno}`, `{salon}` a `{odkaz}`.
+- SMS se otevře v telefonu a odešlete ji sama, nic se neposílá automaticky. E-mail jde poslat přímo z aplikace, pokud jsou nastavené `SMTP_*`.
+
 ## Online rezervace
 
 - Administrace: záložky **Rezervace** (týdenní kalendář s časovou osou, ošetření barevně podle kategorie, kliknutím do volného místa nová rezervace; ruční rezervace, blokace času, stav Proběhlo / Nepřišla / Zrušeno, založení karty z rezervace) a **Nastavení** (ceník ošetření s kategoriemi, popisy a barvami, výchozí ceník převzatý z MyFoxu, otevírací doba, předstih, kód pro web).

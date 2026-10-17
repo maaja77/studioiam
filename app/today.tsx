@@ -3,6 +3,7 @@
 import {useEffect, useState} from 'react';
 import {AlertTriangle, CalendarDays, ClipboardList, Gift, Mail, Package, Phone, Receipt, UserRound, Wallet} from 'lucide-react';
 import {formatRevenue} from '../lib/revenue';
+import ReviewRequests from './reviews';
 import type {TodayBooking, TodayData} from './api/today/route';
 
 type View = 'bookings' | 'receipts' | 'vouchers' | 'stock';
@@ -77,6 +78,7 @@ export default function Today({onOpenClient, onGo}: {onOpenClient: (id: string) 
         <section className="panel"><h2>Čeká na vyřízení</h2>
           {!todo.length ? <p className="muted-inline">Nic, všechno je vyřízené.</p> : <ul className="today-todo">{todo.map(x => <li key={x.label}><button onClick={() => onGo(x.go)}>{x.icon}<span><b>{x.label}</b><small>{x.detail}</small></span></button></li>)}</ul>}
         </section>
+        <ReviewRequests/>
         <section className="panel today-mail"><label className="check"><input type="checkbox" checked={data.morningMail} disabled={busy} onChange={e => toggleMail(e.target.checked)}/> <span><Mail size={15}/> Posílat mi tento přehled každé ráno v 7:00 e-mailem</span></label>
           <small className="muted-inline">{data.mail ? 'E-mail obsahuje jen časy, ošetření a jména. Upozornění a zdravotní údaje zůstávají jen tady v aplikaci.' : 'E-maily zatím nejsou na serveru nastavené, přehled se pošle, až je správce zapne.'}</small></section>
       </aside>

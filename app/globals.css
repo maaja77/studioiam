@@ -428,5 +428,9 @@ dialog.care-dialog{width:min(680px,calc(100% - 24px))}
 .today-todo{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.today-todo button{width:100%;justify-content:flex-start;text-align:left;background:#f7faf9;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--teal);gap:10px}.today-todo button:hover{background:#eef6f4}
 .today-todo span{display:flex;flex-direction:column;min-width:0}.today-todo b{color:var(--ink);font-size:14px}.today-todo small{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
 .today-mail .check span{display:inline-flex;align-items:center;gap:6px}
+.reviews h2{display:flex;align-items:center;gap:7px}.reviews h2 svg{color:#c9932b}.reviews>.link-button{align-self:flex-start}.reviews-setup{display:flex;flex-direction:column;gap:10px}.reviews-setup .form-actions{flex-wrap:wrap}
+.reviews-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}.reviews-list li{display:flex;flex-direction:column;gap:6px;padding:9px 0;border-top:1px solid var(--line)}.reviews-list li:first-child{border-top:0;padding-top:0}
+.reviews-list li>div:first-child{display:flex;flex-direction:column;min-width:0}.reviews-list small{color:var(--muted);font-size:13px}
+.reviews-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.reviews-actions .secondary{min-height:34px;padding:5px 10px;font-size:13px;display:inline-flex;align-items:center;gap:5px;text-decoration:none}
 @media(max-width:900px){.today-layout{grid-template-columns:1fr}}
 @media(max-width:640px){.today-list li{grid-template-columns:50px minmax(0,1fr);padding:14px 4px}.today-actions{grid-column:2;flex-direction:row}}
