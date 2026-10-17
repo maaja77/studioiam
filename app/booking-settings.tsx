@@ -6,6 +6,7 @@ import {DEFAULT_SMS_TEMPLATE, renderSms, SMS_PLACEHOLDERS, smsParts} from '../li
 import {czIban} from '../lib/payment';
 import {coverSrc, logoSrc} from './logo';
 import {formatRevenue} from '../lib/revenue';
+import {applyTheme, checkTheme, DEFAULT_THEME, THEMES} from '../lib/theme';
 import {CATEGORY_COLORS, PRICE_LIST, serviceColor} from '../lib/price-list';
 import type {Service} from './bookings';
 
@@ -153,6 +154,8 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
       <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Údaje salonu byly uloženy.')}>Uložit údaje</button></div>
     </section>
 
+    <ThemePanel value={settings.themeColor} busy={busy} onPick={color => { const next = {...settings, themeColor: color}; setSettings(next); applyTheme(color); run(() => post({kind: 'settings', data: next}), 'Barva kartotéky byla uložena.'); }}/>
+
     <SmsPanel settings={settings} setSettings={setSettings} provider={features.sms || ''} busy={busy} run={run}/>
 
     <CalendarPanel url={features.calendarUrl || ''} busy={busy} run={run}/>
@@ -178,6 +181,21 @@ function LogoPicker({version, busy, onPick, onError}: {version: number; busy: bo
     {!!version && <button type="button" className="link-button" disabled={busy} onClick={() => onPick(null)}>Odebrat logo</button>}
     <small className="muted-inline">PNG, JPG nebo WebP, ideálně čtvercové.</small>
   </div>;
+}
+
+/** Barevný motiv celé administrace: hotové barvy nebo vlastní; uloží se hned po výběru. */
+function ThemePanel({value, busy, onPick}: {value: string; busy: boolean; onPick: (color: string) => void}) {
+  const current = value || DEFAULT_THEME, [custom, setCustom] = useState(current), customError = checkTheme(custom);
+  return <section className="panel theme-panel">
+    <div className="panel-heading"><h2>Barevný vzhled kartotéky</h2></div>
+    <p className="muted-inline">Barva tlačítek, nabídky a podkladů v celé administraci. Rezervační stránka pro klientky zůstává ve své barvě.</p>
+    <div className="theme-swatches" role="radiogroup" aria-label="Barva kartotéky">{THEMES.map(([label, color]) =>
+      <button type="button" key={color} role="radio" aria-checked={current === color} className={current === color ? 'active' : ''} disabled={busy} onClick={() => { setCustom(color); onPick(color === DEFAULT_THEME ? '' : color); }}>
+        <span className="theme-dot" style={{background: color}}/>{label}</button>)}</div>
+    <div className="theme-custom"><label><span>Vlastní barva</span><input type="color" value={custom} onChange={e => setCustom(e.target.value)}/></label>
+      <button type="button" className="secondary" disabled={busy || !!customError || custom === current} onClick={() => onPick(custom)}>Použít vlastní barvu</button>
+      {customError && custom !== current && <small className="error-inline">{customError}</small>}</div>
+  </section>;
 }
 
 /** Fotka salonu nahoře na rezervační stránce; zmenší se na 1600 px a uloží jako JPEG. */

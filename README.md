@@ -188,6 +188,13 @@ Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potře
 - **Balíčky a programy:** u ošetření lze nastavit počet ošetření v balíčku a platbu předem. Klientka online rezervuje 1. termín a hned dostane QR platbu na celou částku; termín čeká na platbu stejně jako u kauce. Další termíny balíčku domluví salon.
 - **Změna termínu klientkou:** po rezervaci (a e-mailem, pokud ho vyplní) dostane klientka tajný odkaz `/rezervace?t=…`, přes který termín zruší nebo přesune, nejpozději 24 h předem (nastavitelné). Salon dostane e-mail a do poznámky rezervace se zapíše, co klientka změnila. V administraci jde termín změnit kdykoliv.
 
+## Barevný vzhled
+
+V Nastavení → Barevný vzhled kartotéky si vyberete barvu celé administrace (tyrkysová, zlatá, pudrová, levandulová, šalvějová,
+modrá, vínová, grafitová) nebo vlastní barvu. Z jedné barvy se odvodí tlačítka, nabídka, podklady i rámečky (CSS `--accent`,
+odstíny přes relativní barvy `oklch(from …)`). Příliš světlou vlastní barvu aplikace nepřijme, bílý text na tlačítkách by nebyl čitelný.
+Barva platí pro všechna zařízení; rezervační stránka a stránky pro klientky mají vlastní barvy.
+
 ## SMS připomínky
 
 Den před termínem dostane klientka SMS, např. „STUDIO I AM: pripominame Vas termin zitra po 19.10. v 10:00 (A-QS Hacker).

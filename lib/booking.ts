@@ -1,4 +1,5 @@
 // Pravidla online rezervací: otevírací doba, volné termíny a porovnání telefonů.
+import {checkTheme, DEFAULT_THEME} from './theme';
 import {czIban} from './payment';
 import {DEFAULT_SMS_TEMPLATE} from './sms';
 import {parseAmounts} from './vouchers';
@@ -17,7 +18,7 @@ export type BookingSettings = {hours: Hours; leadHours: number; horizonDays: num
   businessName: string; businessOwner: string; businessAddress: string; businessId: string; businessPhone: string; businessEmail: string;
   programEnabled: boolean; logoVersion: number; coverVersion: number; voucherMonths: number;
   smsReminders: boolean; smsTime: string; smsTemplate: string; smsAscii: boolean; intakeOnline: boolean;
-  voucherOnline: boolean; voucherAmounts: string; voucherMinKc: number; voucherServices: boolean; lapsedText: string; morningMail: boolean; reviewUrl: string; reviewText: string; birthdayText: string};
+  voucherOnline: boolean; voucherAmounts: string; voucherMinKc: number; voucherServices: boolean; lapsedText: string; morningMail: boolean; reviewUrl: string; reviewText: string; birthdayText: string; themeColor: string};
 export type BusyRange = {start: string; end: string};
 
 export const DEFAULT_SETTINGS: BookingSettings = {
@@ -51,7 +52,7 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   voucherServices: true,
   lapsedText: DEFAULT_LAPSED_TEXT,
   morningMail: false,
-  reviewUrl: '',
+  reviewUrl: '', themeColor: '',
   reviewText: DEFAULT_REVIEW_TEXT,
   birthdayText: DEFAULT_BIRTHDAY_TEXT,
 };
@@ -128,7 +129,9 @@ export function validateSettings(v: unknown): BookingSettings | string {
   if (voucherOnline && !voucherAmounts && !voucherMinKc && !voucherServices) return 'Nabídněte na webu aspoň jednu částku nebo poukazy na ošetření.';
   const reviewUrl = text('reviewUrl', 300);
   if (reviewUrl && !/^https:\/\/[^\s<>"]+\.[^\s<>"]+$/.test(reviewUrl)) return 'Odkaz na hodnocení musí začínat https:// (zkopírujte ho z Google profilu firmy).';
-  return {businessName: text('businessName', 80), businessOwner: text('businessOwner', 80), businessAddress: text('businessAddress', 160), businessId, businessPhone, businessEmail,
+  const themeColor = text('themeColor', 7).toLowerCase(), themeError = checkTheme(themeColor);
+  if (themeError) return themeError;
+  return {themeColor: themeColor === DEFAULT_THEME ? '' : themeColor, businessName: text('businessName', 80), businessOwner: text('businessOwner', 80), businessAddress: text('businessAddress', 160), businessId, businessPhone, businessEmail,
     programEnabled: raw.programEnabled === true, voucherMonths,
     smsReminders: raw.smsReminders === true, smsTime, smsTemplate, smsAscii: raw.smsAscii !== false, intakeOnline: raw.intakeOnline !== false, voucherOnline, voucherAmounts, voucherMinKc, voucherServices, lapsedText: text('lapsedText', 480) || DEFAULT_LAPSED_TEXT, morningMail: raw.morningMail === true, reviewUrl, reviewText: text('reviewText', 480) || DEFAULT_REVIEW_TEXT, birthdayText: text('birthdayText', 480) || DEFAULT_BIRTHDAY_TEXT, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0, coverVersion: Number.isInteger(raw.coverVersion) ? raw.coverVersion as number : 0,
     hours, leadHours: lead, horizonDays: horizon, stepMinutes: step, depositFromKc: depositFrom, depositPercent: percent, depositHoldHours: hold, account, accountName, changeLimitHours: change};

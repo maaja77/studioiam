@@ -14,9 +14,10 @@ import Stock from './stock';
 import CareDialog from './care';
 import Today from './today';
 import {VisitProductList,type CatalogItem,type VisitItem} from './visit-products';
+import {applyTheme, restoreTheme} from '../lib/theme';
 import {logoSrc} from './logo';
 import { Plus, Search, Users, LockKeyhole, Pencil, CalendarDays, Phone, Mail, X, Trash2, NotebookPen, ChevronLeft, Ban, LogOut, Hourglass, Leaf, Cake } from 'lucide-react';
-type Salon={name:string;named:boolean;logoVersion:number;programEnabled:boolean;accountSet:boolean;vouchersExpiring?:number;vouchersPending?:number;stockLow?:number};
+type Salon={name:string;named:boolean;logoVersion:number;themeColor?:string;programEnabled:boolean;accountSet:boolean;vouchersExpiring?:number;vouchersPending?:number;stockLow?:number};
 type Client={id:string;name:string;phone:string;email:string;skin:string;cautions:string;notes:string;programActive:number;blocked?:number;depositRequired?:number;birthDate?:string;intakeBirthDate?:string};
 type Visit={id:string;clientId:string;date:string;treatment:string;products:string;notes:string;revenueCents:number|null;cleanSkin:number;programPriceCents:number|null;programStep:number|null;items?:VisitItem[];care?:string|null};
 const dateText=(s:string)=>new Date(s+'T12:00:00').toLocaleDateString('cs-CZ',{day:'numeric',month:'long',year:'numeric'});
@@ -29,7 +30,8 @@ export default function Home({onLogout}:{onLogout?:()=>void}={}){
  const [revenueMonth,setRevenueMonth]=useState(()=>today().slice(0,7));const monthlyRevenue=revenueSummary(visits,revenueMonth),totalRevenue=revenueSummary(visits);
  const client=clients.find(c=>c.id===selected); const history=visits.filter(v=>v.clientId===selected);
  async function load(){setError('');try{const r=await fetch('/api/records',{cache:'no-store'});const d=await r.json() as {error:string;clients:Client[];visits:Visit[];salon?:Salon;productCatalog?:CatalogItem[]};if(!r.ok)throw new Error(d.error);setClients(d.clients);setVisits(d.visits);setCatalog(d.productCatalog||[]);if(d.salon){setSalon(d.salon);document.title=d.salon.name+' · Kartotéka klientů';}}catch(e){setError((e as Error).message);}finally{setLoading(false);}}
- useEffect(()=>{load();},[]);
+ useEffect(()=>{restoreTheme();load();},[]);
+ useEffect(()=>{if(salon)applyTheme(salon.themeColor);},[salon]);
  useEffect(()=>{if(editor)dialog.current?.showModal();else dialog.current?.close();},[editor]);
  async function save(e:React.FormEvent<HTMLFormElement>){e.preventDefault();if(!editor)return;setBusy(true);setError('');try{const data={...editor.data,...Object.fromEntries(new FormData(e.currentTarget))};const r=await fetch('/api/records',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:editor.kind,action:'save',data})});const d=await r.json() as {error:string;id:string};if(!r.ok)throw new Error(d.error);if(editor.kind==='client')setSelected(d.id);setEditor(null);await load();setNotice('Záznam byl uložen.');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  async function toggleProgram(active:boolean){if(!client)return;if(!active&&!confirm('Vypnout program Čistá pleť u tohoto klienta? Historie návštěv zůstane uložená.'))return;setBusy(true);setError('');try{const r=await fetch('/api/records',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'program',action:'save',data:{id:client.id,active}})});const d=await r.json() as {error:string};if(!r.ok)throw new Error(d.error);await load();setNotice(active?'Program Čistá pleť byl přidán.':'Program Čistá pleť byl vypnut.');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
