@@ -115,7 +115,7 @@ function ProductForm({product, lines, busy, sort, onSave, onCancel}: {product: P
     <div className="panel-heading"><h2>{supply ? (product.id ? 'Upravit materiál' : 'Nový spotřební materiál') : product.id ? 'Upravit produkt' : 'Nový produkt'}</h2><button type="button" className="icon-btn" aria-label="Zavřít" onClick={onCancel}><X size={18}/></button></div>
     <label className="field"><span>{supply ? 'Název materiálu' : 'Název produktu'}</span><input name="name" required maxLength={150} defaultValue={product.name}/></label>
     <div className="segmented-mini" role="radiogroup" aria-label="Druh">{KINDS.map(([k, l]) => <button type="button" key={k} role="radio" aria-checked={kind === k} className={kind === k ? 'active' : ''} onClick={() => setKind(k)}>{l}</button>)}</div>
-    {!supply && <label className="field"><span>Řada (nepovinné)</span><input name="line" maxLength={60} list="stock-lines" defaultValue={product.line || ''} placeholder="Např. Hydratace, Anti-age, Akné"/>
+    {!supply && <label className="field"><span>Řada (nepovinné)</span><input name="line" maxLength={60} list="stock-lines" defaultValue={product.line || ''} placeholder="Např. PDRN, C-Fusion, Neuro Cannabis"/>
       <datalist id="stock-lines">{lines.map(l => <option key={l} value={l}/>)}</datalist></label>}
     {supply ? <div className="field-grid"><label className="field"><span>Kusů v balení</span><input name="packSize" type="number" min={1} max={100000} defaultValue={product.packSize ?? 1}/></label>
       <label className="field"><span>Nákupní cena za balení (Kč)</span><input name="cost" inputMode="decimal" defaultValue={moneyInput(product.costCents)}/></label></div>

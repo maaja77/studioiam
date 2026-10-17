@@ -284,7 +284,7 @@ Sklad má tři druhy produktů, každý na své záložce:
   ukáže se hodnota zásoby. Objeví se ve výběru produktů použitých při návštěvě; spotřebu odepíšete tlačítkem Spotřeba.
 - **Spotřební materiál**: viz níže.
 
-Produkty domácí péče i na ošetření jde zařadit do **řady** (třeba Hydratace, Anti-age, Akné). Řada se píše v úpravě produktu
+Produkty domácí péče i na ošetření jde zařadit do **řady** (třeba A-QS Hacker, PDRN, C-Fusion). Řada se píše v úpravě produktu
 (nabízí už použité řady), seznam se podle řad seskupí a nahoře jde vybrat jen jednu řadu. Na účtence jsou produkty v nabídce
 rozdělené podle řad.
 

@@ -166,7 +166,7 @@ export async function seedDemo(run: Run, put: Put) {
   ([['Enzymatický peeling, kabinetní 250 ml', 2, 1, 89000], ['Hyaluronové sérum, kabinetní 500 ml', 1, 1, 145000], ['Alginátová maska 1 kg', 3, 1, 52000], ['Čisticí gel, kabinetní 1 l', 0, 1, 98000]] as const).forEach(([name, stock, min, cost], i) =>
     run("INSERT INTO products (id,name,price_cents,active,sort,stock,min_stock,cost_cents,kind,created) VALUES (?,?,0,1,?,?,?,?,'pro',?)", ['pro-' + i, name, 10 + i, stock, min, cost, now]));
   // Řady produktů (ukázkové): domácí péče i kabinetní produkty podle linií; vzorek masky zůstává bez řady.
-  ([['p-0', 'Citlivá pleť'], ['p-1', 'Hydratace'], ['p-2', 'Hydratace'], ['pro-0', 'Anti-age'], ['pro-1', 'Hydratace'], ['pro-2', 'Hydratace'], ['pro-3', 'Citlivá pleť']] as const).forEach(([id, line]) => run('UPDATE products SET line=? WHERE id=?', [line, id]));
+  ([['p-0', 'Neuro Cannabis'], ['p-1', 'PDRN'], ['p-2', 'C-Fusion'], ['pro-0', 'A-QS Hacker'], ['pro-1', 'PDRN'], ['pro-2', 'Derma Collage'], ['pro-3', 'Neuro Gaba & Nana']] as const).forEach(([id, line]) => run('UPDATE products SET line=? WHERE id=?', [line, id]));
   // Spotřební materiál (vymyšlené ceny za balení) s výchozí spotřebou na klientku a odpisem podle účtenek za posledních 30 dní.
   const supplyStock = [180, 64, 150, 9, 70, 40, 60, 30], supplyCost = [8900, 4500, 3900, 12900, 21900, 18900, 15900, 4900];
   STARTER_SUPPLIES.forEach((x, i) => {
