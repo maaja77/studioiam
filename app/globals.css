@@ -476,3 +476,7 @@ dialog.care-dialog{width:min(680px,calc(100% - 24px))}
 .deposit-edit{display:grid;gap:12px;margin-top:12px;padding:14px;background:white;border:1px solid var(--line);border-radius:10px}.deposit-edit .segmented-mini{flex-wrap:wrap;max-width:max-content}.deposit-edit .field.inline input{max-width:160px}.deposit-edit .error-inline{color:#963b30;font-size:13px;margin:0}.deposit-edit .form-actions{justify-content:flex-start}
 .unreliable-badge{color:#8a5212!important}.cal-event .tags em.tag-unreliable{background:#fff1d6;color:#7a4a0c}
 .secondary.danger{color:#963b30}
+.program-list{list-style:none;margin:12px 0 0;padding:0}.program-list li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.program-list li:last-child{border-bottom:0}.program-list li.inactive{opacity:.65}
+.program-list b{display:inline-flex;align-items:center;gap:6px;color:var(--teal)}.program-list small{display:block;color:var(--muted);font-size:13px}.program-list-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.program-form-panel{display:grid;gap:12px;margin:14px 0;padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--background)}.program-form-panel h3{margin:0;font-size:17px}.program-form-panel .field small{color:var(--muted);font-size:12px}
+.program-form .field{margin-bottom:6px}

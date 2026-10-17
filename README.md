@@ -7,8 +7,11 @@ Webová aplikace pro kosmetický salon Studio I AM, provozovaná na vlastním se
 - **Kartotéka klientek** (hotovo): karty s kontakty, typem pleti a upozorněními, historie návštěv
   (datum, ošetření, použité přípravky jako seznam s množstvím a tlačítkem „Jako minule“, poznámky, tržba), fotky (nahrání i focení z telefonu, porovnání před/po s koláží ke stažení),
   přehled tržeb za měsíc a celkem.
-- **Program Čistá pleť** (hotovo): série ošetření A-QS Hacker za 1 290 Kč, 2. návštěva −5 %,
-  3. a další −10 %, při odstupu nad 28 dní začíná série znovu. Cena se předvyplní do tržby.
+- **Programy** (hotovo): série jednoho ošetření se slevou podle pořadí návštěvy, spravované v Nastavení → Programy
+  (název, ošetření, cena, slevy po návštěvách, nejdelší odstup). Studio I AM má Čistou pleť (A-QS Hacker za 1 290 Kč,
+  2. návštěva −5 %, 3. a další −10 %) a Hydratovanou pleť (Derma Collage za 1 790 Kč, stejné slevy); při odstupu nad 28 dní
+  začíná série znovu. Klientka může být ve více programech; na kartě se zařadí, cena se při zápisu návštěvy předvyplní do tržby.
+  Program s návštěvami jde jen vypnout, historie zůstane.
 - **Poukazy** (plánováno).
 
 Aplikace vznikla v ChatGPT a 13. 10. 2026 byla exportována pro vlastní provoz
@@ -133,9 +136,9 @@ Dokud chybí název nebo číslo účtu, administrace na to upozorní (bez účt
 
 `SALON_PROFILE` v `.env.selfhost` určuje, co je navíc:
 
-- `studioiam` – Studio I AM: logo studia, tlačítko „Vložit ceník z MyFoxu“, program Čistá pleť zapnutý
+- `studioiam` – Studio I AM: logo studia, tlačítko „Vložit ceník z MyFoxu“, programy Čistá pleť a Hydratovaná pleť
   a při prvním spuštění se do prázdných polí doplní údaje studia (účet, adresa, telefon, IČO).
-- `generic` – jakýkoli další salon: prázdné údaje, neutrální logo, bez ceníku a programu (ten lze zapnout v Nastavení).
+- `generic` – jakýkoli další salon: prázdné údaje, neutrální logo, bez ceníku a programů (vlastní programy si salon založí v Nastavení).
 
 Bez `SALON_PROFILE` se profil zvolí při prvním spuštění sám: instalace, která už má klientky, je Studio I AM,
 nová prázdná je `generic`. Volba se uloží do databáze.

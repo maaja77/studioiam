@@ -6,6 +6,7 @@ import {DEFAULT_SMS_TEMPLATE, renderSms, SMS_PLACEHOLDERS, smsParts} from '../li
 import {czIban} from '../lib/payment';
 import {coverSrc, logoSrc} from './logo';
 import {formatRevenue} from '../lib/revenue';
+import ProgramSettings from './program-settings';
 import {applyTheme, checkTheme, DEFAULT_THEME, THEMES} from '../lib/theme';
 import {CATEGORY_COLORS, PRICE_LIST, serviceColor} from '../lib/price-list';
 import type {Service} from './bookings';
@@ -149,10 +150,11 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
         <label className="field"><span>Telefon pro klientky</span><input value={settings.businessPhone} type="tel" maxLength={30} placeholder="777 123 456" onChange={e => setSettings({...settings, businessPhone: e.target.value})}/></label>
         <label className="field"><span>E-mail pro odpovědi klientek</span><input value={settings.businessEmail} type="email" maxLength={120} onChange={e => setSettings({...settings, businessEmail: e.target.value})}/></label>
       </div>
-      <label className="check"><input type="checkbox" checked={settings.programEnabled} onChange={e => setSettings({...settings, programEnabled: e.target.checked})}/> Program Čistá pleť (série ošetření A-QS Hacker se sledováním termínů na kartě klientky)</label>
       <p className="muted-inline">Na účtence bude i „neplátce DPH“ a QR kód na účet z části Kauce a platby.</p>
       <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Údaje salonu byly uloženy.')}>Uložit údaje</button></div>
     </section>
+
+    <ProgramSettings services={services} onSaved={onSaved}/>
 
     <ThemePanel value={settings.themeColor} busy={busy} onPick={color => { const next = {...settings, themeColor: color}; setSettings(next); applyTheme(color); run(() => post({kind: 'settings', data: next}), 'Barva kartotéky byla uložena.'); }}/>
 

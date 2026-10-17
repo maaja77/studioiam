@@ -169,6 +169,13 @@
       "when": 1792265012621,
       "tag": "0023_client_deposit",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1792265711400,
+      "tag": "0024_programs",
+      "breakpoints": true
     }
   ]
 }

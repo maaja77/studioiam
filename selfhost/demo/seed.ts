@@ -66,6 +66,12 @@ export async function seedDemo(run: Run, put: Put) {
   run("UPDATE clients SET birth_date=? WHERE id='demo-3'", [born(-2, 41)]);
   run("UPDATE clients SET birth_date=? WHERE id='demo-6'", [born(40, 52)]);
   for (const v of visits) run('INSERT INTO visits (id,client_id,date,treatment,products,notes,revenue_cents,clean_skin,program_price_cents,program_step) VALUES (?,?,?,?,?,?,?,?,?,?)', v);
+  // Programy Studia I AM (stejně jako migrace u skutečné instalace): Čistá pleť a Hydratovaná pleť.
+  run("INSERT INTO programs (id,name,treatment,price_cents,discounts,interval_days,active,sort,created) VALUES ('clean-skin','Čistá pleť','A-QS Hacker',129000,'[0,5,10]',28,1,0,?),('hydration','Hydratovaná pleť','Derma Collage',179000,'[0,5,10]',28,1,1,?)", [now, now]);
+  run("INSERT INTO client_programs (client_id,program_id,created) SELECT id,'clean-skin',? FROM clients WHERE clean_skin_active=1", [now]);
+  run("UPDATE visits SET program_id='clean-skin' WHERE clean_skin=1", []);
+  run("INSERT INTO client_programs (client_id,program_id,created) VALUES ('demo-3','hydration',?)", [now]);
+  run("INSERT INTO visits (id,client_id,date,treatment,products,notes,revenue_cents,clean_skin,program_id,program_price_cents,program_step) VALUES ('v-h1','demo-3',?,'Derma Collage','','Hydratovaná pleť, první ošetření série.',179000,0,'hydration',179000,1)", [day(-20)]);
   // Přípravky u návštěv: místo volného textu seznam s množstvím (u v-1 a v-2 zůstává ukázka staršího textového zápisu).
   const used: [string, string, string][] = [['v-3', 'Hydratační sérum s kyselinou hyaluronovou', '3 ml'], ['v-3', 'Alginátová maska', '1 sáček'], ['v-4', 'Enzymatický peeling', '2 ml'],
     ['v-5', 'Lash lifting set', ''], ['v-5', 'Barva na řasy černá', ''], ['v-6', 'Čisticí gel pro citlivou pleť', ''], ['v-6', 'Enzymatický peeling', '2 ml'], ['v-9', 'Mandelic Forte Peel', '1 vrstva'], ['v-10', 'Hyaluron Collagen 3D ampule', '1 ampule']];
