@@ -54,7 +54,7 @@ async function managed(token: string | null) {
 }
 /** Klientka smí měnit jen platný termín, který začíná nejdříve za nastavenou lhůtu. */
 /** Veřejné údaje salonu pro rezervační stránku (hlavička a patička). */
-export const salonInfo = (s: BookingSettings) => ({name: salonName(s), address: s.businessAddress, phone: s.businessPhone, businessId: s.businessId, logoVersion: s.logoVersion});
+export const salonInfo = (s: BookingSettings) => ({name: salonName(s), address: s.businessAddress, phone: s.businessPhone, businessId: s.businessId, logoVersion: s.logoVersion, coverVersion: s.coverVersion});
 const canChange = (b: Managed, settings: BookingSettings) => ['confirmed', 'pending'].includes(b.status) && b.start >= addMinutes(salonNow(), settings.changeLimitHours * 60);
 
 type PaymentKind = 'deposit' | 'prepay';

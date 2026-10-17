@@ -8,7 +8,7 @@ import {releaseExpiredDeposits} from '../public/route';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
 const STATUSES = ['confirmed', 'pending', 'done', 'no_show', 'cancelled'];
-export const LOGO_KEY = 'branding/logo';
+export const LOGO_KEY = 'branding/logo', COVER_KEY = 'branding/cover';
 /** Typ obrázku podle prvních bajtů (nevěří se příponě ani hlavičce od prohlížeče). */
 export function imageType(b: Uint8Array) {
   if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
@@ -47,7 +47,8 @@ export async function POST(request: Request) {
     if (body.kind === 'settings') {
       const settings = validateSettings(d);
       if (typeof settings === 'string') return json({error: settings}, 400);
-      await store({...settings, logoVersion: (await current()).logoVersion}); // logo se mění jen nahráním obrázku
+      const old = await current();
+      await store({...settings, logoVersion: old.logoVersion, coverVersion: old.coverVersion}); // logo a fotka salonu se mění jen nahráním obrázku
       return json({ok: true});
     }
 
@@ -61,6 +62,19 @@ export async function POST(request: Request) {
       if (bytes.length > 1024 * 1024) return json({error: 'Logo je příliš velké (nejvýš 1 MB).'}, 400);
       await photoStorage().put(LOGO_KEY, bytes);
       await store({...settings, logoVersion: Date.now()});
+      return json({ok: true});
+    }
+
+    // Fotka salonu nahoře na rezervační stránce: PNG, JPEG nebo WebP do 3 MB (prohlížeč ji předem zmenší).
+    if (body.kind === 'cover') {
+      const settings = await current();
+      if (d.image === null) { await photoStorage().delete(COVER_KEY); await store({...settings, coverVersion: 0}); return json({ok: true}); }
+      const m = typeof d.image === 'string' ? /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(d.image) : null;
+      const bytes = m ? Uint8Array.from(atob(m[2]), c => c.charCodeAt(0)) : null;
+      if (!bytes || !imageType(bytes)) return json({error: 'Fotka musí být obrázek PNG, JPG nebo WebP.'}, 400);
+      if (bytes.length > 3 * 1024 * 1024) return json({error: 'Fotka je příliš velká (nejvýš 3 MB).'}, 400);
+      await photoStorage().put(COVER_KEY, bytes);
+      await store({...settings, coverVersion: Date.now()});
       return json({ok: true});
     }
 

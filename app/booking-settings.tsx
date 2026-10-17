@@ -4,7 +4,7 @@ import {CalendarDays, Copy, ImageUp, MessageSquare, Pencil, Plus, Trash2, X} fro
 import {addDays, DEFAULT_SETTINGS, salonName, salonNow, WEEKDAYS, type BookingSettings} from '../lib/booking';
 import {DEFAULT_SMS_TEMPLATE, renderSms, SMS_PLACEHOLDERS, smsParts} from '../lib/sms';
 import {czIban} from '../lib/payment';
-import {logoSrc} from './logo';
+import {coverSrc, logoSrc} from './logo';
 import {formatRevenue} from '../lib/revenue';
 import {CATEGORY_COLORS, PRICE_LIST, serviceColor} from '../lib/price-list';
 import type {Service} from './bookings';
@@ -17,13 +17,13 @@ async function post(body: unknown) {
 const ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 /** Zmenší obrázek na nejvýš 256 px, aby logo bylo malé a ostré na účtence i v hlavičce. */
-function shrinkImage(file: File): Promise<string> {
+function shrinkImage(file: File, max = 256, type = 'image/png'): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file), img = new Image();
     img.onload = () => {
-      const scale = Math.min(1, 256 / Math.max(img.width, img.height)), canvas = document.createElement('canvas');
+      const scale = Math.min(1, max / Math.max(img.width, img.height)), canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(img.width * scale)); canvas.height = Math.max(1, Math.round(img.height * scale));
-      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height); URL.revokeObjectURL(url); resolve(canvas.toDataURL('image/png'));
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height); URL.revokeObjectURL(url); resolve(canvas.toDataURL(type, 0.85));
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Obrázek se nepodařilo načíst. Zkuste PNG nebo JPG.')); };
     img.src = url;
@@ -164,6 +164,7 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
       <div className="panel-heading"><h2>Rezervace na vašem webu</h2></div>
       <p>Rezervační stránka má vlastní adresu <b>{bookingUrl}</b>. Na webu stačí, aby na ni vedlo tlačítko „Objednat se“. Pokud ji chcete mít přímo uvnitř stránky na WordPressu, vložte blok <b>Vlastní HTML</b> s tímto kódem:</p>
       <pre className="embed-code">{embed}</pre>
+      <CoverPicker version={settings.coverVersion} busy={busy} onPick={image => run(() => post({kind: 'cover', data: {image}}), image ? 'Fotka salonu byla nahrána.' : 'Fotka salonu byla odebrána.')} onError={setError}/>
       <div className="form-actions"><a className="secondary" href={bookingUrl} target="_blank" rel="noreferrer">Otevřít rezervační stránku</a><button className="secondary" onClick={() => navigator.clipboard.writeText(embed).then(() => setCopied(true), () => setCopied(false))}><Copy size={16}/> {copied ? 'Zkopírováno' : 'Zkopírovat kód'}</button></div>
     </section>
   </div>;
@@ -176,6 +177,17 @@ function LogoPicker({version, busy, onPick, onError}: {version: number; busy: bo
       <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) shrinkImage(f).then(onPick, err => onError((err as Error).message)); }}/></label>
     {!!version && <button type="button" className="link-button" disabled={busy} onClick={() => onPick(null)}>Odebrat logo</button>}
     <small className="muted-inline">PNG, JPG nebo WebP, ideálně čtvercové.</small>
+  </div>;
+}
+
+/** Fotka salonu nahoře na rezervační stránce; zmenší se na 1600 px a uloží jako JPEG. */
+function CoverPicker({version, busy, onPick, onError}: {version: number; busy: boolean; onPick: (image: string | null) => void; onError: (message: string) => void}) {
+  return <div className="cover-picker">
+    <b>Fotka salonu na rezervační stránce</b>
+    {version ? <img src={coverSrc(version)} alt="Fotka salonu"/> : <p className="muted-inline">Klientky ji uvidí nahoře na rezervační stránce, nad výběrem ošetření. Nejlépe vypadá fotka na šířku.</p>}
+    <div className="form-actions"><label className={'secondary' + (busy ? ' disabled' : '')}><ImageUp size={16}/> {version ? 'Změnit fotku' : 'Nahrát fotku'}
+      <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) shrinkImage(f, 1600, 'image/jpeg').then(onPick, err => onError((err as Error).message)); }}/></label>
+      {!!version && <button type="button" className="link-button" disabled={busy} onClick={() => onPick(null)}>Odebrat fotku</button>}</div>
   </div>;
 }
 

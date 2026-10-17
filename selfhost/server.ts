@@ -1,5 +1,5 @@
 import http from 'node:http';import {readFileSync,existsSync,statSync} from 'node:fs';import path from 'node:path';import {createAuth,hashPassword,loginPage,loginBlocked,loginFailed,loginSucceeded,safeNext} from './auth';import {env,PROFILE,readSetting,writeSetting} from './runtime';import {parseSettings,salonName,salonNow} from '../lib/booking';
-import * as records from '../app/api/records/route';import * as photos from '../app/api/photos/route';import * as bookings from '../app/api/bookings/route';import * as publicBooking from '../app/api/public/route';import * as receipts from '../app/api/receipts/route';import * as stats from '../app/api/stats/route';import * as vouchers from '../app/api/vouchers/route';import * as intake from '../app/api/intake/route';import * as lapsed from '../app/api/lapsed/route';import * as stock from '../app/api/stock/route';import * as bank from '../app/api/bank/route';import * as care from '../app/api/care/route';import * as today from '../app/api/today/route';import * as reviews from '../app/api/reviews/route';import * as accounting from '../app/api/accounting/route';import * as invoices from '../app/api/invoices/route';import * as birthdays from '../app/api/birthdays/route';import {LOGO_KEY,imageType} from '../app/api/bookings/route';
+import * as records from '../app/api/records/route';import * as photos from '../app/api/photos/route';import * as bookings from '../app/api/bookings/route';import * as publicBooking from '../app/api/public/route';import * as receipts from '../app/api/receipts/route';import * as stats from '../app/api/stats/route';import * as vouchers from '../app/api/vouchers/route';import * as intake from '../app/api/intake/route';import * as lapsed from '../app/api/lapsed/route';import * as stock from '../app/api/stock/route';import * as bank from '../app/api/bank/route';import * as care from '../app/api/care/route';import * as today from '../app/api/today/route';import * as reviews from '../app/api/reviews/route';import * as accounting from '../app/api/accounting/route';import * as invoices from '../app/api/invoices/route';import * as birthdays from '../app/api/birthdays/route';import {LOGO_KEY,COVER_KEY,imageType} from '../app/api/bookings/route';
 const user=process.env.SALON_USER,encoded=process.env.SALON_PASSWORD_HASH,origin=process.env.SALON_ORIGIN;
 if(!user||!encoded||!origin)throw Error('Set SALON_USER, SALON_PASSWORD_HASH and SALON_ORIGIN before starting.');
 // Heslo změněné v aplikaci má přednost před .env, dokud správce v .env nezadá nový hash (tím heslo obnoví).
@@ -13,7 +13,7 @@ const publicOrigin=process.env.SALON_PUBLIC_ORIGIN?new URL(process.env.SALON_PUB
 const webRoot=path.resolve('dist-selfhost/client');
 const types:Record<string,string>={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.ico':'image/x-icon','.woff2':'font/woff2'};
 // Veřejné jsou jen rezervační stránka, její statické soubory a /api/public; vše ostatní chrání přihlášení.
-const isPublic=(p:string)=>p==='/rezervace'||p==='/rezervace/'||p==='/uctenka'||p==='/dotaznik'||p==='/poukaz'||p==='/pece'||p.startsWith('/assets/')||p==='/favicon.svg'||p==='/logo.png'||p==='/api/public'||/^\/kalendar\/[0-9a-f]{40}\.ics$/.test(p);
+const isPublic=(p:string)=>p==='/rezervace'||p==='/rezervace/'||p==='/uctenka'||p==='/dotaznik'||p==='/poukaz'||p==='/pece'||p.startsWith('/assets/')||p==='/favicon.svg'||p==='/logo.png'||p==='/cover.jpg'||p==='/api/public'||/^\/kalendar\/[0-9a-f]{40}\.ics$/.test(p);
 const frameAncestors=process.env.SALON_BOOKING_FRAME_ANCESTORS||'*';
 const hits=new Map<string,number[]>();
 function rateLimited(ip:string){const now=Date.now(),list=(hits.get(ip)||[]).filter(t=>now-t<3600_000);list.push(now);hits.set(ip,list);if(hits.size>5000)hits.clear();return list.length>20;}
@@ -47,6 +47,12 @@ const server=http.createServer(async(req,res)=>{try{
   if(custom&&type){res.writeHead(200,{'Content-Type':type,'Cache-Control':cache,'X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:Buffer.from(custom.body));return;}
   const fallback=PROFILE==='studioiam'?'logo-studioiam.png':'logo-default.svg';
   res.writeHead(200,{'Content-Type':types[path.extname(fallback)],'Cache-Control':cache,'X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:readFileSync(path.join(webRoot,fallback)));return;
+ }
+ // Fotka salonu na rezervační stránce (nahraná v Nastavení); bez ní 404 a stránka ji nezobrazí.
+ if(url.pathname==='/cover.jpg'&&(req.method==='GET'||req.method==='HEAD')){
+  const cover=settings().coverVersion?await env.BUCKET.get(COVER_KEY):null;const type=cover?imageType(cover.body):'';
+  if(!cover||!type){res.writeHead(404,{'Cache-Control':'no-store'});res.end();return;}
+  res.writeHead(200,{'Content-Type':type,'Cache-Control':url.searchParams.has('v')?'public, max-age=31536000, immutable':'public, max-age=300','X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:Buffer.from(cover.body));return;
  }
  // Kalendář rezervací pro telefon: chrání ho tajný odkaz z Nastavení (telefon se nepřihlašuje).
  if(url.pathname.startsWith('/kalendar/')&&(req.method==='GET'||req.method==='HEAD')){

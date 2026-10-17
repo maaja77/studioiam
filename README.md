@@ -180,6 +180,7 @@ Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potře
 
 - Administrace: záložky **Rezervace** (týdenní kalendář s časovou osou, ošetření barevně podle kategorie, kliknutím do volného místa nová rezervace; ruční rezervace, blokace času, stav Proběhlo / Nepřišla / Zrušeno, založení karty z rezervace) a **Nastavení** (ceník ošetření s kategoriemi, popisy a barvami, výchozí ceník převzatý z MyFoxu, otevírací doba, předstih, kód pro web).
 - Veřejná stránka `/rezervace` (bez hesla) s volnými termíny; rezervace se potvrdí sama. Bez hesla je dostupné jen `/rezervace`, `/assets/*` a `/api/public` (max. 20 odeslání za hodinu z jedné IP).
+- **Fotka salonu:** v Nastavení → Rezervace na vašem webu jde nahrát fotku (PNG, JPG nebo WebP; prohlížeč ji zmenší na 1600 px). Zobrazí se nahoře na rezervační stránce nad výběrem ošetření a server ji vrací bez hesla na `/cover.jpg`.
 - Klientka se zablokovanými online rezervacemi (karta klientky nebo „Nepřišla“ v kalendáři) se pozná podle telefonu nebo e-mailu a online se neobjedná.
 - E-mail o nové rezervaci: v `.env.selfhost` vyplňte `SMTP_*` a `SALON_NOTIFY_EMAIL` (Seznam: `smtp.seznam.cz`, port 465, přihlášení celým e-mailem).
 - Na reverse proxy zveřejněte pro internet jen adresu rezervace (např. `rezervace.studioiam.cz`) a nastavte ji do `SALON_PUBLIC_ORIGIN`; na této adrese server vrací jen rezervační stránku, administrace tam odpoví 404. Administraci nechte za VPN nebo heslem. `SALON_BOOKING_FRAME_ANCESTORS` určuje weby, které smí stránku vložit do iframe.

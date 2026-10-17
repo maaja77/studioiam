@@ -4,9 +4,9 @@ import {CalendarCheck, ChevronLeft, ChevronRight, Clock, Search} from 'lucide-re
 import {addDays, salonNow} from '../lib/booking';
 import {formatRevenue} from '../lib/revenue';
 import {PaymentDetails, type DepositInfo} from './qr-payment';
-import {logoSrc} from './logo';
+import {coverSrc, logoSrc} from './logo';
 
-type Salon = {name: string; address: string; phone: string; businessId: string; logoVersion: number};
+type Salon = {name: string; address: string; phone: string; businessId: string; logoVersion: number; coverVersion?: number};
 type Service = {id: string; name: string; durationMin: number; priceCents: number; category?: string; description?: string; depositCents?: number | null; sessions?: number; prepay?: boolean};
 const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const length = (min: number) => min % 60 === 0 ? `${min / 60} h` : min > 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
@@ -48,6 +48,7 @@ export default function PublicBooking() {
 
   return <div className="public-booking">
     <header className="pb-header"><img className="brand-logo" src={logoSrc(salon?.logoVersion)} alt="" width={56} height={56}/><div><b>{salon?.name.toLocaleUpperCase('cs') || '\u00a0'}</b><span>ONLINE REZERVACE</span></div></header>
+    {!!salon?.coverVersion && !token && !done && <div className="pb-cover"><img src={coverSrc(salon.coverVersion)} alt={'Salon ' + salon.name}/></div>}
     <main className="pb-main">
       {token ? <ManageBooking token={token} horizon={horizon} phone={salon?.phone || ''} onLeave={leaveManage}/>
       : done ? <section className="pb-done"><CalendarCheck size={44} strokeWidth={1.4}/><h1>{done.deposit ? (done.deposit.kind === 'prepay' ? 'Termín držíme, čeká na platbu' : 'Termín držíme, čeká na kauci') : 'Termín je rezervovaný'}</h1>
