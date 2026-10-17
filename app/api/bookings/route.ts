@@ -1,6 +1,7 @@
 // API administrace rezervací: kalendář, ruční rezervace, ceník ošetření, nastavení a blokování klientek.
-import {database, photoStorage, salonProfile} from '../../../db/raw';
-import {addMinutes, isDate, isTime, parseSettings, validateSettings} from '../../../lib/booking';
+import {database, photoStorage, salonProfile, smsName, smsSender} from '../../../db/raw';
+import {addDays, addMinutes, isDate, isTime, parseSettings, salonName, salonNow, validateSettings, type BookingSettings} from '../../../lib/booking';
+import {renderSms, smsPhone} from '../../../lib/sms';
 import {parseRevenue} from '../../../lib/revenue';
 import {releaseExpiredDeposits} from '../public/route';
 export const dynamic = 'force-dynamic';
@@ -21,12 +22,12 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams, db = database();
     const from = isDate(params.get('from')) ? params.get('from')! : '0000-01-01', to = isDate(params.get('to')) ? params.get('to')! : '9999-12-31';
     const [bookings, services, setting] = await db.batch([
-      db.prepare('SELECT b.id,b.service_id AS serviceId,b.client_id AS clientId,b.start_at AS start,b.end_at AS end,b.service_name AS serviceName,b.price_cents AS priceCents,b.name,b.phone,b.email,b.note,b.status,b.source,b.deposit_cents AS depositCents,b.deposit_status AS depositStatus,b.deposit_due AS depositDue,b.vs,b.payment_kind AS paymentKind,b.created,s.color,s.category,(SELECT r.id FROM receipts r WHERE r.booking_id=b.id AND r.status=\'issued\' ORDER BY r.created DESC LIMIT 1) AS receiptId FROM bookings b LEFT JOIN services s ON s.id=b.service_id WHERE b.start_at>=? AND b.start_at<? ORDER BY b.start_at').bind(from, to + 'T99'),
+      db.prepare('SELECT b.id,b.service_id AS serviceId,b.client_id AS clientId,b.start_at AS start,b.end_at AS end,b.service_name AS serviceName,b.price_cents AS priceCents,b.name,b.phone,b.email,b.note,b.status,b.source,b.deposit_cents AS depositCents,b.deposit_status AS depositStatus,b.deposit_due AS depositDue,b.vs,b.payment_kind AS paymentKind,b.reminded_start AS remindedStart,b.reminded_at AS remindedAt,b.created,s.color,s.category,(SELECT r.id FROM receipts r WHERE r.booking_id=b.id AND r.status=\'issued\' ORDER BY r.created DESC LIMIT 1) AS receiptId FROM bookings b LEFT JOIN services s ON s.id=b.service_id WHERE b.start_at>=? AND b.start_at<? ORDER BY b.start_at').bind(from, to + 'T99'),
       db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,active,sort,category,description,color,sessions,prepay FROM services ORDER BY sort,name'),
       db.prepare("SELECT value FROM settings WHERE key='booking'"),
     ]) as {results: Record<string, unknown>[]}[];
     return json({bookings: bookings.results, services: services.results, settings: parseSettings((setting.results[0] as {value?: string} | undefined)?.value),
-      features: {studioPriceList: salonProfile() === 'studioiam'}});
+      features: {studioPriceList: salonProfile() === 'studioiam', sms: smsName()}});
   } catch (e) { console.error(e); return json({error: 'Rezervace se nepodařilo načíst. Zkuste to znovu.'}, 503); }
 }
 
@@ -85,6 +86,30 @@ export async function POST(request: Request) {
       const res = await db.prepare('UPDATE clients SET deposit_required=? WHERE id=?').bind(d.required ? 1 : 0, field('clientId')).run();
       if (!res.meta.changes) return json({error: 'Klient nebyl nalezen.'}, 404);
       return json({ok: true});
+    }
+
+    // SMS: zkušební zpráva na zadané číslo, nebo připomínka jedné rezervace hned.
+    if (body.kind === 'sms') {
+      const send = smsSender();
+      if (!send) return json({error: 'SMS nejsou na serveru nastavené (SMS_PROVIDER v .env.selfhost).'}, 400);
+      const settings = await current();
+      if (body.action === 'test') {
+        const phone = smsPhone(field('phone', 40));
+        if (!phone) return json({error: 'Zadejte číslo mobilu, např. 777 123 456.'}, 400);
+        const tomorrow = addDays(salonNow().slice(0, 10), 1);
+        const text = renderSms(typeof d.template === 'string' ? d.template.slice(0, 480) : settings.smsTemplate, {name: 'Jana Nováková', start: tomorrow + 'T10:00', serviceName: 'Ukázkové ošetření'}, smsSalon(settings), d.ascii === undefined ? settings.smsAscii : d.ascii === true, salonNow().slice(0, 10));
+        await send(phone, text);
+        return json({ok: true, text});
+      }
+      if (body.action === 'remind') {
+        const b = await db.prepare(`SELECT ${REMIND_COLUMNS} FROM bookings b WHERE b.id=?`).bind(field('id')).first<Remind>();
+        if (!b) return json({error: 'Rezervace nebyla nalezena.'}, 404);
+        const phone = smsPhone(b.phone);
+        if (!phone) return json({error: 'Rezervace nemá číslo mobilu, na které jde poslat SMS.'}, 400);
+        await sendReminder(b, phone, settings, send);
+        return json({ok: true});
+      }
+      return json({error: 'Neplatná operace.'}, 400);
     }
 
     if (body.kind !== 'booking') return json({error: 'Neplatná operace.'}, 400);
@@ -154,5 +179,40 @@ export async function POST(request: Request) {
     await db.prepare('INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET service_id=excluded.service_id,client_id=excluded.client_id,start_at=excluded.start_at,end_at=excluded.end_at,service_name=excluded.service_name,price_cents=excluded.price_cents,name=excluded.name,phone=excluded.phone,email=excluded.email,note=excluded.note,status=excluded.status')
       .bind(newId, isBlock ? null : service?.id ?? null, isBlock ? null : clientId, start, addMinutes(start, duration), serviceName, isBlock ? null : service?.priceCents ?? null, isBlock ? '' : name, isBlock ? '' : phone, isBlock ? '' : email, field('note', 1000), status, isBlock ? 'block' : (field('source') === 'online' ? 'online' : 'salon'), new Date().toISOString()).run();
     return json({ok: true, id: newId});
-  } catch (e) { console.error(e); return json({error: 'Změnu se nepodařilo uložit. Zkuste to znovu.'}, 503); }
+  } catch (e) {
+    console.error(e);
+    if (e instanceof Error && /^(SMS brána|Telefon s SMS Gateway)/.test(e.message)) return json({error: e.message}, 502);
+    return json({error: 'Změnu se nepodařilo uložit. Zkuste to znovu.'}, 503);
+  }
+}
+
+type Remind = {id: string; name: string; phone: string; start: string; serviceName: string};
+const REMIND_COLUMNS = 'b.id,b.name,b.phone,b.start_at AS start,b.service_name AS serviceName';
+const smsSalon = (s: BookingSettings) => ({name: salonName(s), phone: s.businessPhone});
+async function sendReminder(b: Remind, phone: string, settings: BookingSettings, send: (phone: string, text: string) => Promise<void>) {
+  await send(phone, renderSms(settings.smsTemplate, b, smsSalon(settings), settings.smsAscii, salonNow().slice(0, 10)));
+  await database().prepare('UPDATE bookings SET reminded_start=?,reminded_at=? WHERE id=?').bind(b.start, new Date().toISOString(), b.id).run();
+}
+
+/**
+ * SMS připomínky na zítřejší termíny (volá časovač serveru). Posílají se od nastaveného času do 20:00,
+ * každému termínu jednou; po přesunu termínu znovu. Rezervace vytvořené méně než den předem se nepřipomínají.
+ */
+export async function remindBookings(now = salonNow()) {
+  const send = smsSender();
+  if (!send) return 0;
+  const db = database(), settings = parseSettings((await db.prepare("SELECT value FROM settings WHERE key='booking'").first<{value: string}>())?.value);
+  if (!settings.smsReminders || now.slice(11, 16) < settings.smsTime || now.slice(11, 16) >= '20:00') return 0;
+  const tomorrow = addDays(now.slice(0, 10), 1);
+  const rows = await db.prepare(`SELECT ${REMIND_COLUMNS},b.created FROM bookings b LEFT JOIN clients c ON c.id=b.client_id
+    WHERE b.start_at>=? AND b.start_at<? AND b.status='confirmed' AND b.source<>'block' AND b.phone<>'' AND COALESCE(c.blocked,0)=0
+      AND (b.reminded_start IS NULL OR b.reminded_start<>b.start_at) ORDER BY b.start_at`).bind(tomorrow, addDays(tomorrow, 1)).all<Remind & {created: string}>();
+  let sent = 0;
+  for (const b of rows.results) {
+    const phone = smsPhone(b.phone);
+    if (!phone || Date.parse(b.created) > Date.parse(b.start + ':00Z') - 26 * 3600_000) continue; // start je místní čas (o 1–2 h před UTC)
+    try { await sendReminder(b, phone, settings, send); sent++; }
+    catch (e) { console.error(`SMS připomínka pro ${b.start} se nepodařila:`, e instanceof Error ? e.message : e); if (/přihlášení|heslo|kredit|IP adresa/.test(String(e))) break; }
+  }
+  return sent;
 }

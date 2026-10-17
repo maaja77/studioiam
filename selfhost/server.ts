@@ -80,6 +80,9 @@ const server=http.createServer(async(req,res)=>{try{
 server.listen(Number(process.env.PORT||8787),process.env.HOST||'127.0.0.1',()=>console.log('Salon self-host server ready'));
 // Jednou denně po 8. hodině pošle salonu e-mail o poukazech, které brzy vyprší (každý poukaz 30 a 7 dní předem).
 let remindedOn='';
-async function dailyTasks(){const now=salonNow();if(now.slice(11,13)<'08'||remindedOn===now.slice(0,10))return;remindedOn=now.slice(0,10);
+async function dailyTasks(){const now=salonNow();
+ // SMS připomínky zítřejších termínů: každých 15 minut od nastaveného času, každý termín jen jednou (hlídá databáze).
+ try{const n=await bookings.remindBookings(now);if(n)console.log(`SMS připomínky odeslány (${n}).`);}catch(e){console.error('SMS reminders failed',e instanceof Error?e.message:e);}
+ if(now.slice(11,13)<'08'||remindedOn===now.slice(0,10))return;remindedOn=now.slice(0,10);
  try{const n=await vouchers.remindExpiring(origin+'/');if(n)console.log(`Připomenutí poukazů odesláno (${n}).`);}catch(e){remindedOn='';console.error('Voucher reminder failed',e instanceof Error?e.message:e);}}
 setTimeout(dailyTasks,10_000);setInterval(dailyTasks,15*60_000);

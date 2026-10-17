@@ -66,6 +66,8 @@ export async function seedDemo(run: Run, put: Put) {
     const x = service(serviceName), [start, end] = at(offset, time, x.minutes);
     run('INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [id, x.id, clientId, start, end, x.name, x.price, name, phone, '', note, status, source, now]);
   }
+  // Ukázka SMS připomínky: zítřejší termín už připomínku dostal.
+  run("UPDATE bookings SET reminded_start=start_at,reminded_at=? WHERE id='b-1' AND start_at<?", [day(0) + 'T08:00:00.000Z', day(2)]);
   const [blockStart, blockEnd] = at(3, '09:00', 120);
   run("INSERT INTO bookings (id,start_at,end_at,service_name,status,source,created) VALUES ('b-3',?,?,'Školení','confirmed','block',?)", [blockStart, blockEnd, now]);
   // Ukázka kaucí: jedna čeká na zaplacení, jedna je zaplacená.
@@ -124,7 +126,7 @@ export async function seedDemo(run: Run, put: Put) {
     if (balance < value) run('INSERT INTO voucher_uses (id,voucher_id,receipt_id,date,amount_cents,note,created) VALUES (?,?,?,?,?,?,?)', ['vu-' + id, id, null, day(issuedOffset + 30), value - balance, 'Uplatněno při ošetření', now]);
   }
 
-  run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, account: '331122037/0300', accountName: 'STUDIO I AM', businessName: 'STUDIO I AM', businessOwner: 'Andrea Marešová', businessAddress: 'Nerudova 884/11, 500 02 Hradec Králové', businessId: '73975052', businessPhone: '775 963 462', programEnabled: true})]);
+  run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, smsReminders: true, account: '331122037/0300', accountName: 'STUDIO I AM', businessName: 'STUDIO I AM', businessOwner: 'Andrea Marešová', businessAddress: 'Nerudova 884/11, 500 02 Hradec Králové', businessId: '73975052', businessPhone: '775 963 462', programEnabled: true})]);
 
   const photos: [string, string, string, string, number][] = [
     ['p-1', 'demo-1', day(-30), 'Před ošetřením', 18],

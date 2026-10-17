@@ -79,7 +79,7 @@ function DemoBar({view, setView}: {view: View; setView: (v: View) => void}) {
       {confirming
         ? <span className="demo-actions"><button type="button" onClick={resetDemo}>Ano, obnovit</button><button type="button" onClick={() => setConfirming(false)}>Zpět</button></span>
         : <button type="button" onClick={() => setConfirming(true)}>Obnovit ukázková data</button>}
-      {mail.length > 0 && <span className="demo-mail">E-mail, který by se teď odeslal: {mail.map((m, i) => <b key={i}>{m.startsWith('klientce') ? m : 'do salonu: ' + m}</b>)} <button type="button" onClick={() => setMail([])}>Zavřít</button></span>}
+      {mail.length > 0 && <span className="demo-mail">Zpráva, která by se teď odeslala: {mail.map((m, i) => <b key={i}>{m.startsWith('e-mail klientce') || m.startsWith('SMS') ? m : 'e-mail do salonu: ' + m}</b>)} <button type="button" onClick={() => setMail([])}>Zavřít</button></span>}
     </div>
   );
 }

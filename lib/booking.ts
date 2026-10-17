@@ -1,12 +1,14 @@
 // Pravidla online rezervací: otevírací doba, volné termíny a porovnání telefonů.
 import {czIban} from './payment';
+import {DEFAULT_SMS_TEMPLATE} from './sms';
 // Časy se ukládají jako místní čas salonu (Europe/Prague) ve tvaru YYYY-MM-DDTHH:MM.
 
 export type Hours = Record<string, [string, string] | null>; // klíč 0 = neděle … 6 = sobota
 export type BookingSettings = {hours: Hours; leadHours: number; horizonDays: number; stepMinutes: number;
   depositFromKc: number; depositPercent: number; depositHoldHours: number; account: string; accountName: string; changeLimitHours: number;
   businessName: string; businessOwner: string; businessAddress: string; businessId: string; businessPhone: string; businessEmail: string;
-  programEnabled: boolean; logoVersion: number; voucherMonths: number};
+  programEnabled: boolean; logoVersion: number; voucherMonths: number;
+  smsReminders: boolean; smsTime: string; smsTemplate: string; smsAscii: boolean};
 export type BusyRange = {start: string; end: string};
 
 export const DEFAULT_SETTINGS: BookingSettings = {
@@ -29,6 +31,10 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   programEnabled: false,
   logoVersion: 0,
   voucherMonths: 6,
+  smsReminders: false,
+  smsTime: '10:00',
+  smsTemplate: DEFAULT_SMS_TEMPLATE,
+  smsAscii: true,
 };
 /** Jméno salonu pro nadpisy a e-maily, dokud ho salon nevyplní v Nastavení. */
 export const salonName = (s: Pick<BookingSettings, 'businessName'>) => s.businessName.trim() || 'Salon';
@@ -93,8 +99,12 @@ export function validateSettings(v: unknown): BookingSettings | string {
   const businessPhone = text('businessPhone', 30), businessEmail = text('businessEmail', 120);
   if (businessPhone && !/^\+?[\d ]{9,20}$/.test(businessPhone)) return 'Zkontrolujte telefon salonu (např. 777 123 456).';
   if (businessEmail && !/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(businessEmail)) return 'Zkontrolujte e-mail salonu.';
+  const smsTime = raw.smsTime === undefined ? DEFAULT_SETTINGS.smsTime : raw.smsTime, smsTemplate = text('smsTemplate', 480) || DEFAULT_SETTINGS.smsTemplate;
+  if (!isTime(smsTime) || smsTime < '07:00' || smsTime > '20:00') return 'SMS připomínky se mohou posílat mezi 7:00 a 20:00.';
+  if (raw.smsReminders === true && smsTemplate.includes('{telefon}') && !businessPhone) return 'Text SMS obsahuje {telefon}: vyplňte telefon salonu v části Údaje salonu.';
   return {businessName: text('businessName', 80), businessOwner: text('businessOwner', 80), businessAddress: text('businessAddress', 160), businessId, businessPhone, businessEmail,
-    programEnabled: raw.programEnabled === true, voucherMonths, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0,
+    programEnabled: raw.programEnabled === true, voucherMonths,
+    smsReminders: raw.smsReminders === true, smsTime, smsTemplate, smsAscii: raw.smsAscii !== false, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0,
     hours, leadHours: lead, horizonDays: horizon, stepMinutes: step, depositFromKc: depositFrom, depositPercent: percent, depositHoldHours: hold, account, accountName, changeLimitHours: change};
 }
 

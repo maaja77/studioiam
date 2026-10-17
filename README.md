@@ -169,6 +169,28 @@ Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potře
 - **Balíčky a programy:** u ošetření lze nastavit počet ošetření v balíčku a platbu předem. Klientka online rezervuje 1. termín a hned dostane QR platbu na celou částku; termín čeká na platbu stejně jako u kauce. Další termíny balíčku domluví salon.
 - **Změna termínu klientkou:** po rezervaci (a e-mailem, pokud ho vyplní) dostane klientka tajný odkaz `/rezervace?t=…`, přes který termín zruší nebo přesune, nejpozději 24 h předem (nastavitelné). Salon dostane e-mail a do poznámky rezervace se zapíše, co klientka změnila. V administraci jde termín změnit kdykoliv.
 
+## SMS připomínky
+
+Den před termínem dostane klientka SMS, např. „STUDIO I AM: pripominame Vas termin zitra po 19.10. v 10:00 (A-QS Hacker).
+Pokud nemuzete prijit, dejte prosim vedet na 775 963 462. Dekujeme.“ Zapíná se v Nastavení → SMS připomínky klientkám,
+kde jde upravit text a čas odeslání (výchozí 10:00) a poslat si zkušební SMS.
+
+- Posílá se potvrzeným rezervacím s číslem mobilu (české číslo bez předvolby se doplní o +420), každému termínu jednou.
+  Po přesunu termínu odejde nová SMS. Rezervace vytvořené méně než den předem a zablokované klientky se nepřipomínají.
+- V detailu rezervace je vidět, jestli SMS odešla, a jde ji poslat hned.
+- Text je ve výchozím nastavení bez háčků a čárek, takže se vejde do jedné SMS (160 znaků; s diakritikou jen 70).
+
+Brána se nastaví v `.env.selfhost` a pak `docker compose up -d`:
+
+- **SMS brána** (`SMS_PROVIDER=smsbrana`): účet na smsbrana.cz s kreditem, v jejich administraci zapnout
+  SMS Connect (a pokud tam je omezení IP adres, povolit veřejnou IP adresu serveru). Do `.env.selfhost` přihlašovací jméno a heslo SMS Connect
+  (`SMSBRANA_LOGIN`, `SMSBRANA_PASSWORD`).
+- **Vlastní telefon** (`SMS_PROVIDER=smsgate`): telefon s Androidem a aplikací SMS Gateway for Android (sms-gate.app),
+  v aplikaci režim Cloud server; jméno a heslo, které aplikace ukáže, patří do `SMSGATE_USER` a `SMSGATE_PASSWORD`.
+  SMS odcházejí z čísla telefonu podle tarifu, telefon musí být zapnutý a online.
+
+Po spuštění je v logu `SMS připomínky přes: …`. Chyby odeslání (např. došlý kredit) jsou v `docker compose logs salon`.
+
 ## Účtenky
 
 - U rezervace v kalendáři tlačítko **Dokončit**: předvyplní ošetření, přidáte produkty ze seznamu (Nastavení → Produkty k prodeji) nebo vlastní položku, slevu v % nebo Kč a zvolíte platbu QR / hotově / kartou.

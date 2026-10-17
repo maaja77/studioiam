@@ -71,6 +71,13 @@
       "when": 1792226373230,
       "tag": "0009_voucher_reminders",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1792228259491,
+      "tag": "0010_sms_reminders",
+      "breakpoints": true
     }
   ]
 }

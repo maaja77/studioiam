@@ -41,6 +41,7 @@
 .booking-chip.status-no_show em{color:#963b30}
 .booking-chip.status-done{background:#f1f5f4;border-left-color:#7da9a4}
 .booking-detail p{margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.booking-detail .sms-line{font-size:14px;color:var(--muted)}
 .booking-detail .note{display:block;background:#f8faf9;border-radius:8px;padding:10px 12px;font-size:14px;white-space:pre-wrap}
 .status-pill{align-self:flex-start;font-size:12px;font-weight:700;border-radius:99px;padding:3px 10px;background:#e2f3ed;color:var(--teal)}
 .status-pill.status-no_show{background:#fff1ef;color:#963b30}
@@ -153,6 +154,9 @@ dialog[open]{margin:auto}
 .public-booking .danger{background:#a4473b;color:white;border-radius:8px;padding:12px 18px;font-size:14px;font-weight:600;min-height:44px}
 .public-booking .danger:hover{background:#86362c}
 .field.narrow{max-width:340px}
+.sms-placeholders{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}.sms-placeholders .secondary{min-height:32px;padding:4px 10px;font-size:13px;font-family:monospace}
+.sms-preview{display:flex;gap:10px;align-items:flex-start;background:#f3f7f7;border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--teal)}.sms-preview svg{flex-shrink:0;margin-top:2px}.sms-preview p{margin:0;color:var(--ink);font-size:14px;overflow-wrap:anywhere}.sms-preview small{color:var(--muted);font-size:12px}
+.sms-actions{align-items:center}.sms-test{display:flex;gap:8px;flex-wrap:wrap;margin-right:auto}.sms-test input{border:1px solid #cad8d6;border-radius:7px;padding:9px 12px;font-size:16px;width:170px}
 .cal-legend{list-style:none;display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 12px;padding:0;font-size:12px;color:var(--muted)}
 .cal-legend li{display:flex;align-items:center;gap:6px}
 .cal-legend span{width:11px;height:11px;border-radius:3px}
