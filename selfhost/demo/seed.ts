@@ -89,6 +89,12 @@ export async function seedDemo(run: Run, put: Put) {
     const x = service(serviceName), [start, end] = at(offset, time, x.minutes);
     run('INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [id, x.id, clientId, start, end, x.name, x.price, name, phone, '', note, status, source, now]);
   }
+  // Dnešní termíny pro přehled Dnes (i o víkendu, aby bylo v ukázce co vidět).
+  const todayAt = (time: string, minutes: number) => { const d = new Date(`${day(0)}T${time}:00Z`); d.setUTCMinutes(d.getUTCMinutes() + minutes); return [`${day(0)}T${time}`, d.toISOString().slice(0, 16)]; };
+  const hacker = service('A-QS Hacker'), carelika = service('Carelika Basic Skin Care'), lash = service('Lash Lifting řas');
+  run('INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', ['b-t1', hacker.id, 'demo-1', ...todayAt('09:00', hacker.minutes), hacker.name, hacker.price, 'Tereza Nováková', '+420 601 234 567', '', 'Čistá pleť, 3. návštěva.', 'confirmed', 'online', now]);
+  run('INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', ['b-t2', carelika.id, 'demo-2', ...todayAt('11:30', carelika.minutes), carelika.name, carelika.price, 'Lucie Horáková', '+420 602 345 678', '', '', 'confirmed', 'salon', now]);
+  run("INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,deposit_cents,deposit_status,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending','online',30000,'pending',?)", ['b-t3', lash.id, null, ...todayAt('17:30', lash.minutes), lash.name, lash.price, 'Eva Nová', '+420 608 123 456', '', 'Poprvé, doporučila kamarádka.', now]);
   // Ukázka SMS připomínky: zítřejší termín už připomínku dostal.
   run("UPDATE bookings SET reminded_start=start_at,reminded_at=? WHERE id='b-1' AND start_at<?", [day(0) + 'T08:00:00.000Z', day(2)]);
   const [blockStart, blockEnd] = at(3, '09:00', 120);

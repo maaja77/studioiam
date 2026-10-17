@@ -13,7 +13,7 @@ export type BookingSettings = {hours: Hours; leadHours: number; horizonDays: num
   businessName: string; businessOwner: string; businessAddress: string; businessId: string; businessPhone: string; businessEmail: string;
   programEnabled: boolean; logoVersion: number; voucherMonths: number;
   smsReminders: boolean; smsTime: string; smsTemplate: string; smsAscii: boolean; intakeOnline: boolean;
-  voucherOnline: boolean; voucherAmounts: string; voucherMinKc: number; voucherServices: boolean; lapsedText: string};
+  voucherOnline: boolean; voucherAmounts: string; voucherMinKc: number; voucherServices: boolean; lapsedText: string; morningMail: boolean};
 export type BusyRange = {start: string; end: string};
 
 export const DEFAULT_SETTINGS: BookingSettings = {
@@ -46,6 +46,7 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   voucherMinKc: 500,
   voucherServices: true,
   lapsedText: DEFAULT_LAPSED_TEXT,
+  morningMail: false,
 };
 /** Jméno salonu pro nadpisy a e-maily, dokud ho salon nevyplní v Nastavení. */
 export const salonName = (s: Pick<BookingSettings, 'businessName'>) => s.businessName.trim() || 'Salon';
@@ -120,7 +121,7 @@ export function validateSettings(v: unknown): BookingSettings | string {
   if (voucherOnline && !voucherAmounts && !voucherMinKc && !voucherServices) return 'Nabídněte na webu aspoň jednu částku nebo poukazy na ošetření.';
   return {businessName: text('businessName', 80), businessOwner: text('businessOwner', 80), businessAddress: text('businessAddress', 160), businessId, businessPhone, businessEmail,
     programEnabled: raw.programEnabled === true, voucherMonths,
-    smsReminders: raw.smsReminders === true, smsTime, smsTemplate, smsAscii: raw.smsAscii !== false, intakeOnline: raw.intakeOnline !== false, voucherOnline, voucherAmounts, voucherMinKc, voucherServices, lapsedText: text('lapsedText', 480) || DEFAULT_LAPSED_TEXT, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0,
+    smsReminders: raw.smsReminders === true, smsTime, smsTemplate, smsAscii: raw.smsAscii !== false, intakeOnline: raw.intakeOnline !== false, voucherOnline, voucherAmounts, voucherMinKc, voucherServices, lapsedText: text('lapsedText', 480) || DEFAULT_LAPSED_TEXT, morningMail: raw.morningMail === true, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0,
     hours, leadHours: lead, horizonDays: horizon, stepMinutes: step, depositFromKc: depositFrom, depositPercent: percent, depositHoldHours: hold, account, accountName, changeLimitHours: change};
 }
 

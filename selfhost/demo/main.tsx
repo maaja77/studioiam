@@ -17,6 +17,7 @@ import * as lapsedApi from '../../app/api/lapsed/route';
 import * as stockApi from '../../app/api/stock/route';
 import * as bankApi from '../../app/api/bank/route';
 import * as careApi from '../../app/api/care/route';
+import * as todayApi from '../../app/api/today/route';
 import PublicCare from '../../app/public-care';
 import * as records from '../../app/api/records/route';
 import * as photos from '../../app/api/photos/route';
@@ -39,6 +40,7 @@ async function handle(url: URL, request: Request) {
   if (url.pathname === '/api/vouchers') return m === 'GET' ? vouchersApi.GET(request) : vouchersApi.POST(request);
   if (url.pathname === '/api/intake') return m === 'GET' ? intakeApi.GET(request) : intakeApi.POST(request);
   if (url.pathname === '/api/lapsed') return m === 'GET' ? lapsedApi.GET(request) : lapsedApi.POST(request);
+  if (url.pathname === '/api/today') return m === 'GET' ? todayApi.GET() : todayApi.POST(request);
   if (url.pathname === '/api/care') return m === 'GET' ? careApi.GET(request) : careApi.POST(request);
   if (url.pathname === '/api/bank') return m === 'GET' ? bankApi.GET() : bankApi.POST(request);
   if (url.pathname === '/api/stock') return m === 'GET' ? stockApi.GET(request) : stockApi.POST(request);

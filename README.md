@@ -158,6 +158,12 @@ Zálohy před aktualizací jsou v `/srv/salony/_zalohy/<salon>-<datum>.tar.gz` (
 Obnova: rozbalit do prázdné složky `data`, přejmenovat `zaloha.sqlite` na `salon.sqlite`, `chown -R 1000:1000 data`.
 Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potřeba ještě šifrovaná záloha mimo server.
 
+## Přehled dne
+
+- Záložka **Dnes** je první a otevře se po přihlášení: dnešní termíny po sobě, u každé klientky upozornění z karty a z vyplněného dotazníku, nezaplacená kauce, nevyplněný dotazník, nová klientka, poslední návštěva a tlačítka Karta a Volat.
+- Vpravo **Čeká na vyřízení**: nezaplacené kauce, proběhlé termíny bez účtenky, nezaplacené účtenky, poukazy z webu čekající na platbu a docházející produkty. Kliknutím se otevře příslušná část.
+- **Ranní e-mail** (zapíná se zaškrtnutím v části Dnes, potřebuje `SMTP_*` a `SALON_NOTIFY_EMAIL`): jednou denně mezi 7:00 a 12:00 přijde salonu přehled s časy, ošetřeními a jmény. Zdravotní údaje ani text upozornění v něm nejsou, jen poznámka „upozornění v kartě“.
+
 ## Online rezervace
 
 - Administrace: záložky **Rezervace** (týdenní kalendář s časovou osou, ošetření barevně podle kategorie, kliknutím do volného místa nová rezervace; ruční rezervace, blokace času, stav Proběhlo / Nepřišla / Zrušeno, založení karty z rezervace) a **Nastavení** (ceník ošetření s kategoriemi, popisy a barvami, výchozí ceník převzatý z MyFoxu, otevírací doba, předstih, kód pro web).
