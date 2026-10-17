@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
-import {Ban, Check, ChevronLeft, ChevronRight, Clock, ExternalLink, Phone, Plus, UserPlus, X} from 'lucide-react';
+import {Ban, Check, ChevronLeft, ChevronRight, Clock, ExternalLink, Phone, Plus, Search, UserPlus, X} from 'lucide-react';
 import {addDays, DEFAULT_SETTINGS, fromMinutes, salonNow, toMinutes, weekday, type BookingSettings} from '../lib/booking';
 import {serviceColor} from '../lib/price-list';
 import {formatRevenue} from '../lib/revenue';
@@ -34,6 +34,10 @@ function layout(list: Booking[]) {
   flush();
   return result;
 }
+/** Čas posunutý o daný počet minut, nejpozději 23:55. */
+const shift = (time: string, minutes: number) => fromMinutes(Math.min(toMinutes(time) + minutes, 23 * 60 + 55));
+/** 90 → „1 h 30 min“ */
+const lengthText = (m: number) => (m >= 60 ? Math.floor(m / 60) + ' h' : '') + (m % 60 ? (m >= 60 ? ' ' : '') + (m % 60) + ' min' : '');
 const duration = (b: Booking) => toMinutes(b.end.slice(11)) - toMinutes(b.start.slice(11)) + (b.end.slice(0, 10) > b.start.slice(0, 10) ? 1440 : 0);
 
 async function post(body: unknown) {
@@ -152,6 +156,7 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
             {clientOf(current)?.blocked === 1 && <p className="caution-line"><Ban size={16}/> Klientka má zablokované online rezervace.</p>}
           </>}
           {current.note && <p className="note">{current.note}</p>}
+          {current.status !== 'cancelled' && <MoveRow key={current.id} booking={current as Booking} busy={busy} onMove={(date, time) => run(() => post({kind: 'booking', action: 'move', data: {id: current.id, date, time}}), `Termín přesunut na ${dayTitle(date)} ${time}.`)}/>}
           {current.source !== 'block' && <div className="booking-actions">
             {current.status !== 'done' && <button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'status', data: {id: current.id, status: 'done'}}), 'Označeno jako proběhlé.')}><Check size={16}/> Proběhlo</button>}
             {current.status !== 'no_show' && <span className="no-show"><button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'status', data: {id: current.id, status: 'no_show', block: blockToo}}).then(onClientsChanged), blockToo ? 'Označeno jako nepřišla, online rezervace zablokovány.' : 'Označeno jako nepřišla.')}><Ban size={16}/> Nepřišla</button>
@@ -167,7 +172,7 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
             : <button className="secondary" disabled={busy} onClick={() => run(async () => { const d = await post({kind: 'booking', action: 'createClient', data: {id: current.id}}); await onClientsChanged(); onOpenClient(d.clientId!); }, 'Karta klientky byla založena.')}><UserPlus size={16}/> Založit kartu</button>)}
           {current.source !== 'block' && current.status !== 'cancelled' && (current.receiptId
             ? <button className="secondary" onClick={() => { setReceipt({id: current.receiptId!}); setOpen(null); }}><ReceiptIcon size={16}/> Účtenka</button>
-            : <button className="primary" onClick={() => { setReceipt({draft: {bookingId: current.id, clientId: current.clientId, clientName: current.name, items: [{name: current.serviceName!, qty: 1, unitCents: current.priceCents || 0, kind: 'service'}], prepaidCents: current.depositStatus === 'paid' ? current.depositCents || 0 : 0, prepaidLabel: current.paymentKind === 'prepay' ? 'Zaplaceno předem' : 'Zaplacená kauce'}}); setOpen(null); }}><ReceiptIcon size={16}/> Vystavit účtenku</button>)}
+            : <button className="primary" onClick={() => { setReceipt({draft: {bookingId: current.id, clientId: current.clientId, clientName: current.name, items: [{name: current.serviceName!, qty: 1, unitCents: current.priceCents || 0, kind: 'service'}], prepaidCents: current.depositStatus === 'paid' ? current.depositCents || 0 : 0, prepaidLabel: current.paymentKind === 'prepay' ? 'Zaplaceno předem' : 'Zaplacená kauce'}}); setOpen(null); }}><Check size={16}/> Dokončit</button>)}
           <button className="secondary" onClick={() => setOpen({mode: 'edit', booking: {...current, date: current.start!.slice(0, 10), time: current.start!.slice(11)}})}>Upravit</button>
           {current.source === 'block' && <button className="secondary" disabled={busy} onClick={() => run(() => post({kind: 'booking', action: 'delete', data: {id: current.id}}), 'Blokace byla odstraněna.')}>Odstranit</button>}
         </div>
@@ -179,9 +184,13 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
 
 function BookingForm({booking, services, clients, busy, error, onSubmit, onClose}: {booking: Partial<Booking> & {date?: string; time?: string}; services: Service[]; clients: ClientLite[]; busy: boolean; error: string; onSubmit: (e: React.FormEvent<HTMLFormElement>) => void; onClose: () => void}) {
   const [source, setSource] = useState(booking.source === 'block' ? 'block' : booking.source || 'salon');
-  const [clientId, setClientId] = useState(booking.clientId || '');
+  const [clientId, setClientId] = useState(booking.clientId || ''), [newName, setNewName] = useState(booking.name || '');
   const [serviceId, setServiceId] = useState(booking.serviceId || '');
-  const [minutes, setMinutes] = useState(booking.start ? duration(booking as Booking) : 60);
+  const [date, setDate] = useState(booking.date || salonNow().slice(0, 10));
+  const [from, setFrom] = useState(booking.time || '10:00');
+  const [to, setTo] = useState(() => shift(booking.time || '10:00', booking.start ? duration(booking as Booking) : 60));
+  const length = toMinutes(to) - toMinutes(from), toInput = useRef<HTMLInputElement>(null);
+  useEffect(() => { toInput.current?.setCustomValidity(length >= 5 ? '' : 'Konec musí být alespoň 5 minut po začátku.'); }, [length]);
   const isBlock = source === 'block', client = clients.find(c => c.id === clientId);
   return <form onSubmit={onSubmit}>
     <div className="dialog-header"><div><p className="eyebrow">KALENDÁŘ</p><h2>{booking.id ? 'Upravit' : 'Nový záznam'}</h2></div><button type="button" disabled={busy} aria-label="Zavřít formulář" onClick={onClose}><X size={21}/></button></div>
@@ -191,11 +200,20 @@ function BookingForm({booking, services, clients, busy, error, onSubmit, onClose
         <label><input type="radio" name="source" value="block" checked={isBlock} onChange={() => setSource('block')}/> Blokovat čas (volno, pauza)</label>
       </div>}
       {isBlock ? <label className="field"><span>Popis</span><input name="serviceName" defaultValue={booking.serviceName || 'Volno'} maxLength={150}/></label> : <>
-        <label className="field"><span>Klientka z kartotéky</span><select name="clientId" value={clientId} onChange={e => setClientId(e.target.value)}><option value="">Nová / bez karty</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}{c.phone ? ' · ' + c.phone : ''}</option>)}</select></label>
-        {!client && <div className="field-grid"><label className="field"><span>Jméno *</span><input name="name" defaultValue={booking.name} required maxLength={120}/></label><label className="field"><span>Telefon</span><input name="phone" type="tel" defaultValue={booking.phone} maxLength={40}/></label></div>}
-        <label className="field"><span>Ošetření *</span><select name="serviceId" required value={serviceId} onChange={e => { setServiceId(e.target.value); const s = services.find(x => x.id === e.target.value); if (s) setMinutes(s.durationMin); }}><option value="" disabled>Vyberte ošetření</option>{services.map(s => <option key={s.id} value={s.id}>{s.name} · {s.durationMin} min · {formatRevenue(s.priceCents)}</option>)}</select></label>
+        <ClientPicker clients={clients} value={clientId} onChange={(id, typed) => { setClientId(id); if (typed) setNewName(typed); }}/>
+        {!client && <div className="field-grid"><label className="field"><span>Jméno *</span><input name="name" value={newName} onChange={e => setNewName(e.target.value)} required maxLength={120}/></label><label className="field"><span>Telefon</span><input name="phone" type="tel" defaultValue={booking.phone} maxLength={40}/></label></div>}
+        <label className="field"><span>Ošetření *</span><select name="serviceId" required value={serviceId} onChange={e => { setServiceId(e.target.value); const s = services.find(x => x.id === e.target.value); if (s) setTo(shift(from, s.durationMin)); }}><option value="" disabled>Vyberte ošetření</option>{services.map(s => <option key={s.id} value={s.id}>{s.name} · {s.durationMin} min · {formatRevenue(s.priceCents)}</option>)}</select></label>
       </>}
-      <div className="field-grid three"><label className="field"><span>Datum</span><input type="date" name="date" required defaultValue={booking.date}/></label><label className="field"><span>Začátek</span><input type="time" name="time" required step={300} defaultValue={booking.time}/></label><label className="field"><span>Délka (min)</span><input type="number" name="durationMin" required min={5} max={720} step={5} value={minutes} onChange={e => setMinutes(Number(e.target.value))}/></label></div>
+      <fieldset className="term"><legend><span>Termín</span><b>{length >= 5 ? lengthText(length) : 'konec musí být po začátku'}</b></legend>
+        <label className="field"><span>Datum · {dayTitle(date)}</span><input type="date" name="date" required value={date} onChange={e => { if (e.target.value) setDate(e.target.value); }}/></label>
+        <div className="date-shift" role="group" aria-label="Posunout datum">
+          <button type="button" className="secondary" onClick={() => setDate(addDays(date, -1))}>−1 den</button>
+          <button type="button" className="secondary" onClick={() => setDate(addDays(date, 1))}>+1 den</button>
+          <button type="button" className="secondary" onClick={() => setDate(addDays(date, 7))}>+1 týden</button>
+        </div>
+        <div className="field-grid two-col"><label className="field"><span>Začátek</span><input type="time" name="time" required step={300} value={from} onChange={e => { const v = e.target.value; if (v) { setFrom(v); setTo(shift(v, length)); } }}/></label><label className="field"><span>Konec</span><input ref={toInput} type="time" required step={300} value={to} onChange={e => setTo(e.target.value)}/></label></div>
+        <input type="hidden" name="durationMin" value={length}/>
+      </fieldset>
       <label className="field"><span>Poznámka</span><textarea name="note" rows={2} maxLength={1000} defaultValue={booking.note}/></label>
     </div>
     {error && <p className="error" role="alert">{error}</p>}
@@ -203,3 +221,46 @@ function BookingForm({booking, services, clients, busy, error, onSubmit, onClose
   </form>;
 }
 
+
+/** Přesun termínu přímo z detailu: jiný den nebo čas, délka zůstane stejná. */
+function MoveRow({booking, busy, onMove}: {booking: Booking; busy: boolean; onMove: (date: string, time: string) => void}) {
+  const [date, setDate] = useState(booking.start.slice(0, 10)), [time, setTime] = useState(booking.start.slice(11));
+  const changed = date !== booking.start.slice(0, 10) || time !== booking.start.slice(11);
+  return <form className="move-row" onSubmit={e => { e.preventDefault(); if (changed) onMove(date, time); }}>
+    <b>Přesunout na</b>
+    <input type="date" aria-label="Nové datum" required value={date} onChange={e => setDate(e.target.value)}/>
+    <input type="time" aria-label="Nový začátek" required step={300} value={time} onChange={e => setTime(e.target.value)}/>
+    <span className="move-quick"><button type="button" className="secondary" onClick={() => setDate(addDays(date, -1))}>−1 den</button><button type="button" className="secondary" onClick={() => setDate(addDays(date, 1))}>+1 den</button><button type="button" className="secondary" onClick={() => setDate(addDays(date, 7))}>+1 týden</button></span>
+    <button className="primary" disabled={busy || !changed}>Přesunout</button>
+  </form>;
+}
+
+const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('cs');
+const initials = (name: string) => name.split(' ').filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase();
+
+/** Výběr klientky z kartotéky s hledáním podle jména, telefonu nebo e-mailu (jako v MyFoxu). */
+function ClientPicker({clients, value, onChange}: {clients: ClientLite[]; value: string; onChange: (id: string, typed?: string) => void}) {
+  const [query, setQuery] = useState(''), [open, setOpen] = useState(!value);
+  const selected = clients.find(c => c.id === value);
+  const q = fold(query.trim()), digits = query.replace(/\D/g, '');
+  const matches = clients.filter(c => !q || fold(c.name + ' ' + c.email).includes(q) || (digits.length >= 3 && c.phone.replace(/\D/g, '').includes(digits)))
+    .sort((a, b) => a.name.localeCompare(b.name, 'cs')).slice(0, 30);
+  return <div className="field client-picker">
+    <span>Klientka</span>
+    <input type="hidden" name="clientId" value={value}/>
+    {selected && !open ? <div className="picked">
+      <span className="avatar">{initials(selected.name)}</span>
+      <span><b>{selected.name}</b><small>{[selected.phone, selected.email].filter(Boolean).join(' · ') || 'Bez kontaktu'}</small>{selected.blocked === 1 && <small className="blocked-badge"><Ban size={12}/> Blokovaná online</small>}</span>
+      <button type="button" className="secondary" onClick={() => { setOpen(true); setQuery(''); }}>Změnit</button>
+    </div> : <>
+      <label className="search"><Search size={18}/><input autoFocus={!value} aria-label="Hledat klientku" placeholder="Hledat jméno, telefon nebo e-mail…" value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (matches[0]) { onChange(matches[0].id); setOpen(false); } } }}/></label>
+      <div className="picker-list" role="listbox" aria-label="Klientky">
+        <button type="button" role="option" aria-selected={!value} className="picker-row new" onClick={() => { onChange('', /\d{3}|@/.test(query) ? '' : query.trim()); setOpen(false); }}><Plus size={18}/> {query.trim() && !/\d{3}|@/.test(query) ? `Nová klientka „${query.trim()}“` : 'Nová klientka / bez karty'}</button>
+        {matches.map(c => <button type="button" role="option" aria-selected={c.id === value} key={c.id} className="picker-row" onClick={() => { onChange(c.id); setOpen(false); }}>
+          <span className="avatar">{initials(c.name)}</span><span><b>{c.name}</b><small>{[c.phone, c.email].filter(Boolean).join(' · ')}</small></span>
+        </button>)}
+        {!matches.length && <p className="muted">Nikoho takového v kartotéce nemáte.</p>}
+      </div>
+    </>}
+  </div>;
+}

@@ -128,6 +128,9 @@ node_modules se nepřenáší. Původní npm/pnpm build patří původní cloudo
    data, dokud není ověřena nová instalace a alespoň jedna skutečná obnova zálohy.
 
 ## Průběžné zálohování vlastního serveru
+Automatické noční šifrované zálohy mimo server nastavíte skripty v `selfhost/zaloha/`
+(postup v README, oddíl Automatické zálohy mimo server). Ruční postup níže je náhradní varianta.
+
 Zálohujte společně salon.sqlite a celý adresář objects/. Nestačí projektový ZIP,
 samotná databáze ani samotný snapshot disků bez ověření konzistence aplikace.
 Nejjednodušší konzistentní záloha je krátce zastavit aplikaci:

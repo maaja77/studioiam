@@ -1,7 +1,9 @@
 'use client';
 import {useEffect, useState} from 'react';
-import {Copy, Pencil, Plus, Trash2, X} from 'lucide-react';
-import {DEFAULT_SETTINGS, WEEKDAYS, type BookingSettings} from '../lib/booking';
+import {Copy, ImageUp, Pencil, Plus, Trash2, X} from 'lucide-react';
+import {DEFAULT_SETTINGS, salonName, WEEKDAYS, type BookingSettings} from '../lib/booking';
+import {czIban} from '../lib/payment';
+import {logoSrc} from './logo';
 import {formatRevenue} from '../lib/revenue';
 import {CATEGORY_COLORS, PRICE_LIST, serviceColor} from '../lib/price-list';
 import type {Service} from './bookings';
@@ -14,23 +16,37 @@ async function post(body: unknown) {
 }
 const ORDER = [1, 2, 3, 4, 5, 6, 0];
 
-export default function BookingSettingsView({bookingUrl}: {bookingUrl: string}) {
+/** Zmenší obrázek na nejvýš 256 px, aby logo bylo malé a ostré na účtence i v hlavičce. */
+function shrinkImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 256 / Math.max(img.width, img.height)), canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.width * scale)); canvas.height = Math.max(1, Math.round(img.height * scale));
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height); URL.revokeObjectURL(url); resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Obrázek se nepodařilo načíst. Zkuste PNG nebo JPG.')); };
+    img.src = url;
+  });
+}
+
+export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: string; onSaved?: () => void}) {
   const [services, setServices] = useState<Service[]>([]), [settings, setSettings] = useState<BookingSettings>(DEFAULT_SETTINGS);
-  const [editing, setEditing] = useState<Partial<Service> | null>(null);
+  const [editing, setEditing] = useState<Partial<Service> | null>(null), [features, setFeatures] = useState({studioPriceList: false});
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [copied, setCopied] = useState(false);
-  const embed = `<iframe src="${bookingUrl}" title="Rezervace Studio I AM" style="width:100%;min-height:900px;border:0" loading="lazy"></iframe>`;
+  const embed = `<iframe src="${bookingUrl}" title="Rezervace – ${salonName(settings).replace(/"/g, '')}" style="width:100%;min-height:900px;border:0" loading="lazy"></iframe>`;
 
   async function load() {
     try {
       const r = await fetch('/api/bookings?from=2000-01-01&to=2000-01-01', {cache: 'no-store'});
-      const d = await r.json() as {error?: string; services: Service[]; settings: BookingSettings};
-      if (!r.ok) throw new Error(d.error); setServices(d.services); setSettings(d.settings);
+      const d = await r.json() as {error?: string; services: Service[]; settings: BookingSettings; features?: {studioPriceList: boolean}};
+      if (!r.ok) throw new Error(d.error); setServices(d.services); setSettings(d.settings); if (d.features) setFeatures(d.features);
     } catch (e) { setError((e as Error).message); }
   }
   useEffect(() => { load(); }, []);
   async function run(action: () => Promise<unknown>, message: string) {
     setBusy(true); setError('');
-    try { await action(); await load(); setNotice(message); setEditing(null); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    try { await action(); await load(); onSaved?.(); setNotice(message); setEditing(null); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   const setDay = (day: number, value: [string, string] | null) => setSettings(s => ({...s, hours: {...s.hours, [String(day)]: value}}));
 
@@ -42,7 +58,7 @@ export default function BookingSettingsView({bookingUrl}: {bookingUrl: string}) 
 
     <section className="panel">
       <div className="panel-heading"><h2>Ošetření a ceník</h2><button className="primary" onClick={() => setEditing({durationMin: 60, active: 1})}><Plus size={17}/> Přidat ošetření</button></div>
-      {!services.length && <div className="empty-services"><p>Zatím tu není žádné ošetření. Klientky si online nic nevyberou, dokud ho nepřidáte.</p><button className="secondary" disabled={busy} onClick={() => run(async () => { for (const [i, [category, name, durationMin, price, extra]] of PRICE_LIST.entries()) await post({kind: 'service', action: 'save', data: {name, category, durationMin, price: String(price), sessions: extra?.sessions ?? 1, prepay: !!extra?.prepay, color: CATEGORY_COLORS[category] || '', active: true, sort: i}}); }, 'Ceník byl vložen. Délky, ceny a popisy si zkontrolujte.')}>Vložit ceník z MyFoxu ({PRICE_LIST.length} ošetření)</button></div>}
+      {!services.length && <div className="empty-services"><p>Zatím tu není žádné ošetření. Klientky si online nic nevyberou, dokud ho nepřidáte tlačítkem Přidat ošetření.</p>{features.studioPriceList && <button className="secondary" disabled={busy} onClick={() => run(async () => { for (const [i, [category, name, durationMin, price, extra]] of PRICE_LIST.entries()) await post({kind: 'service', action: 'save', data: {name, category, durationMin, price: String(price), sessions: extra?.sessions ?? 1, prepay: !!extra?.prepay, color: CATEGORY_COLORS[category] || '', active: true, sort: i}}); }, 'Ceník byl vložen. Délky, ceny a popisy si zkontrolujte.')}>Vložit ceník z MyFoxu ({PRICE_LIST.length} ošetření)</button>}</div>}
       {groups.map(([category, list]) => <div key={category} className="service-group">
         <h3>{category || 'Bez kategorie'} <small>{list.length}</small></h3>
         <ul className="service-list">{list.map(s => <li key={s.id} className={s.active ? '' : 'inactive'}>
@@ -87,25 +103,34 @@ export default function BookingSettingsView({bookingUrl}: {bookingUrl: string}) 
         <label className="field"><span>Výše kauce (%)</span><input type="number" min={1} max={100} value={settings.depositPercent} onChange={e => setSettings({...settings, depositPercent: Number(e.target.value)})}/></label>
         <label className="field"><span>Zaplatit do (hodin)</span><input type="number" min={1} max={168} value={settings.depositHoldHours} onChange={e => setSettings({...settings, depositHoldHours: Number(e.target.value)})}/></label>
       </div>
+      {!czIban(settings.account) && <p className="setup-hint inline" role="note">Vyplňte číslo účtu salonu. Bez něj se nevytvoří QR platby a kauce ani platby předem se po klientkách nebudou vyžadovat.</p>}
       <div className="field-grid">
         <label className="field"><span>Číslo účtu</span><input value={settings.account} placeholder="123456789/0300" onChange={e => setSettings({...settings, account: e.target.value})}/></label>
         <label className="field"><span>Příjemce</span><input value={settings.accountName} maxLength={60} onChange={e => setSettings({...settings, accountName: e.target.value})}/></label>
       </div>
-      {!settings.account && <p className="muted-inline">Bez čísla účtu se kauce nevybírá.</p>}
+      <p className="muted-inline">Na tento účet chodí kauce, platby předem za balíčky a QR platby z účtenek.</p>
+      <label className="field narrow"><span>Dárkové poukazy platí (měsíců od prodeje)</span><input type="number" min={1} max={60} value={settings.voucherMonths} onChange={e => setSettings({...settings, voucherMonths: Number(e.target.value)})}/></label>
       <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Nastavení kauce bylo uloženo.')}>Uložit kauce a platby</button></div>
     </section>
 
     <section className="panel">
-      <div className="panel-heading"><h2>Údaje na účtence</h2></div>
+      <div className="panel-heading"><h2>Údaje salonu</h2></div>
+      <p className="muted-inline">Zobrazí se v administraci, na rezervační stránce, v e-mailech klientkám a na účtenkách.</p>
+      <LogoPicker version={settings.logoVersion} busy={busy} onPick={image => run(() => post({kind: 'logo', data: {image}}), image ? 'Logo bylo nahráno.' : 'Logo bylo odebráno.')} onError={setError}/>
       <div className="field-grid">
         <label className="field"><span>Název provozovny</span><input value={settings.businessName} maxLength={80} onChange={e => setSettings({...settings, businessName: e.target.value})}/></label>
         <label className="field"><span>Provozovatel (jméno podnikatelky)</span><input value={settings.businessOwner} maxLength={80} onChange={e => setSettings({...settings, businessOwner: e.target.value})}/></label>
         <label className="field"><span>Adresa</span><input value={settings.businessAddress} maxLength={160} onChange={e => setSettings({...settings, businessAddress: e.target.value})}/></label>
         <label className="field"><span>IČO</span><input value={settings.businessId} inputMode="numeric" maxLength={8} onChange={e => setSettings({...settings, businessId: e.target.value})}/></label>
+        <label className="field"><span>Telefon pro klientky</span><input value={settings.businessPhone} type="tel" maxLength={30} placeholder="777 123 456" onChange={e => setSettings({...settings, businessPhone: e.target.value})}/></label>
+        <label className="field"><span>E-mail pro odpovědi klientek</span><input value={settings.businessEmail} type="email" maxLength={120} onChange={e => setSettings({...settings, businessEmail: e.target.value})}/></label>
       </div>
+      <label className="check"><input type="checkbox" checked={settings.programEnabled} onChange={e => setSettings({...settings, programEnabled: e.target.checked})}/> Program Čistá pleť (série ošetření A-QS Hacker se sledováním termínů na kartě klientky)</label>
       <p className="muted-inline">Na účtence bude i „neplátce DPH“ a QR kód na účet z části Kauce a platby.</p>
-      <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Údaje na účtence byly uloženy.')}>Uložit údaje</button></div>
+      <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Údaje salonu byly uloženy.')}>Uložit údaje</button></div>
     </section>
+
+    <PasswordPanel/>
 
     <ProductsPanel/>
 
@@ -116,4 +141,44 @@ export default function BookingSettingsView({bookingUrl}: {bookingUrl: string}) 
       <div className="form-actions"><a className="secondary" href={bookingUrl} target="_blank" rel="noreferrer">Otevřít rezervační stránku</a><button className="secondary" onClick={() => navigator.clipboard.writeText(embed).then(() => setCopied(true), () => setCopied(false))}><Copy size={16}/> {copied ? 'Zkopírováno' : 'Zkopírovat kód'}</button></div>
     </section>
   </div>;
+}
+
+function LogoPicker({version, busy, onPick, onError}: {version: number; busy: boolean; onPick: (image: string | null) => void; onError: (message: string) => void}) {
+  return <div className="logo-picker">
+    <img src={logoSrc(version)} alt="Logo salonu" width={64} height={64}/>
+    <label className={'secondary' + (busy ? ' disabled' : '')}><ImageUp size={16}/> {version ? 'Změnit logo' : 'Nahrát logo'}
+      <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) shrinkImage(f).then(onPick, err => onError((err as Error).message)); }}/></label>
+    {!!version && <button type="button" className="link-button" disabled={busy} onClick={() => onPick(null)}>Odebrat logo</button>}
+    <small className="muted-inline">PNG, JPG nebo WebP, ideálně čtvercové.</small>
+  </div>;
+}
+
+/** Změna hesla do administrace; po změně se odhlásí ostatní zařízení. */
+function PasswordPanel() {
+  const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false);
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault(); const form = e.currentTarget, f = Object.fromEntries(new FormData(form)) as Record<string, string>;
+    setError(''); setNotice('');
+    if (f.password !== f.repeat) { setError('Nové heslo a jeho zopakování se neshodují.'); return; }
+    setBusy(true);
+    try {
+      const r = await fetch('/api/account', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({current: f.current, password: f.password})});
+      const d = await r.json() as {error?: string};
+      if (!r.ok) throw new Error(d.error || 'Heslo se nepodařilo změnit.');
+      form.reset(); setNotice('Heslo bylo změněno. Ostatní zařízení se musí přihlásit znovu.');
+    } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
+  }
+  return <section className="panel">
+    <div className="panel-heading"><h2>Heslo do administrace</h2></div>
+    {error && <div className="error" role="alert">{error}</div>}
+    {notice && <p className="notice" role="status">{notice}</p>}
+    <form className="password-form" onSubmit={submit}>
+      <label className="field"><span>Současné heslo</span><input name="current" type="password" autoComplete="current-password" required/></label>
+      <div className="field-grid">
+        <label className="field"><span>Nové heslo (aspoň 12 znaků)</span><input name="password" type="password" autoComplete="new-password" minLength={12} maxLength={200} required/></label>
+        <label className="field"><span>Nové heslo znovu</span><input name="repeat" type="password" autoComplete="new-password" minLength={12} maxLength={200} required/></label>
+      </div>
+      <div className="form-actions"><button className="primary" disabled={busy}>{busy ? 'Měním…' : 'Změnit heslo'}</button></div>
+    </form>
+  </section>;
 }

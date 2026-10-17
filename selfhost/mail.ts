@@ -13,12 +13,12 @@ const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 const clean = (s: string) => s.replace(/[\r\n<>]/g, '');
 
 /** Odešle e-mail salonu, nebo zadanému příjemci (`to`), např. klientce s odkazem na její rezervaci. */
-export function sendMail(config: MailConfig, subject: string, text: string, to = config.to): Promise<void> {
+export function sendMail(config: MailConfig, subject: string, text: string, to = config.to, from: {name: string; replyTo: string} = {name: 'Rezervace', replyTo: ''}): Promise<void> {
   return new Promise((resolve, reject) => {
     const socket = tls.connect({host: config.host, port: config.port, servername: config.host});
     const date = new Date().toUTCString();
     const message = [
-      `From: Studio I AM <${clean(config.from)}>`, `To: <${clean(to)}>`, `Subject: =?UTF-8?B?${b64(subject)}?=`, `Date: ${date}`,
+      `From: =?UTF-8?B?${b64(clean(from.name))}?= <${clean(config.from)}>`, ...(from.replyTo ? [`Reply-To: <${clean(from.replyTo)}>`] : []), `To: <${clean(to)}>`, `Subject: =?UTF-8?B?${b64(subject)}?=`, `Date: ${date}`,
       `Message-ID: <${crypto.randomUUID()}@${clean(config.host)}>`, 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '',
       (b64(text).match(/.{1,76}/g) || []).join('\r\n'), '.',
     ].join('\r\n');

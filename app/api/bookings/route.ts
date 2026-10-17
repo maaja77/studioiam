@@ -1,11 +1,19 @@
 // API administrace rezervací: kalendář, ruční rezervace, ceník ošetření, nastavení a blokování klientek.
-import {database} from '../../../db/raw';
+import {database, photoStorage, salonProfile} from '../../../db/raw';
 import {addMinutes, isDate, isTime, parseSettings, validateSettings} from '../../../lib/booking';
 import {parseRevenue} from '../../../lib/revenue';
 import {releaseExpiredDeposits} from '../public/route';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
 const STATUSES = ['confirmed', 'pending', 'done', 'no_show', 'cancelled'];
+export const LOGO_KEY = 'branding/logo';
+/** Typ obrázku podle prvních bajtů (nevěří se příponě ani hlavičce od prohlížeče). */
+export function imageType(b: Uint8Array) {
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (String.fromCharCode(...b.subarray(0, 4)) === 'RIFF' && String.fromCharCode(...b.subarray(8, 12)) === 'WEBP') return 'image/webp';
+  return '';
+}
 
 export async function GET(request: Request) {
   try {
@@ -17,7 +25,8 @@ export async function GET(request: Request) {
       db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,active,sort,category,description,color,sessions,prepay FROM services ORDER BY sort,name'),
       db.prepare("SELECT value FROM settings WHERE key='booking'"),
     ]) as {results: Record<string, unknown>[]}[];
-    return json({bookings: bookings.results, services: services.results, settings: parseSettings((setting.results[0] as {value?: string} | undefined)?.value)});
+    return json({bookings: bookings.results, services: services.results, settings: parseSettings((setting.results[0] as {value?: string} | undefined)?.value),
+      features: {studioPriceList: salonProfile() === 'studioiam'}});
   } catch (e) { console.error(e); return json({error: 'Rezervace se nepodařilo načíst. Zkuste to znovu.'}, 503); }
 }
 
@@ -28,10 +37,25 @@ export async function POST(request: Request) {
     const d = body.data || {}, db = database();
     const field = (k: string, max = 2000) => typeof d[k] === 'string' ? (d[k] as string).trim().slice(0, max) : '';
 
+    const current = async () => parseSettings((await db.prepare("SELECT value FROM settings WHERE key='booking'").first<{value: string}>())?.value);
+    const store = (value: unknown) => db.prepare("INSERT INTO settings (key,value) VALUES ('booking',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify(value)).run();
     if (body.kind === 'settings') {
       const settings = validateSettings(d);
       if (typeof settings === 'string') return json({error: settings}, 400);
-      await db.prepare("INSERT INTO settings (key,value) VALUES ('booking',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(JSON.stringify(settings)).run();
+      await store({...settings, logoVersion: (await current()).logoVersion}); // logo se mění jen nahráním obrázku
+      return json({ok: true});
+    }
+
+    // Logo salonu: obrázek PNG, JPEG nebo WebP do 1 MB; bez loga se ukáže neutrální výchozí.
+    if (body.kind === 'logo') {
+      const settings = await current();
+      if (d.image === null) { await photoStorage().delete(LOGO_KEY); await store({...settings, logoVersion: 0}); return json({ok: true}); }
+      const m = typeof d.image === 'string' ? /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(d.image) : null;
+      const bytes = m ? Uint8Array.from(atob(m[2]), c => c.charCodeAt(0)) : null;
+      if (!bytes || !imageType(bytes)) return json({error: 'Logo musí být obrázek PNG, JPG nebo WebP.'}, 400);
+      if (bytes.length > 1024 * 1024) return json({error: 'Logo je příliš velké (nejvýš 1 MB).'}, 400);
+      await photoStorage().put(LOGO_KEY, bytes);
+      await store({...settings, logoVersion: Date.now()});
       return json({ok: true});
     }
 
@@ -97,6 +121,17 @@ export async function POST(request: Request) {
         db.prepare('UPDATE bookings SET client_id=? WHERE id=?').bind(clientId, id),
       ]);
       return json({ok: true, clientId});
+    }
+
+    // Rychlý přesun na jiný den nebo čas; délka termínu zůstane stejná.
+    if (body.action === 'move') {
+      const date = field('date'), time = field('time');
+      if (!isDate(date) || !isTime(time)) return json({error: 'Vyplňte nové datum a čas.'}, 400);
+      const b = await db.prepare('SELECT start_at AS start,end_at AS "end" FROM bookings WHERE id=?').bind(id).first<{start: string; end: string}>();
+      if (!b) return json({error: 'Rezervace nebyla nalezena.'}, 404);
+      const minutes = Math.round((Date.parse(b.end + ':00Z') - Date.parse(b.start + ':00Z')) / 60000), start = `${date}T${time}`;
+      await db.prepare('UPDATE bookings SET start_at=?,end_at=? WHERE id=?').bind(start, addMinutes(start, minutes), id).run();
+      return json({ok: true});
     }
 
     // Uložení rezervace nebo blokace času zadané v salonu.

@@ -2,7 +2,7 @@
 // Žádné údaje o klientkách ani o obsazených termínech se ven neposílají.
 // Klientka může přes tajný odkaz z potvrzení zrušit nebo přesunout svůj termín, nejpozději v nastavené lhůtě předem.
 import {database, notifyClient, notifySalon} from '../../../db/raw';
-import {ACTIVE_STATUSES, addDays, addMinutes, freeSlots, isDate, isTime, normalizePhone, parseSettings, salonNow, type BookingSettings} from '../../../lib/booking';
+import {ACTIVE_STATUSES, addDays, addMinutes, freeSlots, isDate, isTime, normalizePhone, parseSettings, salonName, salonNow, type BookingSettings} from '../../../lib/booking';
 import {formatRevenue} from '../../../lib/revenue';
 import {czIban, depositFor, formatIban, spdPayload} from '../../../lib/payment';
 export const dynamic = 'force-dynamic';
@@ -49,6 +49,8 @@ async function managed(token: string | null) {
   return database().prepare('SELECT id,start_at AS start,end_at AS end,service_name AS serviceName,name,phone,email,note,status,deposit_cents AS depositCents,deposit_status AS depositStatus,deposit_due AS depositDue,vs,payment_kind AS paymentKind FROM bookings WHERE manage_token=?').bind(token).first<Managed>();
 }
 /** Klientka smí měnit jen platný termín, který začíná nejdříve za nastavenou lhůtu. */
+/** Veřejné údaje salonu pro rezervační stránku (hlavička a patička). */
+export const salonInfo = (s: BookingSettings) => ({name: salonName(s), address: s.businessAddress, phone: s.businessPhone, businessId: s.businessId, logoVersion: s.logoVersion});
 const canChange = (b: Managed, settings: BookingSettings) => ['confirmed', 'pending'].includes(b.status) && b.start >= addMinutes(salonNow(), settings.changeLimitHours * 60);
 
 type PaymentKind = 'deposit' | 'prepay';
@@ -78,6 +80,14 @@ export async function GET(request: Request) {
   try {
     await releaseExpiredDeposits();
     const params = new URL(request.url).searchParams, {services, settings} = await context();
+    // Účtenka pro klientku přes tajný odkaz (bez údajů z kartotéky).
+    if (params.has('receipt')) {
+      const token = params.get('receipt') || '';
+      const r = /^[0-9a-f-]{36}$/.test(token) ? await database().prepare("SELECT number,client_name AS clientName,issued,items,total_cents AS totalCents,prepaid_cents AS prepaidCents,due_cents AS dueCents,discount_cents AS discountCents,discount_label AS discountLabel,voucher_cents AS voucherCents,(SELECT code FROM vouchers WHERE vouchers.id=receipts.voucher_id) AS voucherCode,method,paid,vs,status FROM receipts WHERE token=?").bind(token).first<Record<string, unknown> & {items: string}>() : null;
+      if (!r) return json({error: 'Účtenka nebyla nalezena. Zkontrolujte prosím odkaz.'}, 404);
+      const {businessName, businessOwner, businessAddress, businessId, businessPhone, account, accountName, logoVersion} = settings;
+      return json({receipt: {...r, id: '', bookingId: null, clientId: null, note: '', items: JSON.parse(r.items)}, settings: {businessName, businessOwner, businessAddress, businessId, businessPhone, account, accountName, logoVersion}});
+    }
     if (params.has('token')) {
       const b = await managed(params.get('token'));
       if (!b) return json({error: 'Rezervace nebyla nalezena. Zkontrolujte prosím odkaz nebo nám zavolejte.'}, 404);
@@ -86,7 +96,7 @@ export async function GET(request: Request) {
     }
     const serviceId = params.get('serviceId');
     if (!serviceId) {
-      return json({services: services.map(x => ({...x, prepay: !!x.prepay, depositCents: payment(x, settings, false)?.cents ?? null})), horizonDays: settings.horizonDays});
+      return json({services: services.map(x => ({...x, prepay: !!x.prepay, depositCents: payment(x, settings, false)?.cents ?? null})), horizonDays: settings.horizonDays, salon: salonInfo(settings)});
     }
     const service = services.find(s => s.id === serviceId);
     if (!service) return json({error: 'Ošetření není k dispozici.'}, 404);
@@ -134,19 +144,19 @@ export async function POST(request: Request) {
 
     const when = whenText(start), link = `${new URL(request.url).origin}/rezervace?t=${token}`;
     notifySalon(`Nová rezervace: ${name}, ${when}`, [
-      'Nová online rezervace ve Studiu I AM', '',
+      `Nová online rezervace (${salonName(settings)})`, '',
       `Ošetření: ${service.name} (${service.durationMin} min${service.priceCents ? ', ' + formatRevenue(service.priceCents) : ''})`,
       `Termín: ${when}`, `Jméno: ${name}`, `Telefon: ${phone}`, email ? `E-mail: ${email}` : '', note ? `Poznámka: ${note}` : '',
       deposit ? `${deposit.kind === 'prepay' ? 'Platba předem' : 'Kauce'}: ${formatRevenue(deposit.amountCents)}, VS ${deposit.vs}, zaplatit do ${deposit.due.replace('T', ' ')}. Do té doby termín čeká na platbu.` : '',
       service.sessions > 1 ? `Balíček ${service.sessions}× ošetření: toto je 1. termín, další je potřeba domluvit.` : '',
       matches.length ? 'Klientka už má kartu v kartotéce.' : 'Nová klientka, karta zatím neexistuje.',
     ].filter(Boolean).join('\n'));
-    if (email) notifyClient(email, `Rezervace ve Studiu I AM: ${when}`, [
+    if (email) notifyClient(email, `Rezervace – ${salonName(settings)}: ${when}`, [
       `Dobrý den, děkujeme za rezervaci.`, '',
-      `Ošetření: ${service.name}`, `Termín: ${when}`, 'Studio I AM, Nerudova 884/11, Hradec Králové', '',
+      `Ošetření: ${service.name}`, `Termín: ${when}`, [salonName(settings), settings.businessAddress].filter(Boolean).join(', '), '',
       deposit ? `Termín držíme do zaplacení ${deposit.kind === 'prepay' ? 'částky' : 'kauce'} ${formatRevenue(deposit.amountCents)} na účet ${deposit.account}, VS ${deposit.vs}, nejpozději ${deposit.due.replace('T', ' ')}.\n` : '',
       `Zrušit nebo změnit termín můžete nejpozději ${settings.changeLimitHours} h předem zde: ${link}`,
-      'Později nám prosím zavolejte: 775 963 462.', '', 'Těšíme se na vás, Studio I AM',
+      settings.businessPhone ? `Později nám prosím zavolejte: ${settings.businessPhone}.` : '', '', `Těšíme se na vás, ${salonName(settings)}`,
     ].filter(Boolean).join('\n'));
     return json({ok: true, id, start, end, service: service.name, deposit, token});
   } catch (e) { console.error(e); return json({error: 'Rezervaci se nepodařilo odeslat. Zkuste to prosím znovu nebo nám zavolejte.'}, 503); }
@@ -157,7 +167,7 @@ async function manage(action: 'cancel' | 'move', token: string, date: string, ti
   const {db, settings} = await context(), b = await managed(token);
   if (!b) return json({error: 'Rezervace nebyla nalezena. Zkontrolujte prosím odkaz nebo nám zavolejte.'}, 404);
   if (b.status === 'cancelled') return json({error: 'Tento termín je už zrušený.'}, 409);
-  if (!canChange(b, settings)) return json({error: `Termín už online změnit nejde (nejpozději ${settings.changeLimitHours} h předem). Zavolejte nám prosím: 775 963 462.`}, 409);
+  if (!canChange(b, settings)) return json({error: `Termín už online změnit nejde (nejpozději ${settings.changeLimitHours} h předem). ${settings.businessPhone ? `Zavolejte nám prosím: ${settings.businessPhone}.` : 'Ozvěte se nám prosím telefonicky.'}`}, 409);
   const stamp = new Date(salonNow() + ':00').toLocaleString('cs-CZ', {day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit'});
   const old = whenText(b.start);
   if (action === 'cancel') {
@@ -176,6 +186,6 @@ async function manage(action: 'cancel' | 'move', token: string, date: string, ti
     .bind(start, end, due, `Klientka přesunula online ${stamp} z ${b.start.replace('T', ' ')}.`, b.id).run();
   const when = whenText(start);
   notifySalon(`Přesunutá rezervace: ${b.name}, ${when}`, ['Klientka přesunula online rezervaci.', '', `Ošetření: ${b.serviceName}`, `Původní termín: ${old}`, `Nový termín: ${when}`, `Jméno: ${b.name}`, `Telefon: ${b.phone}`].join('\n'));
-  if (b.email) notifyClient(b.email, `Změna termínu ve Studiu I AM: ${when}`, [`Dobrý den, váš termín jsme přesunuli.`, '', `Ošetření: ${b.serviceName}`, `Nový termín: ${when}`, '', 'Těšíme se na vás, Studio I AM'].join('\n'));
+  if (b.email) notifyClient(b.email, `Změna termínu – ${salonName(settings)}: ${when}`, [`Dobrý den, váš termín jsme přesunuli.`, '', `Ošetření: ${b.serviceName}`, `Nový termín: ${when}`, '', `Těšíme se na vás, ${salonName(settings)}`].join('\n'));
   return json({ok: true, booking: await manageInfo({...b, start, end, depositDue: due}, settings)});
 }

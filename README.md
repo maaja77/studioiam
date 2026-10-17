@@ -35,7 +35,7 @@ cd studioiam
 
 # 1. Data: rozbalte exportní ZIP mimo repozitář a ověřte zálohu
 python3 selfhost/verify-backup.py /cesta/k/Kartoteka-salonu/backup
-test ! -e data && cp -a /cesta/k/Kartoteka-salonu/backup data
+if [ -e data ]; then echo 'Složka data už existuje, záloha se NEZKOPÍROVALA (viz Import zálohy).'; else cp -a /cesta/k/Kartoteka-salonu/backup data; fi
 sudo chown -R 1000:1000 data && sudo chmod -R go-rwx data
 
 # 2. Přihlášení
@@ -61,8 +61,27 @@ Podrobný postup přechodu, kontroly po importu a zálohování: [docs/MIGRACE.m
 Administrace má vlastní přihlašovací stránku (`/prihlaseni`) v designu studia. Jméno je `SALON_USER`,
 heslo je to, ze kterého vznikl `SALON_PASSWORD_HASH` (ne samotný hash). Volba „Pamatovat si přihlášení“
 drží přihlášení 30 dní, bez ní do zavření prohlížeče (nejdéle 12 hodin). Tlačítko Odhlásit je v hlavičce.
-Po 10 chybných pokusech z jedné adresy se přihlášení na 15 minut zablokuje. Změna hesla
-(nový hash a `docker compose up -d`) odhlásí všechna zařízení.
+Po 10 chybných pokusech z jedné adresy se přihlášení na 15 minut zablokuje.
+
+Heslo si lze změnit přímo v aplikaci (Nastavení → Heslo do administrace); ostatní zařízení se odhlásí.
+Zapomenuté heslo obnoví správce serveru: nový hash do `SALON_PASSWORD_HASH` a `docker compose up -d`.
+Nový hash v `.env.selfhost` má vždy přednost před heslem změněným v aplikaci.
+
+## Import zálohy do běžící instalace
+
+Když aplikace už běží s prázdnou nebo starou složkou `data`, záloha se při instalaci nezkopíruje.
+Postup (složka zálohy obsahuje `salon.sqlite` a `objects/`):
+
+```sh
+docker compose down
+mv data data-puvodni
+python3 selfhost/verify-backup.py /cesta/k/zaloze
+cp -a /cesta/k/zaloze data
+sudo chown -R 1000:1000 data && sudo chmod -R go-rwx data
+docker compose up -d
+```
+
+Databáze se při spuštění sama doplní o nové tabulky. Po kontrole smažte `data-puvodni` a kopie zálohy mimo server.
 
 ## Aktualizace
 
@@ -70,6 +89,74 @@ Po 10 chybných pokusech z jedné adresy se přihlášení na 15 minut zablokuje
 git pull
 docker compose up -d --build
 ```
+
+Před větší aktualizací spusťte ruční zálohu (`sudo systemctl start salon-zaloha`, viz níže).
+
+## Automatické zálohy mimo server
+
+Každou noc ve 2:30 se databáze, fotky, logo i `.env.selfhost` zašifrují a odešlou mimo server
+(nástroj restic, běží v Dockeru, nic se neinstaluje). Aplikace se kvůli záloze nezastavuje.
+Uchovává se 14 denních, 8 týdenních a 12 měsíčních záloh. Každý 1. den v měsíci se záloha
+zkušebně obnoví do dočasné složky a zkontroluje (databáze, vazby, všechny fotky).
+
+Úložiště vyberte mimo Proxmox (doporučení: Backblaze B2 v EU regionu, pár korun měsíčně;
+jde i S3 úložiště nebo disk NAS). Nastavení jednou:
+
+```sh
+sudo cp selfhost/zaloha/zaloha.env.example /etc/salon-zaloha.env
+sudo chmod 600 /etc/salon-zaloha.env
+sudo nano /etc/salon-zaloha.env   # heslo záloh, úložiště, klíče, SALON_DIRS = složka s compose.yaml
+sudo selfhost/zaloha/nainstalovat.sh
+sudo systemctl start salon-zaloha && journalctl -u salon-zaloha -n 30   # první záloha hned
+sudo selfhost/zaloha/obnovit.sh --test                                  # zkušební obnova
+```
+
+Heslo záloh (`RESTIC_PASSWORD`) uložte i mimo server, například do správce hesel. Bez něj zálohy
+nejdou otevřít. Selhání záloh hlídá zdarma healthchecks.io (`HEALTHCHECK_URL`):
+když noční záloha neproběhne, přijde e-mail.
+
+Obnova (např. po havárii VM):
+
+```sh
+sudo selfhost/zaloha/obnovit.sh --seznam                 # přehled záloh
+sudo selfhost/zaloha/obnovit.sh studioiam /tmp/obnova    # obnoví a zkontroluje poslední zálohu
+docker compose down && mv data data-stara && sudo mv /tmp/obnova data && docker compose up -d
+```
+
+Název salonu v příkazu je jméno složky instalace (u dalších salonů jejich zkratka). Při stavbě
+nového serveru je v obnovené složce i původní nastavení `env.selfhost-ze-zalohy`.
+
+## Údaje salonu a profil instalace
+
+Název, adresa, telefon, IČO, e-mail, číslo účtu a logo se vyplňují v Nastavení → Údaje salonu.
+Dokud chybí název nebo číslo účtu, administrace na to upozorní (bez účtu se netvoří QR platby a kauce).
+
+`SALON_PROFILE` v `.env.selfhost` určuje, co je navíc:
+
+- `studioiam` – Studio I AM: logo studia, tlačítko „Vložit ceník z MyFoxu“, program Čistá pleť zapnutý
+  a při prvním spuštění se do prázdných polí doplní údaje studia (účet, adresa, telefon, IČO).
+- `generic` – jakýkoli další salon: prázdné údaje, neutrální logo, bez ceníku a programu (ten lze zapnout v Nastavení).
+
+Bez `SALON_PROFILE` se profil zvolí při prvním spuštění sám: instalace, která už má klientky, je Studio I AM,
+nová prázdná je `generic`. Volba se uloží do databáze.
+
+## Další salony (samostatná instalace pro každý salon)
+
+Každý salon má vlastní kontejner, databázi, fotky, heslo a adresu, takže se jeho data nemíchají s ostatními.
+Skripty počítají se složkou `/srv/salony` (změníte proměnnou `SALONY_DIR`) a s reverzní proxy s HTTPS,
+např. Caddy s doménou typu `*.mojesalony.cz`.
+
+```sh
+# jednou (a po každém git pull): sestaví obraz a aktualizuje všechny salony, předtím zálohuje jejich data
+sudo selfhost/salony/aktualizovat.sh
+
+# nový salon: vypíše přihlašovací jméno, heslo a řádky pro Caddyfile
+sudo selfhost/salony/novy-salon.sh lucie https://lucie.mojesalony.cz
+```
+
+Zálohy před aktualizací jsou v `/srv/salony/_zalohy/<salon>-<datum>.tar.gz` (posledních 10 na salon).
+Obnova: rozbalit do prázdné složky `data`, přejmenovat `zaloha.sqlite` na `salon.sqlite`, `chown -R 1000:1000 data`.
+Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potřeba ještě šifrovaná záloha mimo server.
 
 ## Online rezervace
 
@@ -84,11 +171,22 @@ docker compose up -d --build
 
 ## Účtenky
 
-- U rezervace v kalendáři tlačítko **Vystavit účtenku**: předvyplní ošetření, přidáte produkty ze seznamu (Nastavení → Produkty k prodeji) nebo vlastní položku, zvolíte platbu hotově / kartou / QR.
+- U rezervace v kalendáři tlačítko **Dokončit**: předvyplní ošetření, přidáte produkty ze seznamu (Nastavení → Produkty k prodeji) nebo vlastní položku, slevu v % nebo Kč a zvolíte platbu QR / hotově / kartou.
+- Po dokončení se u nezaplacené účtenky hned ukáže velký QR kód k platbě a tlačítko Zaplaceno.
+- Účtenku s QR platbou jde klientce poslat e-mailem (potřebuje nastavené SMTP), SMS z telefonu (otevře se zpráva s odkazem), sdílením nebo odkazem. Odkaz `/uctenka?t=…` je veřejný a tajný, klientka na něm vidí účtenku, QR kód a platební údaje ke zkopírování. Používá adresu `SALON_PUBLIC_ORIGIN`, jinak `SALON_ORIGIN`, takže ta musí být pro klientky dostupná.
 - Zaplacená kauce nebo platba předem se z účtenky odečte; rezervace se označí jako proběhlá.
 - QR platba (SPD) na doplatek, číslování `RRRR/0001` po letech, VS = číslo účtenky. Storno účtenku nemaže, jen označí.
 - Záložka **Účtenky**: přehled za měsíc, nezaplacené účtenky a prodej bez rezervace. Tisk přes tlačítko Tisk (účtenka je připravená na úzký papír 80 mm i A4).
 - Údaje na účtence (název, provozovatel, adresa, IČO, neplátce DPH) se nastaví v Nastavení.
+
+## Dárkové poukazy
+
+Záložka Poukazy: prodej poukazu na částku nebo na ošetření (s účtenkou, takže se započítá do tržeb v den prodeje),
+přehled s hlídáním platnosti (upozornění a odznak u záložky, když poukaz vyprší do 30 dnů), tisk poukazu (A6, PDF),
+ruční čerpání, prodloužení platnosti a storno. Výchozí platnost (6 měsíců) se mění v Nastavení → Kauce a platby.
+Když je nastavený e-mail (SMTP a `SALON_NOTIFY_EMAIL`), server jednou denně po 8. hodině pošle salonu souhrn poukazů,
+kterým za 30 a znovu za 7 dní končí platnost (kupujícím se nic neposílá).
+Poukaz se uplatní na účtence zadáním kódu; uhrazená část se do tržeb znovu nepočítá a storno účtenky ji vrátí na poukaz.
 
 ## Náhled s ukázkovými daty
 

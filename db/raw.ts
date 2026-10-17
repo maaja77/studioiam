@@ -5,5 +5,13 @@ export async function deleteClientPhotos(clientId:string){const rows=await datab
 /** Upozornění salonu (e-mail na vlastním serveru). Když není nastavené, nic se neodešle. */
 type Notify=(subject:string,text:string,to?:string)=>Promise<void>;
 export function notifySalon(subject:string,text:string,to?:string){const send=(env as {NOTIFY?:Notify}).NOTIFY;if(send)send(subject,text,to).catch(e=>console.error('Notification failed',e instanceof Error?e.message:e));}
+/** Odeslání e-mailu salonu s čekáním na výsledek (null = e-mail není nastavený). */
+export const salonMailer=()=>(env as {NOTIFY?:Notify}).NOTIFY||null;
 /** E-mail klientce (jen když zadala platnou adresu a e-mail je nastavený). */
 export function notifyClient(email:string,subject:string,text:string){if(/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(email))notifySalon(subject,text,email);}
+/** Jsou e-maily nastavené (SMTP)? Bez nich se klientce nic neodešle. */
+export const mailEnabled=()=>!!(env as {NOTIFY?:Notify}).NOTIFY;
+/** Adresa, na které klientky otevřou odkazy (veřejná adresa rezervací, jinak adresa aplikace). */
+export const publicOrigin=(fallback:string)=>(env as {PUBLIC_ORIGIN?:string}).PUBLIC_ORIGIN||fallback;
+/** Profil instalace: 'studioiam' (Studio I AM s vlastním ceníkem a logem) nebo 'generic' pro ostatní salony. */
+export const salonProfile=()=>(env as {PROFILE?:string}).PROFILE||'generic';

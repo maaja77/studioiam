@@ -1,0 +1,1 @@
+ALTER TABLE `vouchers` ADD `reminder_stage` integer DEFAULT 0 NOT NULL;

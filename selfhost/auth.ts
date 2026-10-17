@@ -1,6 +1,6 @@
 // Přihlášení do administrace: vlastní přihlašovací stránka a podepsaná session cookie místo okna HTTP Basic.
 // Cookie nese jen dobu platnosti a podpis; klíč se odvozuje z hashe hesla, takže změna hesla odhlásí všechna zařízení.
-import {createHash,createHmac,scryptSync,timingSafeEqual} from 'node:crypto';
+import {createHash,createHmac,randomBytes,scryptSync,timingSafeEqual} from 'node:crypto';
 export {loginPage} from './login-page';
 
 export const COOKIE='salon_session';
@@ -21,6 +21,8 @@ export function createAuth(user:string,encoded:string,secure:boolean){
   /** Nová session; „zapamatovat“ drží přihlášení 30 dní, jinak do zavření prohlížeče (nejdéle 12 hodin). */
   issue(remember:boolean){const exp=Math.floor(Date.now()/1000)+(remember?REMEMBER_DAYS*86400:SESSION_HOURS*3600);const payload=`v1.${exp}`;return cookie(`${payload}.${sign(payload)}`,remember?REMEMBER_DAYS*86400:undefined);},
   clear:()=>cookie('',0),
+  /** Platí přihlášení déle než běžná session, tj. bylo s „zapamatovat“? */
+  remembered(header:string|undefined){const m=/(?:^|;\s*)salon_session=v1\.(\d{10})\./.exec(header||'');return !!m&&Number(m[1])-Date.now()/1000>SESSION_HOURS*3600;},
   valid(header:string|undefined){
    const value=(header||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(COOKIE+'='))?.slice(COOKIE.length+1)||'';
    const m=/^(v1\.(\d{10}))\.([A-Za-z0-9_-]{43})$/.exec(value);if(!m||Number(m[2])<Date.now()/1000)return false;
@@ -28,6 +30,9 @@ export function createAuth(user:string,encoded:string,secure:boolean){
   },
  };
 }
+
+/** Hash hesla ve stejném tvaru jako selfhost/hash-password.mjs (sůl:scrypt). */
+export function hashPassword(password:string){const salt=randomBytes(16).toString('hex');return salt+':'+scryptSync(password,salt,64).toString('hex');}
 
 /** Pokusy o přihlášení z jedné adresy: po 10 chybách 15 minut pauza. */
 const failures=new Map<string,number[]>();

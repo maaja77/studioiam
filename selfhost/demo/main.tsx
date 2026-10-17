@@ -4,14 +4,17 @@ import React from 'react';
 import {createRoot} from 'react-dom/client';
 import Home from '../../app/page';
 import PublicBooking from '../../app/public-booking';
+import PublicReceipt from '../../app/public-receipt';
 import * as bookings from '../../app/api/bookings/route';
 import * as publicApi from '../../app/api/public/route';
 import * as receiptsApi from '../../app/api/receipts/route';
+import * as statsApi from '../../app/api/stats/route';
+import * as vouchersApi from '../../app/api/vouchers/route';
 import * as records from '../../app/api/records/route';
 import * as photos from '../../app/api/photos/route';
-import {resetDemo} from './runtime';
+import {env, resetDemo} from './runtime';
 import {loginPage} from '../login-page';
-import {LOGO} from '../../app/logo';
+import {LOGO} from './studio-logo';
 import '../../app/globals.css';
 import './demo.css';
 
@@ -24,6 +27,10 @@ async function handle(url: URL, request: Request) {
   if (url.pathname === '/api/records') return m === 'GET' ? records.GET() : records.POST(request);
   if (url.pathname === '/api/bookings') return m === 'GET' ? bookings.GET(request) : bookings.POST(request);
   if (url.pathname === '/api/receipts') return m === 'GET' ? receiptsApi.GET(request) : receiptsApi.POST(request);
+  if (url.pathname === '/api/stats') return statsApi.GET(request);
+  if (url.pathname === '/api/vouchers') return m === 'GET' ? vouchersApi.GET(request) : vouchersApi.POST(request);
+  if (url.pathname === '/api/demo-logo') { const o = await env.BUCKET.get('branding/logo'); return o ? new Response(o.body as BodyInit, {headers: {'Content-Type': 'image/png'}}) : new Response(null, {status: 404}); }
+  if (url.pathname === '/api/account') return Response.json({error: 'V ukázce se heslo nemění. Na serveru tu změníte heslo do administrace.'}, {status: 400});
   if (url.pathname === '/api/public') return m === 'GET' ? publicApi.GET(request) : publicApi.POST(request);
   if (url.pathname === '/api/photos') return m === 'GET' ? photos.GET(request) : m === 'POST' ? photos.POST(request) : photos.DELETE(request);
   return Response.json({error: 'Not found'}, {status: 404});
@@ -43,6 +50,8 @@ window.fetch = async (input, init) => {
 const blobs = new Map<string, string>();
 async function swap(img: HTMLImageElement) {
   const src = img.getAttribute('src') || '';
+  // Logo salonu vrací server na /logo.png; náhled server nemá, ukáže nahrané logo nebo logo Studia I AM.
+  if (src.startsWith('/logo.png')) { const r = await window.fetch('/api/demo-logo'); img.setAttribute('src', r.ok ? URL.createObjectURL(await r.blob()) : LOGO); return; }
   if (!src.startsWith('/api/photos?id=')) return;
   let blob = blobs.get(src);
   if (!blob) { const r = await window.fetch(src); if (!r.ok) return; blob = URL.createObjectURL(await r.blob()); blobs.set(src, blob); }
@@ -77,7 +86,7 @@ function DemoBar({view, setView}: {view: View; setView: (v: View) => void}) {
 
 // Přihlašovací stránku server posílá jako samostatné HTML; v náhledu ji ukážeme v rámu a přihlášení jen přepne na administraci.
 function DemoLogin({onLogin}: {onLogin: () => void}) {
-  const html = React.useMemo(() => loginPage({logo: LOGO, notice: 'Ukázka: zadejte cokoli a klikněte na Přihlásit se.'}), []);
+  const html = React.useMemo(() => loginPage({logo: LOGO, salon: 'STUDIO I AM', notice: 'Ukázka: zadejte cokoli a klikněte na Přihlásit se.'}), []);
   return <iframe className="demo-login" title="Přihlášení" srcDoc={html} onLoad={e => {
     const form = e.currentTarget.contentDocument?.querySelector('form');
     form?.addEventListener('submit', ev => { ev.preventDefault(); onLogin(); });
@@ -86,6 +95,13 @@ function DemoLogin({onLogin}: {onLogin: () => void}) {
 
 function Demo() {
   const [view, setView] = React.useState<View>(() => location.hash === '#rezervace' ? 'public' : location.hash === '#prihlaseni' ? 'login' : 'admin');
+  // Odkaz na účtenku pro klientku v náhledu neotevře novou stránku, ale ukáže ji tady.
+  const [receipt, setReceipt] = React.useState('');
+  React.useEffect(() => {
+    const on = (e: MouseEvent) => { const a = (e.target as HTMLElement).closest?.('a'); const m = a?.href.match(/\/uctenka\?t=([0-9a-f-]{36})/); if (m) { e.preventDefault(); setReceipt(m[1]); } };
+    document.addEventListener('click', on, true); return () => document.removeEventListener('click', on, true);
+  }, []);
+  if (receipt) return <><div className="demo-bar" role="note"><span><strong>Ukázka:</strong> takhle účtenku uvidí klientka po otevření odkazu.</span><button type="button" onClick={() => setReceipt('')}>Zpět do administrace</button></div><PublicReceipt token={receipt}/></>;
   return <><DemoBar view={view} setView={setView}/>{view === 'admin' ? <Home onLogout={() => setView('login')}/> : view === 'login' ? <DemoLogin onLogin={() => setView('admin')}/> : <PublicBooking/>}</>;
 }
 
