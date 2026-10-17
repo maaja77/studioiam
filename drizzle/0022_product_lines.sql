@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `line` text DEFAULT '' NOT NULL;

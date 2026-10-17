@@ -12,7 +12,7 @@ import {logoSrc} from './logo';
 
 export type ReceiptItem = {name: string; qty: number; unitCents: number; kind: 'service' | 'product' | 'voucher' | 'other'; productId?: string};
 export type Receipt = {id: string; number: string; bookingId: string | null; clientId: string | null; clientName: string; issued: string; items: ReceiptItem[]; totalCents: number; prepaidCents: number; dueCents: number; method: string; paid: number; vs: string; status: string; note: string; discountCents?: number; discountLabel?: string; voucherCents?: number; voucherCode?: string | null};
-export type Product = {id: string; name: string; priceCents: number; active: number; sort: number; stock?: number | null};
+export type Product = {id: string; name: string; priceCents: number; active: number; sort: number; stock?: number | null; line?: string};
 /** Podklad pro novou účtenku, např. z rezervace v kalendáři. */
 export type ReceiptDraft = {bookingId?: string; clientId?: string | null; clientName?: string; items: ReceiptItem[]; prepaidCents?: number; prepaidLabel?: string};
 type Client = {id: string; name: string};
@@ -111,7 +111,11 @@ function ReceiptForm({draft, products, clients, busy, onSubmit, onCancel}: {draf
       </div>
       <div className="receipt-add">
         <select aria-label="Přidat produkt" value="" onChange={e => { const p = products.find(x => x.id === e.target.value); if (p) setItems([...items, {name: p.name, qty: 1, unitCents: p.priceCents, price: String(p.priceCents / 100).replace('.', ','), kind: 'product', productId: p.id}]); }}>
-          <option value="">+ Přidat produkt…</option>{products.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name} · {formatRevenue(p.priceCents)}{p.stock != null && ` · skladem ${p.stock} ks`}</option>)}
+          <option value="">+ Přidat produkt…</option>{(() => { const offered = products.filter(p => p.active), option = (p: Product) => <option key={p.id} value={p.id}>{p.name} · {formatRevenue(p.priceCents)}{p.stock != null && ` · skladem ${p.stock} ks`}</option>;
+            // Produkty seskupené podle řad ze Skladu; bez řad zůstane obyčejný seznam.
+            if (!offered.some(p => p.line)) return offered.map(option);
+            const lines = [...new Set(offered.map(p => p.line || ''))];
+            return lines.map(l => <optgroup key={l} label={l || 'Bez řady'}>{offered.filter(p => (p.line || '') === l).map(option)}</optgroup>); })()}
         </select>
         <button type="button" className="secondary" onClick={() => setItems([...items, {name: '', qty: 1, unitCents: 0, price: '', kind: 'other'}])}><Plus size={16}/> Vlastní položka</button>
       </div>

@@ -9,7 +9,7 @@ import type {StockMove, StockProduct} from '../../../lib/stock';
 import {ALL_SERVICES, recipeFor, STARTER_SUPPLIES, type SupplyRow} from '../../../lib/supplies';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
-export const PRODUCT_COLUMNS = 'id,name,price_cents AS priceCents,active,sort,stock,min_stock AS minStock,cost_cents AS costCents,kind,pack_size AS packSize';
+export const PRODUCT_COLUMNS = 'id,name,price_cents AS priceCents,active,sort,stock,min_stock AS minStock,cost_cents AS costCents,kind,pack_size AS packSize,line';
 
 export async function GET(request: Request) {
   try {
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     }
     const since = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const [products, sold, services, supplies, used, treated] = await db.batch([
-      db.prepare(`SELECT ${PRODUCT_COLUMNS} FROM products ORDER BY sort,name`),
+      db.prepare(`SELECT ${PRODUCT_COLUMNS} FROM products ORDER BY line=\'\',line COLLATE NOCASE,sort,name`),
       // Prodané kusy za posledních 90 dní: podle nich se dá odhadnout, na jak dlouho zásoba vystačí.
       db.prepare("SELECT product_id AS productId,-sum(delta) AS qty FROM stock_moves WHERE kind IN ('sale','return') AND date>=? GROUP BY product_id").bind(new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10)),
       db.prepare('SELECT id,name,category FROM services WHERE active=1 ORDER BY sort,name'),
@@ -54,13 +54,13 @@ export async function POST(request: Request) {
       if (price === undefined || price === null) return json({error: 'Zadejte prodejní cenu v Kč, například 590 nebo 590,50.'}, 400);
       if (pack !== null && (Number.isNaN(pack) || pack < 1 || pack > 100000)) return json({error: 'Počet kusů v balení musí být celé číslo 1–100 000.'}, 400);
       if (cost === undefined) return json({error: 'Zadejte nákupní cenu v Kč, nebo ji nechte prázdnou.'}, 400);
-      const track = d.track === true, minStock = count('minStock'), start = count('stock');
+      const line = supply ? '' : field('line', 60).replace(/\s+/g, ' '), track = d.track === true, minStock = count('minStock'), start = count('stock');
       if (track && (Number.isNaN(minStock) || (minStock !== null && (minStock < 0 || minStock > 9999)))) return json({error: 'Minimum na skladě musí být celé číslo 0–9999.'}, 400);
       const id = field('id') || crypto.randomUUID(), old = await db.prepare('SELECT stock FROM products WHERE id=?').bind(id).first<{stock: number | null}>();
       const startTracking = track && (old?.stock === null || old?.stock === undefined);
       if (startTracking && (start === null || Number.isNaN(start) || start < 0 || start > 99999)) return json({error: 'Zadejte, kolik kusů máte teď na skladě.'}, 400);
-      const statements = [db.prepare('INSERT INTO products (id,name,price_cents,active,sort,stock,min_stock,cost_cents,kind,pack_size,created) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,price_cents=excluded.price_cents,active=excluded.active,sort=excluded.sort,stock=CASE WHEN excluded.stock IS NULL THEN NULL WHEN products.stock IS NULL THEN excluded.stock ELSE products.stock END,min_stock=excluded.min_stock,cost_cents=excluded.cost_cents,kind=excluded.kind,pack_size=excluded.pack_size')
-        .bind(id, name, price, kind !== 'sale' || d.active !== false ? 1 : 0, Number.isInteger(d.sort) ? d.sort as number : 0, !track ? null : startTracking ? start : old!.stock, track ? minStock : null, cost, kind, pack, now)];
+      const statements = [db.prepare('INSERT INTO products (id,name,price_cents,active,sort,stock,min_stock,cost_cents,kind,pack_size,line,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,price_cents=excluded.price_cents,active=excluded.active,sort=excluded.sort,stock=CASE WHEN excluded.stock IS NULL THEN NULL WHEN products.stock IS NULL THEN excluded.stock ELSE products.stock END,min_stock=excluded.min_stock,cost_cents=excluded.cost_cents,kind=excluded.kind,pack_size=excluded.pack_size,line=excluded.line')
+        .bind(id, name, price, kind !== 'sale' || d.active !== false ? 1 : 0, Number.isInteger(d.sort) ? d.sort as number : 0, !track ? null : startTracking ? start : old!.stock, track ? minStock : null, cost, kind, pack, line, now)];
       if (startTracking) statements.push(db.prepare("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,receipt_id,note,created) VALUES (?,?,?,'start',?,?,NULL,?,?)").bind(crypto.randomUUID(), id, salonNow(), start, start, MOVE_NOTES.start, now));
       if (!track) statements.push(db.prepare('DELETE FROM stock_moves WHERE product_id=?').bind(id));
       await db.batch(statements);

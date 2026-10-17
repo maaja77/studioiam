@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     if (!visit) return json({error: 'Návštěva nebyla nalezena.'}, 404);
     const [note, products, used, previous] = await Promise.all([
       noteOf(db, visitId),
-      db.prepare("SELECT id,name,price_cents AS priceCents FROM products WHERE active=1 AND kind='sale' ORDER BY sort,name").all<{id: string; name: string; priceCents: number}>(),
+      db.prepare("SELECT id,name,price_cents AS priceCents FROM products WHERE active=1 AND kind='sale' ORDER BY line='',line COLLATE NOCASE,sort,name").all<{id: string; name: string; priceCents: number}>(),
       db.prepare('SELECT product_id AS productId FROM visit_products WHERE visit_id=? AND product_id IS NOT NULL').bind(visitId).all<{productId: string}>(),
       // Text naposledy poslaný ke stejnému ošetření se nabídne znovu, ať se nemusí psát pokaždé.
       db.prepare('SELECT n.text,n.products FROM care_notes n JOIN visits v ON v.id=n.visit_id WHERE lower(v.treatment)=lower(?) AND n.visit_id<>? ORDER BY n.created DESC LIMIT 1').bind(visit.treatment, visitId).first<{text: string; products: string}>(),

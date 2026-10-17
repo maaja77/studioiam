@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     const month = /^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month')! : salonNow().slice(0, 7);
     const [list, products] = await db.batch([
       db.prepare(`SELECT ${RECEIPT_COLUMNS} FROM receipts WHERE issued>=? AND issued<? ORDER BY issued DESC`).bind(month + '-01', month + '-99'),
-      db.prepare("SELECT id,name,price_cents AS priceCents,active,sort,stock FROM products WHERE kind='sale' ORDER BY sort,name"),
+      db.prepare("SELECT id,name,price_cents AS priceCents,active,sort,stock,line FROM products WHERE kind='sale' ORDER BY line='',line COLLATE NOCASE,sort,name"),
     ]) as {results: Row[]}[];
     return json({month, receipts: list.results.map(decode), products: products.results, settings: await settings()});
   } catch (e) { console.error(e); return json({error: 'Účtenky se nepodařilo načíst. Zkuste to znovu.'}, 503); }

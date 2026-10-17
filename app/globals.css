@@ -461,3 +461,5 @@ dialog.care-dialog{width:min(680px,calc(100% - 24px))}
 .recipe-service small{color:var(--muted);font-size:13px}.recipe-cost{font-weight:600;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-end}.recipe-cost small{color:#8a5212;font-weight:400;font-size:12px}
 .recipe-table .num{text-align:right;white-space:nowrap}.recipe-table td small{color:var(--muted);font-size:12px}.recipe-table tr.unused td{color:var(--muted)}.recipe-table tr.total td{font-weight:700}
 .recipe-table input{width:72px;border:1px solid #cad8d6;border-radius:7px;padding:6px 8px;font-size:16px;text-align:right}.recipe-form{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.line-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}.line-chips button{border:1px solid var(--line);background:white;color:var(--muted);min-height:34px;border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer}.line-chips button.active{background:var(--teal);border-color:var(--teal);color:white}
+.stock-list>li.stock-line-heading{padding:14px 4px 6px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
