@@ -4,8 +4,9 @@ import {CalendarCheck, ChevronLeft, ChevronRight, Clock, Search} from 'lucide-re
 import {addDays, salonNow} from '../lib/booking';
 import {formatRevenue} from '../lib/revenue';
 import {PaymentDetails, type DepositInfo} from './qr-payment';
-import {LOGO} from './logo';
+import {logoSrc} from './logo';
 
+type Salon = {name: string; address: string; phone: string; businessId: string; logoVersion: number};
 type Service = {id: string; name: string; durationMin: number; priceCents: number; category?: string; description?: string; depositCents?: number | null; sessions?: number; prepay?: boolean};
 const fold = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const length = (min: number) => min % 60 === 0 ? `${min / 60} h` : min > 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
@@ -14,13 +15,13 @@ const dayLabel = (date: string) => new Date(date + 'T12:00:00').toLocaleDateStri
 const longDate = (date: string) => new Date(date + 'T12:00:00').toLocaleDateString('cs-CZ', {weekday: 'long', day: 'numeric', month: 'long'});
 
 export default function PublicBooking() {
-  const [services, setServices] = useState<Service[] | null>(null), [horizon, setHorizon] = useState(60);
+  const [services, setServices] = useState<Service[] | null>(null), [horizon, setHorizon] = useState(60), [salon, setSalon] = useState<Salon | null>(null);
   const [service, setService] = useState<Service | null>(null), [reload, setReload] = useState(0);
   const [date, setDate] = useState(''), [time, setTime] = useState(''), [query, setQuery] = useState('');
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [done, setDone] = useState<{start: string; service: string; deposit?: DepositInfo | null; token?: string} | null>(null);
   const [token, setToken] = useState(() => typeof location === 'undefined' ? '' : new URLSearchParams(location.search).get('t') || '');
 
-  useEffect(() => { fetch('/api/public', {cache: 'no-store'}).then(r => r.json() as Promise<{services?: Service[]; horizonDays?: number; error?: string}>).then(d => { if (!d.services) throw new Error(d.error); setServices(d.services); setHorizon(d.horizonDays || 60); }).catch(() => setError('Rezervace se nepodařilo načíst. Zkuste to prosím později.')); }, []);
+  useEffect(() => { fetch('/api/public', {cache: 'no-store'}).then(r => r.json() as Promise<{services?: Service[]; horizonDays?: number; salon?: Salon; error?: string}>).then(d => { if (!d.services) throw new Error(d.error); setServices(d.services); setHorizon(d.horizonDays || 60); if (d.salon) { setSalon(d.salon); document.title = 'Rezervace · ' + d.salon.name; } }).catch(() => setError('Rezervace se nepodařilo načíst. Zkuste to prosím později.')); }, []);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); if (!service) return; setBusy(true); setError('');
@@ -46,9 +47,9 @@ export default function PublicBooking() {
   }
 
   return <div className="public-booking">
-    <header className="pb-header"><img className="brand-logo" src={LOGO} alt="" width={56} height={56}/><div><b>STUDIO I AM</b><span>ONLINE REZERVACE</span></div></header>
+    <header className="pb-header"><img className="brand-logo" src={logoSrc(salon?.logoVersion)} alt="" width={56} height={56}/><div><b>{salon?.name.toLocaleUpperCase('cs') || '\u00a0'}</b><span>ONLINE REZERVACE</span></div></header>
     <main className="pb-main">
-      {token ? <ManageBooking token={token} horizon={horizon} onLeave={leaveManage}/>
+      {token ? <ManageBooking token={token} horizon={horizon} phone={salon?.phone || ''} onLeave={leaveManage}/>
       : done ? <section className="pb-done"><CalendarCheck size={44} strokeWidth={1.4}/><h1>{done.deposit ? (done.deposit.kind === 'prepay' ? 'Termín držíme, čeká na platbu' : 'Termín držíme, čeká na kauci') : 'Termín je rezervovaný'}</h1>
         <p><b>{done.service}</b><br/>{longDate(done.start.slice(0, 10))} v {done.start.slice(11)}</p>
         {done.deposit ? <>
@@ -86,7 +87,7 @@ export default function PublicBooking() {
         </section>}
       </>}
     </main>
-    <footer className="pb-footer">Studio I AM · Nerudova 884/11, Hradec Králové · tel. 775 963 462 · IČO 73975052</footer>
+    {salon && <footer className="pb-footer">{[salon.name, salon.address, salon.phone && 'tel. ' + salon.phone, salon.businessId && 'IČO ' + salon.businessId].filter(Boolean).join(' · ')}</footer>}
   </div>;
 }
 
@@ -112,7 +113,7 @@ function SlotPicker({query, horizon, onPick, onError}: {query: string; horizon: 
 type Managed = {start: string; end: string; service: string; status: string; durationMin: number; canChange: boolean; limitHours: number; deposit: DepositInfo | null};
 
 /** Správa vlastní rezervace přes tajný odkaz: zrušení nebo přesun nejpozději v nastavené lhůtě předem. */
-function ManageBooking({token, horizon, onLeave}: {token: string; horizon: number; onLeave: () => void}) {
+function ManageBooking({token, horizon, phone, onLeave}: {token: string; horizon: number; phone: string; onLeave: () => void}) {
   const [booking, setBooking] = useState<Managed | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<'view' | 'move' | 'cancel'>('view'), [picked, setPicked] = useState<{date: string; time: string} | null>(null), [message, setMessage] = useState('');
   useEffect(() => {
@@ -140,7 +141,7 @@ function ManageBooking({token, horizon, onLeave}: {token: string; horizon: numbe
     <p className="pb-summary"><b>{booking.service}</b><br/>{longDate(booking.start.slice(0, 10))} v {booking.start.slice(11)} · {booking.durationMin} min{booking.status === 'pending' && <><br/>{booking.deposit?.kind === 'prepay' ? 'Termín čeká na zaplacení.' : 'Termín čeká na zaplacení kauce.'}</>}</p>
     {booking.deposit && !cancelled && mode === 'view' && <PaymentDetails deposit={booking.deposit}/>}
     {cancelled ? <button className="primary" onClick={onLeave}>Rezervovat nový termín</button>
-    : !booking.canChange ? <p className="pb-muted">Online lze termín zrušit nebo změnit nejpozději {booking.limitHours} hodin předem. Teď nám prosím zavolejte na 775 963 462.</p>
+    : !booking.canChange ? <p className="pb-muted">Online lze termín zrušit nebo změnit nejpozději {booking.limitHours} hodin předem. {phone ? `Teď nám prosím zavolejte na ${phone}.` : 'Teď se nám prosím ozvěte telefonicky.'}</p>
     : mode === 'cancel' ? <div className="pb-confirm"><p>Opravdu chcete termín zrušit?</p><div className="pb-actions"><button className="danger" disabled={busy} onClick={() => send('cancel')}>{busy ? 'Ruším…' : 'Ano, zrušit termín'}</button><button className="secondary" onClick={() => setMode('view')}>Ponechat termín</button></div></div>
     : mode === 'move' ? <>
       <button className="pb-back" onClick={() => { setMode('view'); setPicked(null); }}><ChevronLeft size={16}/> Zpět</button>

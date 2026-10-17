@@ -5,7 +5,8 @@ import {czIban} from './payment';
 export type Hours = Record<string, [string, string] | null>; // klíč 0 = neděle … 6 = sobota
 export type BookingSettings = {hours: Hours; leadHours: number; horizonDays: number; stepMinutes: number;
   depositFromKc: number; depositPercent: number; depositHoldHours: number; account: string; accountName: string; changeLimitHours: number;
-  businessName: string; businessOwner: string; businessAddress: string; businessId: string};
+  businessName: string; businessOwner: string; businessAddress: string; businessId: string; businessPhone: string; businessEmail: string;
+  programEnabled: boolean; logoVersion: number};
 export type BusyRange = {start: string; end: string};
 
 export const DEFAULT_SETTINGS: BookingSettings = {
@@ -16,14 +17,20 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   depositFromKc: 2000,
   depositPercent: 30,
   depositHoldHours: 24,
-  account: '331122037/0300',
-  accountName: 'STUDIO I AM',
+  account: '',
+  accountName: '',
   changeLimitHours: 24,
-  businessName: 'STUDIO I AM',
-  businessOwner: 'Andrea Marešová',
-  businessAddress: 'Nerudova 884/11, 500 02 Hradec Králové',
-  businessId: '73975052',
+  businessName: '',
+  businessOwner: '',
+  businessAddress: '',
+  businessId: '',
+  businessPhone: '',
+  businessEmail: '',
+  programEnabled: false,
+  logoVersion: 0,
 };
+/** Jméno salonu pro nadpisy a e-maily, dokud ho salon nevyplní v Nastavení. */
+export const salonName = (s: Pick<BookingSettings, 'businessName'>) => s.businessName.trim() || 'Salon';
 export const WEEKDAYS = ['Neděle', 'Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota'];
 export const ACTIVE_STATUSES = ['confirmed', 'done', 'pending'];
 
@@ -51,8 +58,7 @@ export function addMinutes(local: string, minutes: number) {
 export function parseSettings(raw: string | null | undefined): BookingSettings {
   try {
     const v = JSON.parse(raw || '') as Partial<BookingSettings>;
-    // Prázdný účet by tiše vypnul kauce i platby předem, proto se použije účet salonu.
-    return {...DEFAULT_SETTINGS, ...v, account: v.account?.trim() || DEFAULT_SETTINGS.account, hours: {...DEFAULT_SETTINGS.hours, ...(v.hours || {})}};
+    return {...DEFAULT_SETTINGS, ...v, hours: {...DEFAULT_SETTINGS.hours, ...(v.hours || {})}};
   } catch { return DEFAULT_SETTINGS; }
 }
 
@@ -81,7 +87,11 @@ export function validateSettings(v: unknown): BookingSettings | string {
   const raw = s as unknown as Record<string, unknown>, text = (k: keyof BookingSettings, max: number) => typeof raw[k] === 'string' ? (raw[k] as string).trim().slice(0, max) : String(DEFAULT_SETTINGS[k]);
   const businessId = text('businessId', 12);
   if (businessId && !/^\d{8}$/.test(businessId)) return 'IČO musí mít 8 číslic.';
-  return {businessName: text('businessName', 80), businessOwner: text('businessOwner', 80), businessAddress: text('businessAddress', 160), businessId,
+  const businessPhone = text('businessPhone', 30), businessEmail = text('businessEmail', 120);
+  if (businessPhone && !/^\+?[\d ]{9,20}$/.test(businessPhone)) return 'Zkontrolujte telefon salonu (např. 777 123 456).';
+  if (businessEmail && !/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(businessEmail)) return 'Zkontrolujte e-mail salonu.';
+  return {businessName: text('businessName', 80), businessOwner: text('businessOwner', 80), businessAddress: text('businessAddress', 160), businessId, businessPhone, businessEmail,
+    programEnabled: raw.programEnabled === true, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0,
     hours, leadHours: lead, horizonDays: horizon, stepMinutes: step, depositFromKc: depositFrom, depositPercent: percent, depositHoldHours: hold, account, accountName, changeLimitHours: change};
 }
 

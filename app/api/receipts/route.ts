@@ -2,7 +2,7 @@
 // Salon není plátce DPH, účtenka proto obsahuje jen celkové částky bez daně.
 import {database, mailEnabled, notifyClient, publicOrigin} from '../../../db/raw';
 import {receiptMessage} from '../../../lib/receipt-message';
-import {parseSettings, salonNow} from '../../../lib/booking';
+import {parseSettings, salonName, salonNow} from '../../../lib/booking';
 import {parseRevenue} from '../../../lib/revenue';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       const email = field('email', 200);
       if (!/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(email)) return json({error: 'Zadejte platný e-mail klientky.'}, 400);
       if (!mailEnabled()) return json({error: 'Odesílání e-mailů není na serveru nastavené (SMTP v souboru .env.selfhost). Pošlete účtenku přes SMS nebo odkaz.'}, 409);
-      notifyClient(email, `Účtenka ${r.number} – ${s.businessName || 'Studio I AM'}`, receiptMessage(r, s, link));
+      notifyClient(email, `Účtenka ${r.number} – ${salonName(s)}`, receiptMessage(r, s, link));
       return json({ok: true, link});
     }
 

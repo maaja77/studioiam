@@ -11,9 +11,9 @@ import * as receiptsApi from '../../app/api/receipts/route';
 import * as statsApi from '../../app/api/stats/route';
 import * as records from '../../app/api/records/route';
 import * as photos from '../../app/api/photos/route';
-import {resetDemo} from './runtime';
+import {env, resetDemo} from './runtime';
 import {loginPage} from '../login-page';
-import {LOGO} from '../../app/logo';
+import {LOGO} from './studio-logo';
 import '../../app/globals.css';
 import './demo.css';
 
@@ -27,6 +27,8 @@ async function handle(url: URL, request: Request) {
   if (url.pathname === '/api/bookings') return m === 'GET' ? bookings.GET(request) : bookings.POST(request);
   if (url.pathname === '/api/receipts') return m === 'GET' ? receiptsApi.GET(request) : receiptsApi.POST(request);
   if (url.pathname === '/api/stats') return statsApi.GET(request);
+  if (url.pathname === '/api/demo-logo') { const o = await env.BUCKET.get('branding/logo'); return o ? new Response(o.body as BodyInit, {headers: {'Content-Type': 'image/png'}}) : new Response(null, {status: 404}); }
+  if (url.pathname === '/api/account') return Response.json({error: 'V ukázce se heslo nemění. Na serveru tu změníte heslo do administrace.'}, {status: 400});
   if (url.pathname === '/api/public') return m === 'GET' ? publicApi.GET(request) : publicApi.POST(request);
   if (url.pathname === '/api/photos') return m === 'GET' ? photos.GET(request) : m === 'POST' ? photos.POST(request) : photos.DELETE(request);
   return Response.json({error: 'Not found'}, {status: 404});
@@ -46,6 +48,8 @@ window.fetch = async (input, init) => {
 const blobs = new Map<string, string>();
 async function swap(img: HTMLImageElement) {
   const src = img.getAttribute('src') || '';
+  // Logo salonu vrací server na /logo.png; náhled server nemá, ukáže nahrané logo nebo logo Studia I AM.
+  if (src.startsWith('/logo.png')) { const r = await window.fetch('/api/demo-logo'); img.setAttribute('src', r.ok ? URL.createObjectURL(await r.blob()) : LOGO); return; }
   if (!src.startsWith('/api/photos?id=')) return;
   let blob = blobs.get(src);
   if (!blob) { const r = await window.fetch(src); if (!r.ok) return; blob = URL.createObjectURL(await r.blob()); blobs.set(src, blob); }
@@ -80,7 +84,7 @@ function DemoBar({view, setView}: {view: View; setView: (v: View) => void}) {
 
 // Přihlašovací stránku server posílá jako samostatné HTML; v náhledu ji ukážeme v rámu a přihlášení jen přepne na administraci.
 function DemoLogin({onLogin}: {onLogin: () => void}) {
-  const html = React.useMemo(() => loginPage({logo: LOGO, notice: 'Ukázka: zadejte cokoli a klikněte na Přihlásit se.'}), []);
+  const html = React.useMemo(() => loginPage({logo: LOGO, salon: 'STUDIO I AM', notice: 'Ukázka: zadejte cokoli a klikněte na Přihlásit se.'}), []);
   return <iframe className="demo-login" title="Přihlášení" srcDoc={html} onLoad={e => {
     const form = e.currentTarget.contentDocument?.querySelector('form');
     form?.addEventListener('submit', ev => { ev.preventDefault(); onLogin(); });

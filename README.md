@@ -61,8 +61,11 @@ Podrobný postup přechodu, kontroly po importu a zálohování: [docs/MIGRACE.m
 Administrace má vlastní přihlašovací stránku (`/prihlaseni`) v designu studia. Jméno je `SALON_USER`,
 heslo je to, ze kterého vznikl `SALON_PASSWORD_HASH` (ne samotný hash). Volba „Pamatovat si přihlášení“
 drží přihlášení 30 dní, bez ní do zavření prohlížeče (nejdéle 12 hodin). Tlačítko Odhlásit je v hlavičce.
-Po 10 chybných pokusech z jedné adresy se přihlášení na 15 minut zablokuje. Změna hesla
-(nový hash a `docker compose up -d`) odhlásí všechna zařízení.
+Po 10 chybných pokusech z jedné adresy se přihlášení na 15 minut zablokuje.
+
+Heslo si lze změnit přímo v aplikaci (Nastavení → Heslo do administrace); ostatní zařízení se odhlásí.
+Zapomenuté heslo obnoví správce serveru: nový hash do `SALON_PASSWORD_HASH` a `docker compose up -d`.
+Nový hash v `.env.selfhost` má vždy přednost před heslem změněným v aplikaci.
 
 ## Import zálohy do běžící instalace
 
@@ -86,6 +89,38 @@ Databáze se při spuštění sama doplní o nové tabulky. Po kontrole smažte 
 git pull
 docker compose up -d --build
 ```
+
+## Údaje salonu a profil instalace
+
+Název, adresa, telefon, IČO, e-mail, číslo účtu a logo se vyplňují v Nastavení → Údaje salonu.
+Dokud chybí název nebo číslo účtu, administrace na to upozorní (bez účtu se netvoří QR platby a kauce).
+
+`SALON_PROFILE` v `.env.selfhost` určuje, co je navíc:
+
+- `studioiam` – Studio I AM: logo studia, tlačítko „Vložit ceník z MyFoxu“, program Čistá pleť zapnutý
+  a při prvním spuštění se do prázdných polí doplní údaje studia (účet, adresa, telefon, IČO).
+- `generic` – jakýkoli další salon: prázdné údaje, neutrální logo, bez ceníku a programu (ten lze zapnout v Nastavení).
+
+Bez `SALON_PROFILE` se profil zvolí při prvním spuštění sám: instalace, která už má klientky, je Studio I AM,
+nová prázdná je `generic`. Volba se uloží do databáze.
+
+## Další salony (samostatná instalace pro každý salon)
+
+Každý salon má vlastní kontejner, databázi, fotky, heslo a adresu, takže se jeho data nemíchají s ostatními.
+Skripty počítají se složkou `/srv/salony` (změníte proměnnou `SALONY_DIR`) a s reverzní proxy s HTTPS,
+např. Caddy s doménou typu `*.mojesalony.cz`.
+
+```sh
+# jednou (a po každém git pull): sestaví obraz a aktualizuje všechny salony, předtím zálohuje jejich data
+sudo selfhost/salony/aktualizovat.sh
+
+# nový salon: vypíše přihlašovací jméno, heslo a řádky pro Caddyfile
+sudo selfhost/salony/novy-salon.sh lucie https://lucie.mojesalony.cz
+```
+
+Zálohy před aktualizací jsou v `/srv/salony/_zalohy/<salon>-<datum>.tar.gz` (posledních 10 na salon).
+Obnova: rozbalit do prázdné složky `data`, přejmenovat `zaloha.sqlite` na `salon.sqlite`, `chown -R 1000:1000 data`.
+Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potřeba ještě šifrovaná záloha mimo server.
 
 ## Online rezervace
 

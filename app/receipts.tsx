@@ -3,9 +3,9 @@ import {useEffect, useRef, useState} from 'react';
 import {Banknote, Check, Copy, CreditCard, Mail, MessageSquare, Plus, Printer, QrCode as QrIcon, Receipt as ReceiptIcon, Share2, Trash2, X} from 'lucide-react';
 import {formatRevenue, parseRevenue} from '../lib/revenue';
 import {czIban, formatIban, spdPayload} from '../lib/payment';
-import {DEFAULT_SETTINGS, salonNow, type BookingSettings} from '../lib/booking';
+import {DEFAULT_SETTINGS, salonName, salonNow, type BookingSettings} from '../lib/booking';
 import {QrCode} from './qr-payment';
-import {LOGO} from './logo';
+import {logoSrc} from './logo';
 
 export type ReceiptItem = {name: string; qty: number; unitCents: number; kind: 'service' | 'product' | 'other'};
 export type Receipt = {id: string; number: string; bookingId: string | null; clientId: string | null; clientName: string; issued: string; items: ReceiptItem[]; totalCents: number; prepaidCents: number; dueCents: number; method: string; paid: number; vs: string; status: string; note: string; discountCents?: number; discountLabel?: string};
@@ -31,8 +31,8 @@ export function ReceiptPaper({receipt, settings}: {receipt: Receipt; settings: B
     ? spdPayload({iban, amountCents: receipt.dueCents, vs: receipt.vs, message: 'Uctenka ' + receipt.number, recipient: settings.accountName}) : '';
   return <article className={'receipt-paper' + (receipt.status === 'cancelled' ? ' cancelled' : '')}>
     <header>
-      <img src={LOGO} alt="" width={64} height={64}/>
-      <b>{settings.businessName || 'Studio I AM'}</b>
+      <img src={logoSrc(settings.logoVersion)} alt="" width={64} height={64}/>
+      <b>{salonName(settings)}</b>
       {settings.businessOwner && <span>{settings.businessOwner}</span>}
       {settings.businessAddress && <span>{settings.businessAddress}</span>}
       {settings.businessId && <span>IČO {settings.businessId} · neplátce DPH</span>}

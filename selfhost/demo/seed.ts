@@ -105,7 +105,7 @@ export async function seedDemo(run: Run, put: Put) {
         ['rh-' + n, y, seq, `${y}/${String(seq).padStart(4, '0')}`, id, null, who, end, JSON.stringify(items), total, total, ['cash', 'card', 'qr'][k % 3], `${y}${String(seq).padStart(4, '0')}`, 'issued', '', discount, discount ? '10 %' : '', now]);
     }
   }
-  run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, account: '331122037/0300'})]);
+  run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, account: '331122037/0300', accountName: 'STUDIO I AM', businessName: 'STUDIO I AM', businessOwner: 'Andrea Marešová', businessAddress: 'Nerudova 884/11, 500 02 Hradec Králové', businessId: '73975052', businessPhone: '775 963 462', programEnabled: true})]);
 
   const photos: [string, string, string, string, number][] = [
     ['p-1', 'demo-1', day(-30), 'Před ošetřením', 18],

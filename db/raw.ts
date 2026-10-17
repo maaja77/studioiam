@@ -11,3 +11,5 @@ export function notifyClient(email:string,subject:string,text:string){if(/^[^\s@
 export const mailEnabled=()=>!!(env as {NOTIFY?:Notify}).NOTIFY;
 /** Adresa, na které klientky otevřou odkazy (veřejná adresa rezervací, jinak adresa aplikace). */
 export const publicOrigin=(fallback:string)=>(env as {PUBLIC_ORIGIN?:string}).PUBLIC_ORIGIN||fallback;
+/** Profil instalace: 'studioiam' (Studio I AM s vlastním ceníkem a logem) nebo 'generic' pro ostatní salony. */
+export const salonProfile=()=>(env as {PROFILE?:string}).PROFILE||'generic';

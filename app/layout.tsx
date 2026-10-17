@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Studio I AM · Kartotéka klientů",
-  description: "Soukromá kartotéka klientů kosmetického salonu Studio I AM. Kontakty, návštěvy a poznámky o ošetření.",
+  title: "Kartotéka klientů",
+  description: "Soukromá kartotéka klientů kosmetického salonu. Kontakty, návštěvy a poznámky o ošetření.",
   other: {
     "codex-preview": "development",
   },

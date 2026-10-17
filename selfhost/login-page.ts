@@ -1,15 +1,15 @@
 // Přihlašovací stránka administrace (čisté HTML bez Reactu, aby se načetla i bez přihlášení).
 const esc=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]!);
 
-export function loginPage({error='',name='',next='/',notice='',logo='/logo.png'}:{error?:string;name?:string;next?:string;notice?:string;logo?:string}){
- return `<!doctype html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Přihlášení · Studio I AM</title><link rel="icon" type="image/png" href="/logo.png"><link rel="apple-touch-icon" href="/logo.png"><style>
+export function loginPage({error='',name='',next='/',notice='',logo='/logo.png',salon='Salon'}:{error?:string;name?:string;next?:string;notice?:string;logo?:string;salon?:string}){
+ return `<!doctype html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Přihlášení · ${esc(salon)}</title><link rel="icon" href="${esc(logo)}"><link rel="apple-touch-icon" href="${esc(logo)}"><style>
 :root{--ink:#243638;--muted:#68787a;--teal:#126b66;--line:#e1e9e8;--gold:#b8955a}
 *{box-sizing:border-box}html,body{height:100%}
 body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:radial-gradient(circle at 15% 10%,#e3f0ed 0,transparent 45%),radial-gradient(circle at 90% 95%,#f3ebdc 0,transparent 40%),#f3f7f7;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
 main{width:100%;max-width:400px}
 .card{background:white;border:1px solid var(--line);border-radius:20px;box-shadow:0 18px 50px #1e4b4818;padding:40px 36px 32px}
 .brand{text-align:center;margin-bottom:28px}.brand img{width:92px;height:92px;object-fit:contain;display:block;margin:0 auto 14px}
-.brand b{display:block;font-family:Georgia,serif;font-weight:400;font-size:30px;letter-spacing:.5px}
+.brand b{display:block;font-family:Georgia,serif;font-weight:400;font-size:30px;letter-spacing:.5px;overflow-wrap:anywhere}
 .brand span{display:block;font-size:11px;letter-spacing:2.4px;color:var(--gold);margin-top:4px}
 h1{font-family:Georgia,serif;font-weight:400;font-size:20px;margin:0 0 20px;text-align:center;color:var(--muted)}
 label{display:block;font-size:14px;font-weight:600;margin-bottom:16px}
@@ -24,7 +24,7 @@ input:focus-visible,button:focus-visible{outline:3px solid #30a49b;outline-offse
 footer{text-align:center;color:var(--muted);font-size:12px;margin-top:20px;line-height:1.6}
 @media(max-width:420px){.card{padding:32px 22px 26px;border-radius:16px}.brand img{width:76px;height:76px}.brand b{font-size:26px}}
 </style></head><body><main><div class="card">
-<div class="brand"><img src="${esc(logo)}" alt=""><b>Studio I AM</b><span>ADMINISTRACE SALONU</span></div>
+<div class="brand"><img src="${esc(logo)}" alt=""><b>${esc(salon)}</b><span>ADMINISTRACE SALONU</span></div>
 <h1>Přihlášení</h1>
 ${error?`<p class="error" role="alert">${esc(error)}</p>`:''}${notice?`<p class="notice" role="status">${esc(notice)}</p>`:''}
 <form method="post" action="/prihlaseni" autocomplete="on">

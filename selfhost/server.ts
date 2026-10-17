@@ -1,8 +1,13 @@
-import http from 'node:http';import {readFileSync,existsSync,statSync} from 'node:fs';import path from 'node:path';import {createAuth,loginPage,loginBlocked,loginFailed,loginSucceeded,safeNext} from './auth';
-import * as records from '../app/api/records/route';import * as photos from '../app/api/photos/route';import * as bookings from '../app/api/bookings/route';import * as publicBooking from '../app/api/public/route';import * as receipts from '../app/api/receipts/route';import * as stats from '../app/api/stats/route';
+import http from 'node:http';import {readFileSync,existsSync,statSync} from 'node:fs';import path from 'node:path';import {createAuth,hashPassword,loginPage,loginBlocked,loginFailed,loginSucceeded,safeNext} from './auth';import {env,PROFILE,readSetting,writeSetting} from './runtime';import {parseSettings,salonName} from '../lib/booking';
+import * as records from '../app/api/records/route';import * as photos from '../app/api/photos/route';import * as bookings from '../app/api/bookings/route';import * as publicBooking from '../app/api/public/route';import * as receipts from '../app/api/receipts/route';import * as stats from '../app/api/stats/route';import {LOGO_KEY,imageType} from '../app/api/bookings/route';
 const user=process.env.SALON_USER,encoded=process.env.SALON_PASSWORD_HASH,origin=process.env.SALON_ORIGIN;
 if(!user||!encoded||!origin)throw Error('Set SALON_USER, SALON_PASSWORD_HASH and SALON_ORIGIN before starting.');
-const auth=createAuth(user,encoded,new URL(origin).protocol==='https:');
+// Heslo změněné v aplikaci má přednost před .env, dokud správce v .env nezadá nový hash (tím heslo obnoví).
+const secure=new URL(origin).protocol==='https:';
+function currentAuth(){try{const saved=JSON.parse(readSetting('auth')||'null') as {hash?:string;envHash?:string}|null;if(saved?.hash&&saved.envHash===encoded)return createAuth(user!,saved.hash,secure);if(saved)writeSetting('auth',null);}catch{writeSetting('auth',null);}return createAuth(user!,encoded!,secure);}
+let auth=currentAuth();
+const settings=()=>parseSettings(readSetting('booking'));
+const logoUrl=()=>{const v=settings().logoVersion;return '/logo.png'+(v?'?v='+v:'');};
 // Volitelně samostatná veřejná adresa rezervací (např. https://rezervace.studioiam.cz); na ní je jen rezervační stránka.
 const publicOrigin=process.env.SALON_PUBLIC_ORIGIN?new URL(process.env.SALON_PUBLIC_ORIGIN).origin:'';const publicHost=publicOrigin?new URL(publicOrigin).host:'';
 const webRoot=path.resolve('dist-selfhost/client');
@@ -20,13 +25,13 @@ const server=http.createServer(async(req,res)=>{try{
  const allowed=auth.valid(req.headers.cookie);
  if(!onPublicHost&&pathname==='/prihlaseni'){
   const query=new URL(req.url||'/','http://x').searchParams;
-  if(req.method==='GET'||req.method==='HEAD'){if(allowed){res.writeHead(303,{Location:safeNext(query.get('next'))});res.end();return;}html(200,loginPage({next:safeNext(query.get('next')),notice:query.has('odhlaseno')?'Byli jste odhlášeni.':''}));return;}
+  if(req.method==='GET'||req.method==='HEAD'){if(allowed){res.writeHead(303,{Location:safeNext(query.get('next'))});res.end();return;}html(200,loginPage({next:safeNext(query.get('next')),notice:query.has('odhlaseno')?'Byli jste odhlášeni.':'',salon:salonName(settings()),logo:logoUrl()}));return;}
   if(req.method!=='POST'){res.writeHead(405);res.end();return;}
   if(req.headers.origin&&req.headers.origin!==origin){res.writeHead(403);res.end();return;}
   let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>8192){res.writeHead(413);res.end();return;}}
   const form=new URLSearchParams(raw),name=(form.get('name')||'').trim(),next=safeNext(form.get('next'));
-  if(loginBlocked(clientIp)){html(429,loginPage({name,next,error:'Příliš mnoho neúspěšných pokusů. Zkuste to znovu za 15 minut.'}));return;}
-  if(!auth.check(name,form.get('password')||'')){loginFailed(clientIp);html(401,loginPage({name,next,error:'Jméno nebo heslo nesouhlasí. Zkontrolujte velká a malá písmena.'}));return;}
+  if(loginBlocked(clientIp)){html(429,loginPage({name,next,error:'Příliš mnoho neúspěšných pokusů. Zkuste to znovu za 15 minut.',salon:salonName(settings()),logo:logoUrl()}));return;}
+  if(!auth.check(name,form.get('password')||'')){loginFailed(clientIp);html(401,loginPage({name,next,error:'Jméno nebo heslo nesouhlasí. Zkontrolujte velká a malá písmena.',salon:salonName(settings()),logo:logoUrl()}));return;}
   loginSucceeded(clientIp);res.writeHead(303,{Location:next,'Set-Cookie':auth.issue(form.get('remember')==='1'),'Cache-Control':'no-store'});res.end();return;
  }
  if(!onPublicHost&&pathname==='/odhlaseni'&&req.method==='POST'){if(req.headers.origin&&req.headers.origin!==origin){res.writeHead(403);res.end();return;}res.writeHead(303,{Location:'/prihlaseni?odhlaseno','Set-Cookie':auth.clear(),'Cache-Control':'no-store'});res.end();return;}
@@ -35,6 +40,29 @@ const server=http.createServer(async(req,res)=>{try{
   const wanted=new URL(req.url||'/','http://x');res.writeHead(303,{Location:'/prihlaseni'+(wanted.pathname==='/'&&!wanted.search?'':'?next='+encodeURIComponent(wanted.pathname+wanted.search)),'Cache-Control':'no-store'});res.end();return;
  }
  const base=onPublicHost?publicOrigin:origin;const url=new URL(req.url||'/',base);if(url.origin!==new URL(base).origin){res.writeHead(400);res.end();return;}
+ // Logo salonu: nahrané v Nastavení, jinak logo Studia I AM (jen jeho instalace) nebo neutrální výchozí.
+ if(url.pathname==='/logo.png'&&(req.method==='GET'||req.method==='HEAD')){
+  const cache=url.searchParams.has('v')?'public, max-age=31536000, immutable':'public, max-age=300';
+  const custom=settings().logoVersion?await env.BUCKET.get(LOGO_KEY):null;const type=custom?imageType(custom.body):'';
+  if(custom&&type){res.writeHead(200,{'Content-Type':type,'Cache-Control':cache,'X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:Buffer.from(custom.body));return;}
+  const fallback=PROFILE==='studioiam'?'logo-studioiam.png':'logo-default.svg';
+  res.writeHead(200,{'Content-Type':types[path.extname(fallback)],'Cache-Control':cache,'X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:readFileSync(path.join(webRoot,fallback)));return;
+ }
+ // Změna hesla přihlášenou uživatelkou: ověří současné heslo, ostatní zařízení se odhlásí (klíč session se odvozuje z hesla).
+ if(url.pathname==='/api/account'){
+  const reply=(status:number,data:unknown,extra:Record<string,string>={})=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store',...extra});res.end(JSON.stringify(data));};
+  if(req.method!=='POST'){reply(405,{error:'Nepovolená operace.'});return;}
+  if(req.headers.origin&&req.headers.origin!==origin){reply(403,{error:'Nepovolený požadavek.'});return;}
+  if(loginBlocked(clientIp)){reply(429,{error:'Příliš mnoho neúspěšných pokusů. Zkuste to znovu za 15 minut.'});return;}
+  let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>4096){reply(413,{error:'Požadavek je příliš dlouhý.'});return;}}
+  let body:{current?:unknown;password?:unknown}={};try{body=JSON.parse(raw);}catch{reply(400,{error:'Neplatný požadavek.'});return;}
+  const current=typeof body.current==='string'?body.current:'',password=typeof body.password==='string'?body.password:'';
+  if(!auth.check(user,current)){loginFailed(clientIp);reply(400,{error:'Současné heslo nesouhlasí.'});return;}
+  if(password.length<12||password.length>200){reply(400,{error:'Nové heslo musí mít 12 až 200 znaků.'});return;}
+  if(password===current){reply(400,{error:'Nové heslo je stejné jako současné.'});return;}
+  const remember=auth.remembered(req.headers.cookie);writeSetting('auth',JSON.stringify({hash:hashPassword(password),envHash:encoded}));auth=currentAuth();
+  reply(200,{ok:true},{'Set-Cookie':auth.issue(remember)});return;
+ }
  if(url.pathname==='/api/public'&&req.method==='POST'){if(rateLimited(clientIp)){res.writeHead(429,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Příliš mnoho pokusů. Zkuste to prosím později nebo nám zavolejte.'}));return;}}
  if(url.pathname.startsWith('/api/')){
   const headers=new Headers();for(const [k,v] of Object.entries(req.headers)){if(v)headers.set(k,Array.isArray(v)?v.join(','):v);}

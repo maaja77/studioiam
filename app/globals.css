@@ -265,3 +265,16 @@ dialog[open]{margin:auto}
 .month-chart{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:2px;height:220px;align-items:stretch;padding-top:8px}.month-col{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:6px;background:transparent;padding:0 2px;border-radius:6px;min-width:0}.month-col:hover{background:#f2f7f6}.month-bar-wrap{flex:1;display:flex;align-items:flex-end;border-bottom:1px solid var(--line)}.month-bar{display:block;width:100%;max-width:44px;margin:0 auto;background:#7fb5b0;border-radius:4px 4px 0 0;min-height:0}.month-col.selected .month-bar,.month-col:hover .month-bar{background:var(--teal)}.month-col.future .month-bar{background:#dbe7e5}.month-label{font-size:12px;color:var(--muted);text-align:center}.month-col.selected .month-label{color:var(--ink);font-weight:700}.month-tip{position:absolute;bottom:calc(100% - 40px);left:50%;transform:translateX(-50%);background:var(--ink);color:white;border-radius:8px;padding:6px 10px;font-size:12px;white-space:nowrap;z-index:2;display:flex;flex-direction:column;align-items:center;pointer-events:none}.month-tip b{text-transform:capitalize}.month-tip small{opacity:.8}.stats-table-view{margin-top:12px;font-size:14px}.stats-table-view summary{cursor:pointer;color:var(--teal)}
 @media(max-width:900px){.stat-tiles{grid-template-columns:1fr 1fr}.stat-tile.main{grid-column:1/-1}}@media(max-width:520px){.stat-tile strong{font-size:22px}.stat-tile.main strong{font-size:28px}.bar-cell{display:none}.month-chart{height:180px}.month-label{font-size:10px}.stats-table td{padding:8px 4px}}
 @media(max-width:720px){.main-nav{overflow-x:auto;scrollbar-width:none}.main-nav button{flex:1 0 auto;padding:8px 8px;font-size:13px}.stats-panel{padding-left:14px;padding-right:14px}}
+
+/* Nastavení salonu: upozornění na chybějící údaje, logo a heslo */
+.setup-hint{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#fdf6e8;border:1px solid #efdcb4;color:#7a5418;border-radius:10px;padding:10px 14px;margin:0 0 20px;font-size:14px}
+.setup-hint.inline{display:block;margin:12px 0}
+.logo-picker{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:14px 0 18px}
+.logo-picker img{width:64px;height:64px;object-fit:contain;border-radius:50%;background:#f7f9f9;border:1px solid var(--line)}
+.logo-picker label{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.logo-picker label.disabled{opacity:.55;cursor:wait}
+.logo-picker input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.logo-picker label:focus-within{outline:3px solid #30a49b;outline-offset:3px}
+.logo-picker small{flex-basis:100%}
+.password-form{display:flex;flex-direction:column;gap:14px;max-width:640px}
+@media(max-width:640px){.password-form .field-grid{grid-template-columns:1fr}}
