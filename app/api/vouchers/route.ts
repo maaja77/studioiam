@@ -1,13 +1,32 @@
-// API dárkových poukazů: prodej (s účtenkou), přehled s hlídáním platnosti, čerpání, prodloužení a storno.
-import {database, mailEnabled, salonMailer} from '../../../db/raw';
-import {addDays, isDate, parseSettings, salonNow} from '../../../lib/booking';
+// API dárkových poukazů: prodej (s účtenkou), objednávky z webu, přehled s hlídáním platnosti, čerpání, prodloužení a storno.
+import {database, mailEnabled, notifyClient, publicOrigin, salonMailer} from '../../../db/raw';
+import {addDays, isDate, parseSettings, salonName, salonNow} from '../../../lib/booking';
 import {formatRevenue} from '../../../lib/revenue';
 import {parseRevenue} from '../../../lib/revenue';
 import {addMonths, daysLeft, EXPIRING_DAYS, normalizeCode, voucherCode, type Voucher} from '../../../lib/vouchers';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
-export const VOUCHER_COLUMNS = 'id,code,kind,service_name AS serviceName,value_cents AS valueCents,balance_cents AS balanceCents,buyer_name AS buyerName,buyer_contact AS buyerContact,recipient_name AS recipientName,note,issued,valid_until AS validUntil,status,receipt_id AS receiptId';
+export const VOUCHER_COLUMNS = 'id,code,kind,service_name AS serviceName,value_cents AS valueCents,balance_cents AS balanceCents,buyer_name AS buyerName,buyer_contact AS buyerContact,recipient_name AS recipientName,note,issued,valid_until AS validUntil,status,receipt_id AS receiptId,source,buyer_email AS buyerEmail,delivery,vs,pay_due AS payDue';
 const METHODS = ['cash', 'card', 'qr'];
+type DB = ReturnType<typeof database>;
+
+/** Nový jedinečný kód poukazu. */
+export async function uniqueVoucherCode(db: DB) {
+  for (let i = 0; i < 10; i++) { const c = voucherCode(); if (!await db.prepare('SELECT 1 FROM vouchers WHERE code=?').bind(c).first()) return c; }
+  throw new Error('Kód poukazu se nepodařilo vytvořit.');
+}
+
+/** Účtenka za prodej poukazu, aby se započítal do tržeb (QR platba zůstane nezaplacená, dokud ji salon nepotvrdí). */
+async function saleReceipt(db: DB, v: {id: string; code: string; serviceName: string; valueCents: number; buyerName: string}, method: string, paid: boolean) {
+  const issued = salonNow(), year = Number(issued.slice(0, 4));
+  const last = await db.prepare('SELECT max(seq) AS seq FROM receipts WHERE year=?').bind(year).first<{seq: number | null}>();
+  const seq = (last?.seq || 0) + 1, number = `${year}/${String(seq).padStart(4, '0')}`, vs = `${year}${String(seq).padStart(4, '0')}`, receiptId = crypto.randomUUID();
+  const items = [{name: `Dárkový poukaz ${v.code}${v.serviceName ? ' – ' + v.serviceName : ''}`, qty: 1, unitCents: v.valueCents, kind: 'voucher'}];
+  return {receiptId, statements: [
+    db.prepare('INSERT INTO receipts (id,year,seq,number,booking_id,client_id,client_name,issued,items,total_cents,prepaid_cents,due_cents,method,paid,vs,status,note,discount_cents,discount_label,token,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(receiptId, year, seq, number, null, null, v.buyerName, issued, JSON.stringify(items), v.valueCents, 0, v.valueCents, method, paid ? 1 : 0, vs, 'issued', '', 0, '', crypto.randomUUID(), new Date().toISOString()),
+    db.prepare('UPDATE vouchers SET receipt_id=? WHERE id=?').bind(receiptId, v.id)]};
+}
 
 export async function GET(request: Request) {
   try {
@@ -46,8 +65,7 @@ export async function POST(request: Request) {
       if (value === undefined || value === null || value <= 0 || value > 10000000) return json({error: 'Zadejte hodnotu poukazu v Kč, například 1500.'}, 400);
       const validUntil = field('validUntil', 10);
       if (!isDate(validUntil) || validUntil < today || validUntil > addMonths(today, 120)) return json({error: 'Zkontrolujte datum platnosti (nejdřív dnes).'}, 400);
-      let code = '';
-      for (let i = 0; i < 10 && !code; i++) { const c = voucherCode(); if (!await db.prepare('SELECT 1 FROM vouchers WHERE code=?').bind(c).first()) code = c; }
+      const code = await uniqueVoucherCode(db);
       const id = crypto.randomUUID(), now = new Date().toISOString();
       const statements = [db.prepare('INSERT INTO vouchers (id,code,kind,service_name,value_cents,balance_cents,buyer_name,buyer_contact,recipient_name,note,issued,valid_until,status,receipt_id,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
         .bind(id, code, kind, serviceName, value, value, field('buyerName', 120), field('buyerContact', 120), field('recipientName', 120), field('note', 500), today, validUntil, 'active', null, now)];
@@ -55,14 +73,8 @@ export async function POST(request: Request) {
       let receiptId: string | null = null;
       if (d.receipt !== false) {
         const method = METHODS.includes(field('method')) ? field('method') : 'cash';
-        const issued = salonNow(), year = Number(issued.slice(0, 4));
-        const last = await db.prepare('SELECT max(seq) AS seq FROM receipts WHERE year=?').bind(year).first<{seq: number | null}>();
-        const seq = (last?.seq || 0) + 1, number = `${year}/${String(seq).padStart(4, '0')}`, vs = `${year}${String(seq).padStart(4, '0')}`;
-        receiptId = crypto.randomUUID();
-        const items = [{name: `Dárkový poukaz ${code}${serviceName ? ' – ' + serviceName : ''}`, qty: 1, unitCents: value, kind: 'voucher'}];
-        statements.push(db.prepare('INSERT INTO receipts (id,year,seq,number,booking_id,client_id,client_name,issued,items,total_cents,prepaid_cents,due_cents,method,paid,vs,status,note,discount_cents,discount_label,token,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-          .bind(receiptId, year, seq, number, null, null, field('buyerName', 120), issued, JSON.stringify(items), value, 0, value, method, method === 'qr' ? 0 : 1, vs, 'issued', '', 0, '', crypto.randomUUID(), now));
-        statements.push(db.prepare('UPDATE vouchers SET receipt_id=? WHERE id=?').bind(receiptId, id));
+        const sale = await saleReceipt(db, {id, code, serviceName, valueCents: value, buyerName: field('buyerName', 120)}, method, method !== 'qr');
+        receiptId = sale.receiptId; statements.push(...sale.statements);
       }
       await db.batch(statements);
       return json({ok: true, id, code, receiptId});
@@ -72,11 +84,32 @@ export async function POST(request: Request) {
     const v = await db.prepare(`SELECT ${VOUCHER_COLUMNS} FROM vouchers WHERE id=?`).bind(id).first<Voucher>();
     if (!v) return json({error: 'Poukaz nebyl nalezen.'}, 404);
 
+    // Platba za poukaz objednaný na webu dorazila: poukaz začne platit ode dneška, vznikne účtenka a kupující dostane odkaz.
+    if (body.action === 'paid') {
+      if (v.status !== 'pending') return json({error: 'Poukaz už není objednávka čekající na platbu.'}, 409);
+      const settings = parseSettings((await db.prepare("SELECT value FROM settings WHERE key='booking'").first<{value: string}>())?.value);
+      const validUntil = addMonths(today, settings.voucherMonths);
+      const sale = await saleReceipt(db, v, 'qr', true);
+      await db.batch([db.prepare("UPDATE vouchers SET status='active',issued=?,valid_until=?,reminder_stage=0 WHERE id=? AND status='pending'").bind(today, validUntil, id), ...sale.statements]);
+      if (v.buyerEmail) {
+        const token = (await db.prepare('SELECT token FROM vouchers WHERE id=?').bind(id).first<{token: string | null}>())?.token;
+        const link = token ? `${publicOrigin(new URL(request.url).origin)}/poukaz?t=${token}` : '';
+        notifyClient(v.buyerEmail, `Dárkový poukaz – ${salonName(settings)}`, [
+          'Dobrý den,', '', `děkujeme, platba dorazila. Dárkový poukaz ${v.kind === 'service' ? 'na ošetření ' + v.serviceName : 'v hodnotě ' + formatRevenue(v.valueCents)} je platný do ${dateText(validUntil)}.`,
+          link ? `Poukaz si můžete zobrazit, vytisknout nebo uložit jako PDF zde: ${link}` : '',
+          v.delivery === 'pickup' ? 'Tištěný poukaz pro vás připravíme v salonu.' : '', '',
+          `Kód poukazu: ${v.code}. Při objednání stačí nahlásit kód nebo poukaz přinést s sebou.`,
+          settings.businessPhone ? `Objednat se lze na tel. ${settings.businessPhone}.` : '', '', `Děkujeme, ${salonName(settings)}`,
+        ].join('\n').replace(/\n{3,}/g, '\n\n'));
+      }
+      return json({ok: true, receiptId: sale.receiptId});
+    }
     if (body.action === 'update') {
       await db.prepare('UPDATE vouchers SET buyer_name=?,buyer_contact=?,recipient_name=?,note=? WHERE id=?').bind(field('buyerName', 120), field('buyerContact', 120), field('recipientName', 120), field('note', 500), id).run();
       return json({ok: true});
     }
     if (body.action === 'extend') {
+      if (v.status === 'pending') return json({error: 'Poukaz ještě není zaplacený, platnost se nastaví při potvrzení platby.'}, 409);
       const validUntil = field('validUntil', 10);
       if (!isDate(validUntil) || validUntil > addMonths(today, 120)) return json({error: 'Zadejte nové datum platnosti.'}, 400);
       await db.prepare('UPDATE vouchers SET valid_until=?,reminder_stage=0,note=ltrim(note||char(10)||?,char(10)) WHERE id=?').bind(validUntil, `Platnost změněna ${today} z ${v.validUntil} na ${validUntil}.`, id).run();
@@ -84,7 +117,7 @@ export async function POST(request: Request) {
     }
     // Ruční čerpání, např. poukaz uplatněný mimo účtenku nebo ve starém systému.
     if (body.action === 'use') {
-      if (v.status !== 'active') return json({error: 'Poukaz je stornovaný.'}, 409);
+      if (v.status !== 'active') return json({error: v.status === 'pending' ? 'Poukaz ještě není zaplacený.' : 'Poukaz je stornovaný.'}, 409);
       const amount = v.kind === 'service' ? v.balanceCents : money('amount');
       if (!amount || amount <= 0 || amount > v.balanceCents) return json({error: `Částka musí být 1 až ${v.balanceCents / 100} Kč (zůstatek poukazu).`}, 400);
       await db.batch([
@@ -95,6 +128,7 @@ export async function POST(request: Request) {
     }
     if (body.action === 'cancel') {
       if (v.status === 'cancelled') return json({error: 'Poukaz už je stornovaný.'}, 409);
+      if (v.status === 'pending') { await db.prepare("UPDATE vouchers SET status='cancelled',note=ltrim(note||char(10)||?,char(10)) WHERE id=?").bind(`Objednávka zrušena ${today}, platba nedorazila.`, id).run(); return json({ok: true}); }
       if (v.balanceCents < v.valueCents) return json({error: 'Poukaz už byl čerpán, stornovat ho nejde. Případně zapište čerpání zbytku.'}, 409);
       const statements = [db.prepare("UPDATE vouchers SET status='cancelled' WHERE id=?").bind(id)];
       // Storno prodaného poukazu stornuje i jeho účtenku, aby nezůstala v tržbách.

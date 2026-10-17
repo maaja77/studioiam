@@ -35,6 +35,8 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
   const [services, setServices] = useState<Service[]>([]), [settings, setSettings] = useState<BookingSettings>(DEFAULT_SETTINGS);
   const [editing, setEditing] = useState<Partial<Service> | null>(null), [features, setFeatures] = useState<{studioPriceList: boolean; sms?: string; calendarUrl?: string}>({studioPriceList: false});
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [copied, setCopied] = useState(false);
+  const shopUrl = bookingUrl.replace(/\/rezervace$/, '/poukaz'), [shopCopied, setShopCopied] = useState(false);
+  const shopEmbed = `<iframe src="${shopUrl}" title="Dárkový poukaz – ${salonName(settings).replace(/"/g, '')}" style="width:100%;min-height:1100px;border:0" loading="lazy"></iframe>`;
   const embed = `<iframe src="${bookingUrl}" title="Rezervace – ${salonName(settings).replace(/"/g, '')}" style="width:100%;min-height:900px;border:0" loading="lazy"></iframe>`;
 
   async function load() {
@@ -92,6 +94,7 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
         <label className="field"><span>Nejdál dopředu (dní)</span><input type="number" min={1} max={365} value={settings.horizonDays} onChange={e => setSettings({...settings, horizonDays: Number(e.target.value)})}/></label>
         <label className="field"><span>Nabízet časy po</span><select value={settings.stepMinutes} onChange={e => setSettings({...settings, stepMinutes: Number(e.target.value)})}><option value={15}>15 minutách</option><option value={30}>30 minutách</option><option value={60}>hodině</option></select></label>
       </div>
+      <label className="check"><input type="checkbox" checked={settings.intakeOnline} onChange={e => setSettings({...settings, intakeOnline: e.target.checked})}/> Po online rezervaci poslat nové klientce vstupní dotazník a souhlas se zpracováním údajů</label>
       <label className="field narrow"><span>Klientka může zrušit nebo přesunout termín nejpozději (hodin předem)</span><input type="number" min={0} max={336} value={settings.changeLimitHours} onChange={e => setSettings({...settings, changeLimitHours: Number(e.target.value)})}/></label>
       <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Nastavení bylo uloženo.')}>Uložit otevírací dobu</button></div>
     </section>
@@ -110,8 +113,28 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
         <label className="field"><span>Příjemce</span><input value={settings.accountName} maxLength={60} onChange={e => setSettings({...settings, accountName: e.target.value})}/></label>
       </div>
       <p className="muted-inline">Na tento účet chodí kauce, platby předem za balíčky a QR platby z účtenek.</p>
-      <label className="field narrow"><span>Dárkové poukazy platí (měsíců od prodeje)</span><input type="number" min={1} max={60} value={settings.voucherMonths} onChange={e => setSettings({...settings, voucherMonths: Number(e.target.value)})}/></label>
       <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Nastavení kauce bylo uloženo.')}>Uložit kauce a platby</button></div>
+    </section>
+
+    <section className="panel">
+      <div className="panel-heading"><h2>Dárkové poukazy</h2></div>
+      <label className="field narrow"><span>Poukazy platí (měsíců od prodeje)</span><input type="number" min={1} max={60} value={settings.voucherMonths} onChange={e => setSettings({...settings, voucherMonths: Number(e.target.value)})}/></label>
+      <label className="check"><input type="checkbox" checked={settings.voucherOnline} onChange={e => setSettings({...settings, voucherOnline: e.target.checked})}/> Prodávat poukazy na webu</label>
+      {settings.voucherOnline && <>
+        <p className="muted-inline">Kupující vybere poukaz a zaplatí QR platbou na účet salonu. Když peníze dorazí, potvrdíte platbu v části Poukazy a kupující dostane poukaz e-mailem k vytištění. Platnost se počítá od zaplacení.</p>
+        {!czIban(settings.account) && <p className="setup-hint inline" role="note">Nejdřív vyplňte číslo účtu v části Kauce a platby, bez něj se poukazy na webu prodávat nedají.</p>}
+        <div className="field-grid">
+          <label className="field"><span>Nabízené částky (Kč, oddělte čárkou)</span><input value={settings.voucherAmounts} placeholder="1000, 1500, 2000" maxLength={120} onChange={e => setSettings({...settings, voucherAmounts: e.target.value})}/></label>
+          <label className="field"><span>Vlastní částka nejméně (Kč, 0 = nejde)</span><input type="number" min={0} step={100} value={settings.voucherMinKc} onChange={e => setSettings({...settings, voucherMinKc: Number(e.target.value)})}/></label>
+        </div>
+        <label className="check"><input type="checkbox" checked={settings.voucherServices} onChange={e => setSettings({...settings, voucherServices: e.target.checked})}/> Nabízet i poukazy na ošetření (všechna ošetření s cenou, která nabízíte online)</label>
+      </>}
+      <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Nastavení poukazů bylo uloženo.')}>Uložit poukazy</button></div>
+      {settings.voucherOnline && <>
+        <p>Stránka pro nákup poukazů má adresu <b>{shopUrl}</b>. Na webu na ni může vést tlačítko „Darovat poukaz“, nebo ji vložte blokem <b>Vlastní HTML</b>:</p>
+        <pre className="embed-code">{shopEmbed}</pre>
+        <div className="form-actions"><a className="secondary" href={shopUrl} target="_blank" rel="noreferrer">Otevřít stránku poukazů</a><button className="secondary" onClick={() => navigator.clipboard.writeText(shopEmbed).then(() => setShopCopied(true), () => setShopCopied(false))}><Copy size={16}/> {shopCopied ? 'Zkopírováno' : 'Zkopírovat kód'}</button></div>
+      </>}
     </section>
 
     <section className="panel">

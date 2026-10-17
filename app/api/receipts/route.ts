@@ -125,6 +125,7 @@ export async function POST(request: Request) {
     if (voucher) {
       const state = voucherState(voucher, salonNow().slice(0, 10));
       if (state === 'cancelled') return json({error: `Poukaz ${voucher.code} je stornovaný.`}, 409);
+      if (state === 'pending') return json({error: `Poukaz ${voucher.code} ještě není zaplacený. Platbu potvrdíte v části Poukazy.`}, 409);
       if (state === 'used') return json({error: `Poukaz ${voucher.code} je už vyčerpaný.`}, 409);
       if (state === 'expired') return json({error: `Platnost poukazu ${voucher.code} skončila ${voucher.validUntil.split('-').reverse().map(Number).join('. ')}. Platnost můžete prodloužit v části Poukazy.`}, 409);
     }

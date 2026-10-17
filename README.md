@@ -191,6 +191,20 @@ Brána se nastaví v `.env.selfhost` a pak `docker compose up -d`:
 
 Po spuštění je v logu `SMS připomínky přes: …`. Chyby odeslání (např. došlý kredit) jsou v `docker compose logs salon`.
 
+## Vstupní dotazník a souhlas (GDPR)
+
+Před první návštěvou vyplní klientka zdravotní dotazník (alergie, léky, těhotenství, kožní a další onemocnění,
+nedávné zákroky…), souhlas se zpracováním osobních údajů a údajů o zdraví, volitelně souhlas s fotografiemi, a podepíše se prstem.
+
+- Nová klientka dostane odkaz `/dotaznik?t=…` hned po online rezervaci (na potvrzovací stránce i v e-mailu). Vypnout jde
+  v Nastavení → Otevírací doba a pravidla. Po vyplnění se karta klientky založí sama (nebo se spáruje podle telefonu).
+- Stávajícím klientkám se dotazník připraví na kartě: odkaz SMS, e-mailem, nebo „Vyplnit teď v salonu“ na tabletu či telefonu.
+- Na kartě jsou odpovědi „ano“ jako upozornění, souhlas s fotkami, podpis a uložený text souhlasu (pozdější změna textu
+  vyplněné dotazníky nemění). V detailu rezervace je vidět, jestli je dotazník vyplněný.
+- „Klientka odvolala souhlas“ smaže odpovědi o zdraví; jméno, podpis a text souhlasu zůstanou jako doklad.
+- Text souhlasu se skládá z údajů salonu (název, provozovatel, IČO, adresa) v `lib/intake.ts`. Uvádí uchování po dobu
+  návštěv a nejdéle 3 roky od poslední; staré karty je potřeba mazat ručně. Text je vhodné nechat zkontrolovat.
+
 ## Kalendář v telefonu
 
 V Nastavení → Kalendář v telefonu se zapne tajný odkaz `/kalendar/<kód>.ics`. Telefon ho odebírá jako kalendář
@@ -216,10 +230,20 @@ calendar.google.com → Další kalendáře → Z adresy URL) a změny si stahuj
 
 Záložka Poukazy: prodej poukazu na částku nebo na ošetření (s účtenkou, takže se započítá do tržeb v den prodeje),
 přehled s hlídáním platnosti (upozornění a odznak u záložky, když poukaz vyprší do 30 dnů), tisk poukazu (A6, PDF),
-ruční čerpání, prodloužení platnosti a storno. Výchozí platnost (6 měsíců) se mění v Nastavení → Kauce a platby.
+ruční čerpání, prodloužení platnosti a storno. Výchozí platnost (6 měsíců) se mění v Nastavení → Dárkové poukazy.
 Když je nastavený e-mail (SMTP a `SALON_NOTIFY_EMAIL`), server jednou denně po 8. hodině pošle salonu souhrn poukazů,
 kterým za 30 a znovu za 7 dní končí platnost (kupujícím se nic neposílá).
 Poukaz se uplatní na účtence zadáním kódu; uhrazená část se do tržeb znovu nepočítá a storno účtenky ji vrátí na poukaz.
+
+### Prodej poukazů na webu
+
+Zapíná se v Nastavení → Dárkové poukazy (potřebuje číslo účtu salonu). Stránka `/poukaz` (na veřejné adrese
+`SALON_PUBLIC_ORIGIN`, jde vložit do WordPressu přes iframe stejně jako rezervace) nabídne nastavené částky, vlastní
+částku od zvoleného minima a poukazy na ošetření s cenou. Kupující vyplní jméno a e-mail a zaplatí QR platbou
+(variabilní symbol začíná 9, splatnost 5 dní). Objednávka čeká v části Poukazy jako „Čeká na platbu“ a kód poukazu
+se kupujícímu neukáže, ani ho nejde uplatnit. Když peníze dorazí, salon klikne na Platba přišla: poukaz začne platit
+ode dneška, vznikne účtenka (QR, zaplaceno) a kupující dostane e-mailem odkaz na poukaz k vytištění nebo uložení do PDF.
+Nezaplacenou objednávku salon zruší tlačítkem Zrušit objednávku.
 
 ## Náhled s ukázkovými daty
 

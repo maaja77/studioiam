@@ -70,7 +70,7 @@ function ReceiptForm({draft, products, clients, busy, onSubmit, onCancel}: {draf
   const discountLabel = discountCents ? (discountKind === '%' ? `${discountNumber.toLocaleString('cs-CZ')} %` : '') : '';
   const total = subtotal - discountCents, prepaid = Math.min(draft.prepaidCents || 0, total);
   const [voucherInput, setVoucherInput] = useState(''), [voucher, setVoucher] = useState<{v: Voucher; today: string} | null>(null), [voucherError, setVoucherError] = useState('');
-  const voucherProblem = voucher ? ({cancelled: 'je stornovaný', used: 'je už vyčerpaný', expired: `prošel ${dateText(voucher.v.validUntil)}`} as Record<string, string>)[voucherState(voucher.v, voucher.today)] : '';
+  const voucherProblem = voucher ? ({pending: 'ještě není zaplacený', cancelled: 'je stornovaný', used: 'je už vyčerpaný', expired: `prošel ${dateText(voucher.v.validUntil)}`} as Record<string, string>)[voucherState(voucher.v, voucher.today)] : '';
   const covered = voucher && !voucherProblem ? voucherCover(voucher.v, items.map((x, i) => ({name: x.name, qty: x.qty, unitCents: priced[i] || 0})), total - prepaid) : 0;
   async function findVoucher() {
     setVoucherError(''); setVoucher(null);

@@ -18,7 +18,7 @@ export default function PublicBooking() {
   const [services, setServices] = useState<Service[] | null>(null), [horizon, setHorizon] = useState(60), [salon, setSalon] = useState<Salon | null>(null);
   const [service, setService] = useState<Service | null>(null), [reload, setReload] = useState(0);
   const [date, setDate] = useState(''), [time, setTime] = useState(''), [query, setQuery] = useState('');
-  const [error, setError] = useState(''), [busy, setBusy] = useState(false), [done, setDone] = useState<{start: string; service: string; deposit?: DepositInfo | null; token?: string} | null>(null);
+  const [error, setError] = useState(''), [busy, setBusy] = useState(false), [done, setDone] = useState<{start: string; service: string; deposit?: DepositInfo | null; token?: string; intake?: string} | null>(null);
   const [token, setToken] = useState(() => typeof location === 'undefined' ? '' : new URLSearchParams(location.search).get('t') || '');
 
   useEffect(() => { fetch('/api/public', {cache: 'no-store'}).then(r => r.json() as Promise<{services?: Service[]; horizonDays?: number; salon?: Salon; error?: string}>).then(d => { if (!d.services) throw new Error(d.error); setServices(d.services); setHorizon(d.horizonDays || 60); if (d.salon) { setSalon(d.salon); document.title = 'Rezervace · ' + d.salon.name; } }).catch(() => setError('Rezervace se nepodařilo načíst. Zkuste to prosím později.')); }, []);
@@ -28,9 +28,9 @@ export default function PublicBooking() {
     const f = Object.fromEntries(new FormData(e.currentTarget));
     try {
       const r = await fetch('/api/public', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({...f, consent: f.consent === 'on', serviceId: service.id, date, time})});
-      const d = await r.json() as {error?: string; start?: string; service?: string; deposit?: DepositInfo | null; token?: string};
+      const d = await r.json() as {error?: string; start?: string; service?: string; deposit?: DepositInfo | null; token?: string; intake?: string};
       if (!r.ok) { if (r.status === 409) { setTime(''); setReload(n => n + 1); } throw new Error(d.error); }
-      setDone({start: d.start || `${date}T${time}`, service: d.service || service.name, deposit: d.deposit, token: d.token});
+      setDone({start: d.start || `${date}T${time}`, service: d.service || service.name, deposit: d.deposit, token: d.token, intake: d.intake});
     } catch (err) { setError((err as Error).message || 'Rezervaci se nepodařilo odeslat.'); } finally { setBusy(false); }
   }
 
@@ -57,7 +57,8 @@ export default function PublicBooking() {
           <PaymentDetails deposit={done.deposit}/>
         </> : <p className="pb-muted">Těšíme se na vás.</p>}
         {done.token && <p className="pb-muted">Termín můžete sama zrušit nebo přesunout přes odkaz níže (pokud jste vyplnila e-mail, pošleme vám ho i tam).</p>}
-        <div className="pb-actions">{done.token && <button className="primary" onClick={() => openManage(done.token!)}>Zrušit nebo změnit termín</button>}
+        {done.intake && <div className="pb-intake"><p><b>Před první návštěvou prosím vyplňte krátký zdravotní dotazník.</b> Zabere asi 3 minuty a ošetření pak bude bezpečné a rychlejší.</p><a className="primary" href={done.intake}>Vyplnit dotazník</a></div>}
+        <div className="pb-actions">{done.token && <button className={done.intake ? 'secondary' : 'primary'} onClick={() => openManage(done.token!)}>Zrušit nebo změnit termín</button>}
         <button className="secondary" onClick={() => { setDone(null); setService(null); setDate(''); setTime(''); }}>Rezervovat další termín</button></div></section>
       : <>
         <ol className="pb-steps" aria-label="Postup rezervace"><li className={!service ? 'active' : 'done'}>Ošetření</li><li className={service && !time ? 'active' : time ? 'done' : ''}>Termín</li><li className={time ? 'active' : ''}>Kontakt</li></ol>
