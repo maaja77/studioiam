@@ -9,7 +9,7 @@ import {VOUCHER_COLUMNS} from '../vouchers/route';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
 export const METHODS = ['cash', 'card', 'qr'];
-export type ReceiptItem = {name: string; qty: number; unitCents: number; kind: 'service' | 'product' | 'voucher' | 'other'};
+export type ReceiptItem = {name: string; qty: number; unitCents: number; kind: 'service' | 'product' | 'voucher' | 'other'; productId?: string};
 const RECEIPT_COLUMNS = 'id,number,booking_id AS bookingId,client_id AS clientId,client_name AS clientName,issued,items,total_cents AS totalCents,prepaid_cents AS prepaidCents,due_cents AS dueCents,method,paid,vs,status,note,discount_cents AS discountCents,discount_label AS discountLabel,voucher_cents AS voucherCents,(SELECT code FROM vouchers WHERE vouchers.id=receipts.voucher_id) AS voucherCode';
 type Row = Record<string, unknown> & {items: string};
 const decode = (r: Row) => ({...r, items: JSON.parse(r.items) as ReceiptItem[]});
@@ -32,10 +32,30 @@ export async function GET(request: Request) {
     const month = /^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month')! : salonNow().slice(0, 7);
     const [list, products] = await db.batch([
       db.prepare(`SELECT ${RECEIPT_COLUMNS} FROM receipts WHERE issued>=? AND issued<? ORDER BY issued DESC`).bind(month + '-01', month + '-99'),
-      db.prepare('SELECT id,name,price_cents AS priceCents,active,sort FROM products ORDER BY sort,name'),
+      db.prepare('SELECT id,name,price_cents AS priceCents,active,sort,stock FROM products ORDER BY sort,name'),
     ]) as {results: Row[]}[];
     return json({month, receipts: list.results.map(decode), products: products.results, settings: await settings()});
   } catch (e) { console.error(e); return json({error: 'Účtenky se nepodařilo načíst. Zkuste to znovu.'}, 503); }
+}
+
+type DB = ReturnType<typeof database>;
+/** Prodané produkty se sledovaným skladem se odečtou ze skladu (podle produktu, u ručně dopsané položky podle názvu). */
+async function stockForSale(db: DB, items: ReceiptItem[], receiptId: string, issued: string, number: string) {
+  const products = items.some(x => x.kind === 'product') ? (await db.prepare('SELECT id,name FROM products WHERE stock IS NOT NULL').all<{id: string; name: string}>()).results : [];
+  const key = (t: string) => t.trim().toLocaleLowerCase('cs'), now = new Date().toISOString();
+  return items.flatMap(x => {
+    if (x.kind !== 'product') return [];
+    const p = products.find(y => y.id === x.productId) || (!x.productId ? products.find(y => key(y.name) === key(x.name)) : undefined);
+    return p ? [db.prepare('UPDATE products SET stock=stock-? WHERE id=?').bind(x.qty, p.id),
+      db.prepare("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,receipt_id,note,created) SELECT ?,id,?,'sale',?,stock,?,?,? FROM products WHERE id=?").bind(crypto.randomUUID(), issued, -x.qty, receiptId, `Účtenka ${number}`, now, p.id)] : [];
+  });
+}
+/** Storno účtenky vrátí prodané kusy na sklad. */
+async function stockReturn(db: DB, receiptId: string) {
+  const moves = (await db.prepare("SELECT product_id AS productId,delta FROM stock_moves WHERE receipt_id=? AND kind='sale'").bind(receiptId).all<{productId: string; delta: number}>()).results;
+  const now = new Date().toISOString(), date = salonNow();
+  return moves.flatMap(m => [db.prepare('UPDATE products SET stock=stock+? WHERE id=? AND stock IS NOT NULL').bind(-m.delta, m.productId),
+    db.prepare("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,receipt_id,note,created) SELECT ?,id,?,'return',?,stock,?,?,? FROM products WHERE id=? AND stock IS NOT NULL").bind(crypto.randomUUID(), date, -m.delta, receiptId, 'Storno účtenky', now, m.productId)]);
 }
 
 export async function POST(request: Request) {
@@ -44,19 +64,6 @@ export async function POST(request: Request) {
     const body = await request.json() as {kind?: string; action?: string; data?: Record<string, unknown>};
     const d = body.data || {}, db = database();
     const field = (k: string, max = 2000) => typeof d[k] === 'string' ? (d[k] as string).trim().slice(0, max) : '';
-
-    if (body.kind === 'product') {
-      if (body.action === 'delete') { await db.prepare('DELETE FROM products WHERE id=?').bind(field('id')).run(); return json({ok: true}); }
-      const name = field('name', 150);
-      if (!name) return json({error: 'Vyplňte název produktu.'}, 400);
-      let price: number | null;
-      try { price = parseRevenue(typeof d.price === 'number' ? String(d.price) : d.price); } catch { return json({error: 'Zadejte cenu v Kč, například 590 nebo 590,50.'}, 400); }
-      if (price === null) return json({error: 'Vyplňte cenu produktu.'}, 400);
-      const id = field('id') || crypto.randomUUID();
-      await db.prepare('INSERT INTO products (id,name,price_cents,active,sort,created) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,price_cents=excluded.price_cents,active=excluded.active,sort=excluded.sort')
-        .bind(id, name, price, d.active === false ? 0 : 1, Number.isInteger(d.sort) ? d.sort as number : 0, new Date().toISOString()).run();
-      return json({ok: true, id});
-    }
 
     if (body.kind !== 'receipt') return json({error: 'Neplatná operace.'}, 400);
     const id = field('id');
@@ -94,6 +101,7 @@ export async function POST(request: Request) {
       if (sold) statements.push(db.prepare("UPDATE vouchers SET status='cancelled' WHERE id=?").bind(sold.id));
       // Započtená kauce se po stornu znovu ukáže jako zaplacená, aby šla použít na nové účtence.
       if (r.bookingId && r.prepaidCents) statements.push(db.prepare("UPDATE bookings SET deposit_status='paid' WHERE id=? AND deposit_status='used'").bind(r.bookingId));
+      statements.push(...await stockReturn(db, id));
       await db.batch(statements);
       return json({ok: true});
     }
@@ -106,7 +114,8 @@ export async function POST(request: Request) {
       if (!name) return json({error: 'Každá položka potřebuje název.'}, 400);
       if (!Number.isInteger(qty) || qty < 1 || qty > 99) return json({error: `Počet u položky „${name}“ musí být 1–99.`}, 400);
       if (!Number.isInteger(unit) || unit < 0 || unit > 99999999) return json({error: `Zkontrolujte cenu u položky „${name}“.`}, 400);
-      items.push({name, qty, unitCents: unit, kind: raw.kind === 'service' || raw.kind === 'product' || raw.kind === 'voucher' ? raw.kind : 'other'});
+      const kind = raw.kind === 'service' || raw.kind === 'product' || raw.kind === 'voucher' ? raw.kind : 'other';
+      items.push({name, qty, unitCents: unit, kind, ...(kind === 'product' && typeof raw.productId === 'string' && raw.productId ? {productId: raw.productId.slice(0, 64)} : {})});
     }
     const method = METHODS.includes(field('method')) ? field('method') : 'cash';
     const subtotal = items.reduce((sum, x) => sum + x.qty * x.unitCents, 0), discount = Number(d.discountCents || 0);
@@ -143,6 +152,7 @@ export async function POST(request: Request) {
     if (covered) statements.push(
       db.prepare('INSERT INTO voucher_uses (id,voucher_id,receipt_id,date,amount_cents,note,created) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(), voucher!.id, receiptId, issued.slice(0, 10), covered, `Účtenka ${number}`, new Date().toISOString()),
       db.prepare(`UPDATE vouchers SET balance_cents=${voucher!.kind === 'service' ? '0' : 'max(0,balance_cents-?)'} WHERE id=?`).bind(...(voucher!.kind === 'service' ? [voucher!.id] : [covered, voucher!.id])));
+    statements.push(...await stockForSale(db, items, receiptId, issued, number));
     if (booking) statements.push(db.prepare(`UPDATE bookings SET status=CASE WHEN status IN ('confirmed','pending') THEN 'done' ELSE status END${prepaid ? ",deposit_status='used'" : ''} WHERE id=?`).bind(bookingId));
     await db.batch(statements);
     return json({ok: true, id: receiptId, number});

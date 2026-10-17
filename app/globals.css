@@ -353,3 +353,16 @@ dd .voucher-state.expiring{background:#fdf6e8}dd .voucher-state.expired{backgrou
 .lapsed-who{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 280px}.lapsed-who small{color:var(--muted)}.lapsed-note{color:var(--teal)!important}
 .lapsed-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.lapsed-actions .secondary{min-height:36px;padding:6px 10px;display:inline-flex;align-items:center;gap:5px;font-size:14px}
 .lapsed-text{margin-top:14px}.lapsed-text summary{cursor:pointer;font-weight:600}.lapsed-text textarea{width:100%;margin-top:8px}
+/* Sklad */
+.stock-list{list-style:none;margin:0;padding:0}.stock-list>li{padding:14px 4px;border-bottom:1px solid var(--line)}.stock-list>li:last-child{border-bottom:0}.stock-list>li.inactive .stock-name b{color:var(--muted)}
+.stock-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
+.stock-name{display:flex;flex-direction:column;gap:3px;flex:1 1 260px;min-width:0}.stock-name small{color:var(--muted)}
+.stock-count{display:flex;flex-direction:column;align-items:flex-end;min-width:86px}.stock-count strong{font-size:20px}.stock-count small{color:var(--muted);display:flex;align-items:center;gap:4px}
+.stock-count.low strong,.stock-count.low small{color:#b4532a}.stock-count.off small{font-style:italic}
+.stock-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.stock-actions .secondary{min-height:36px;padding:6px 10px;display:inline-flex;align-items:center;gap:5px;font-size:14px}
+.icon-btn{background:none;border:1px solid var(--line);border-radius:8px;width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;color:var(--ink);cursor:pointer}.icon-btn:hover{border-color:var(--teal);color:var(--teal)}
+.stock-move,.stock-history{margin-top:12px;padding:14px;border-radius:10px;background:#f7f4ef;display:flex;flex-direction:column;gap:10px}
+.stock-history table{width:100%;border-collapse:collapse;font-size:14px}.stock-history th{text-align:left;color:var(--muted);font-weight:500;padding:4px 6px}.stock-history td{padding:6px;border-top:1px solid var(--line)}
+.stock-history td small{color:var(--muted)}.stock-history .minus{color:#b4532a}.stock-history .plus{color:var(--teal)}
+.stock-form{margin-bottom:14px}.stock-warn{grid-column:1/-1;color:#b4532a;font-size:13px}
+@media(max-width:640px){.stock-count{align-items:flex-start}.stock-row{gap:8px}}

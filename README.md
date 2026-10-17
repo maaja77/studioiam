@@ -218,13 +218,21 @@ calendar.google.com → Další kalendáře → Z adresy URL) a změny si stahuj
 
 ## Účtenky
 
-- U rezervace v kalendáři tlačítko **Dokončit**: předvyplní ošetření, přidáte produkty ze seznamu (Nastavení → Produkty k prodeji) nebo vlastní položku, slevu v % nebo Kč a zvolíte platbu QR / hotově / kartou.
+- U rezervace v kalendáři tlačítko **Dokončit**: předvyplní ošetření, přidáte produkty ze seznamu (záložka Sklad) nebo vlastní položku, slevu v % nebo Kč a zvolíte platbu QR / hotově / kartou.
 - Po dokončení se u nezaplacené účtenky hned ukáže velký QR kód k platbě a tlačítko Zaplaceno.
 - Účtenku s QR platbou jde klientce poslat e-mailem (potřebuje nastavené SMTP), SMS z telefonu (otevře se zpráva s odkazem), sdílením nebo odkazem. Odkaz `/uctenka?t=…` je veřejný a tajný, klientka na něm vidí účtenku, QR kód a platební údaje ke zkopírování. Používá adresu `SALON_PUBLIC_ORIGIN`, jinak `SALON_ORIGIN`, takže ta musí být pro klientky dostupná.
 - Zaplacená kauce nebo platba předem se z účtenky odečte; rezervace se označí jako proběhlá.
 - QR platba (SPD) na doplatek, číslování `RRRR/0001` po letech, VS = číslo účtenky. Storno účtenku nemaže, jen označí.
 - Záložka **Účtenky**: přehled za měsíc, nezaplacené účtenky a prodej bez rezervace. Tisk přes tlačítko Tisk (účtenka je připravená na úzký papír 80 mm i A4).
 - Údaje na účtence (název, provozovatel, adresa, IČO, neplátce DPH) se nastaví v Nastavení.
+
+## Sklad produktů
+
+Záložka Sklad: produkty k prodeji (prodejní a nepovinně nákupní cena) a u těch se zapnutým sledováním počet kusů.
+Prodej produktu na účtence kusy odečte (ručně dopsaná položka se spáruje podle názvu), storno účtenky je vrátí.
+Ručně se zapisuje naskladnění (s nákupní cenou), spotřeba v salonu (testery, ošetření) a inventura (skutečný počet).
+U každého produktu je historie pohybů a odhad, na jak dlouho zásoba vystačí podle prodejů za 90 dní. Když počet klesne
+na nastavené minimum, ukáže se upozornění a odznak u záložky; na účtence se zobrazí, kolik kusů je skladem.
 
 ## Klientky, které dlouho nepřišly
 

@@ -92,8 +92,16 @@ export async function seedDemo(run: Run, put: Put) {
   run("INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,deposit_cents,deposit_status,deposit_due,vs,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,'confirmed','online',70000,'paid',?,?,?)",
     ['b-7', architect.id, 'demo-2', kStart, kEnd, architect.name, architect.price, 'Lucie Horáková', '+420 602 345 678', '', '', kStart, kStart.slice(2, 10).replace(/-/g, '') + '1042', now]);
   // Ukázkové produkty a účtenky.
-  const products: [string, number][] = [['Čisticí gel pro citlivou pleť', 590], ['Hydratační sérum s kyselinou hyaluronovou', 1290], ['Krém s SPF 50', 790], ['Pleťová maska – vzorek', 120]];
-  products.forEach(([name, price], i) => run('INSERT INTO products (id,name,price_cents,active,sort,created) VALUES (?,?,?,1,?,?)', ['p-' + i, name, price * 100, i, now]));
+  // Sklad: [název, cena, kusů, minimum, nákupní cena]; vzorky masek se nesledují.
+  const products: [string, number, number | null, number | null, number | null][] = [['Čisticí gel pro citlivou pleť', 590, 6, 2, 320], ['Hydratační sérum s kyselinou hyaluronovou', 1290, 1, 2, 690], ['Krém s SPF 50', 790, 9, 3, 410], ['Pleťová maska – vzorek', 120, null, null, null]];
+  products.forEach(([name, price, stock, min, cost], i) => {
+    run('INSERT INTO products (id,name,price_cents,active,sort,stock,min_stock,cost_cents,created) VALUES (?,?,?,1,?,?,?,?,?)', ['p-' + i, name, price * 100, i, stock, min, cost === null ? null : cost * 100, now]);
+    if (stock !== null) {
+      run("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,note,created) VALUES (?,?,?,'start',?,?,'Počáteční stav',?)", ['sm-a' + i, 'p-' + i, day(-60) + 'T09:00', stock + 4, stock + 4, now]);
+      run("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,note,created) VALUES (?,?,?,'sale',-3,?,'Účtenky',?)", ['sm-b' + i, 'p-' + i, day(-20) + 'T15:00', stock + 1, now]);
+      run("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,note,created) VALUES (?,?,?,'use',-1,?,'Tester',?)", ['sm-c' + i, 'p-' + i, day(-7) + 'T10:00', stock, now]);
+    }
+  });
   const year = Number(day(0).slice(0, 4)), dna = service('DNA Glow Rebirth');
   const receipt = (seq: number, bookingId: string | null, clientId: string | null, clientName: string, issued: string, items: {name: string; qty: number; unitCents: number; kind: string}[], method: string, paid: number) => {
     const total = items.reduce((a, x) => a + x.qty * x.unitCents, 0);

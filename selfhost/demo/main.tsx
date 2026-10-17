@@ -14,6 +14,7 @@ import * as statsApi from '../../app/api/stats/route';
 import * as vouchersApi from '../../app/api/vouchers/route';
 import * as intakeApi from '../../app/api/intake/route';
 import * as lapsedApi from '../../app/api/lapsed/route';
+import * as stockApi from '../../app/api/stock/route';
 import * as records from '../../app/api/records/route';
 import * as photos from '../../app/api/photos/route';
 import {env, resetDemo} from './runtime';
@@ -35,6 +36,7 @@ async function handle(url: URL, request: Request) {
   if (url.pathname === '/api/vouchers') return m === 'GET' ? vouchersApi.GET(request) : vouchersApi.POST(request);
   if (url.pathname === '/api/intake') return m === 'GET' ? intakeApi.GET(request) : intakeApi.POST(request);
   if (url.pathname === '/api/lapsed') return m === 'GET' ? lapsedApi.GET(request) : lapsedApi.POST(request);
+  if (url.pathname === '/api/stock') return m === 'GET' ? stockApi.GET(request) : stockApi.POST(request);
   if (url.pathname === '/api/demo-logo') { const o = await env.BUCKET.get('branding/logo'); return o ? new Response(o.body as BodyInit, {headers: {'Content-Type': 'image/png'}}) : new Response(null, {status: 404}); }
   if (url.pathname === '/api/account') return Response.json({error: 'V ukázce se heslo nemění. Na serveru tu změníte heslo do administrace.'}, {status: 400});
   if (url.pathname === '/api/public') return m === 'GET' ? publicApi.GET(request) : publicApi.POST(request);

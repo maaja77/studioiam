@@ -8,7 +8,6 @@ import {logoSrc} from './logo';
 import {formatRevenue} from '../lib/revenue';
 import {CATEGORY_COLORS, PRICE_LIST, serviceColor} from '../lib/price-list';
 import type {Service} from './bookings';
-import {ProductsPanel} from './receipts';
 
 async function post(body: unknown) {
   const r = await fetch('/api/bookings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
@@ -160,7 +159,6 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
 
     <PasswordPanel/>
 
-    <ProductsPanel/>
 
     <section className="panel">
       <div className="panel-heading"><h2>Rezervace na vašem webu</h2></div>
