@@ -91,7 +91,7 @@ export default function BookingSettingsView({bookingUrl}: {bookingUrl: string}) 
         <label className="field"><span>Číslo účtu</span><input value={settings.account} placeholder="123456789/0300" onChange={e => setSettings({...settings, account: e.target.value})}/></label>
         <label className="field"><span>Příjemce</span><input value={settings.accountName} maxLength={60} onChange={e => setSettings({...settings, accountName: e.target.value})}/></label>
       </div>
-      {!settings.account && <p className="muted-inline">Bez čísla účtu se kauce nevybírá.</p>}
+      <p className="muted-inline">Na tento účet chodí kauce, platby předem za balíčky a QR platby z účtenek.</p>
       <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Nastavení kauce bylo uloženo.')}>Uložit kauce a platby</button></div>
     </section>
 

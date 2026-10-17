@@ -16,7 +16,7 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   depositFromKc: 2000,
   depositPercent: 30,
   depositHoldHours: 24,
-  account: '',
+  account: '331122037/0300',
   accountName: 'STUDIO I AM',
   changeLimitHours: 24,
   businessName: 'STUDIO I AM',
@@ -51,7 +51,8 @@ export function addMinutes(local: string, minutes: number) {
 export function parseSettings(raw: string | null | undefined): BookingSettings {
   try {
     const v = JSON.parse(raw || '') as Partial<BookingSettings>;
-    return {...DEFAULT_SETTINGS, ...v, hours: {...DEFAULT_SETTINGS.hours, ...(v.hours || {})}};
+    // Prázdný účet by tiše vypnul kauce i platby předem, proto se použije účet salonu.
+    return {...DEFAULT_SETTINGS, ...v, account: v.account?.trim() || DEFAULT_SETTINGS.account, hours: {...DEFAULT_SETTINGS.hours, ...(v.hours || {})}};
   } catch { return DEFAULT_SETTINGS; }
 }
 
