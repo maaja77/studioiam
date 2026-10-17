@@ -13,4 +13,5 @@ function objectPath(key:string){const p=path.resolve(root,key);if(!p.startsWith(
 const BUCKET={async put(key:string,bytes:Uint8Array){const p=objectPath(key);mkdirSync(path.dirname(p),{recursive:true,mode:0o700});const temp=p+'.'+crypto.randomUUID()+'.tmp';writeFileSync(temp,bytes,{mode:0o600});renameSync(temp,p);},async get(key:string){const p=objectPath(key);return existsSync(p)?{body:new Uint8Array(readFileSync(p))}:null;},async delete(keys:string|string[]){for(const k of Array.isArray(keys)?keys:[keys])rmSync(objectPath(k),{force:true});}};
 const mail=mailConfig();if(!mail)console.log('E-mailová upozornění nejsou nastavená (SMTP_HOST, SMTP_USER, SMTP_PASS, SALON_NOTIFY_EMAIL).');
 const NOTIFY=mail?(subject:string,text:string,to?:string)=>sendMail(mail,subject,text,to):undefined;
-export const env={DB,BUCKET,NOTIFY};
+const PUBLIC_ORIGIN=process.env.SALON_PUBLIC_ORIGIN?new URL(process.env.SALON_PUBLIC_ORIGIN).origin:process.env.SALON_ORIGIN?new URL(process.env.SALON_ORIGIN).origin:undefined;
+export const env={DB,BUCKET,NOTIFY,PUBLIC_ORIGIN};

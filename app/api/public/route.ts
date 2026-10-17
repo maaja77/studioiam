@@ -78,6 +78,14 @@ export async function GET(request: Request) {
   try {
     await releaseExpiredDeposits();
     const params = new URL(request.url).searchParams, {services, settings} = await context();
+    // Účtenka pro klientku přes tajný odkaz (bez údajů z kartotéky).
+    if (params.has('receipt')) {
+      const token = params.get('receipt') || '';
+      const r = /^[0-9a-f-]{36}$/.test(token) ? await database().prepare("SELECT number,client_name AS clientName,issued,items,total_cents AS totalCents,prepaid_cents AS prepaidCents,due_cents AS dueCents,discount_cents AS discountCents,discount_label AS discountLabel,method,paid,vs,status FROM receipts WHERE token=?").bind(token).first<Record<string, unknown> & {items: string}>() : null;
+      if (!r) return json({error: 'Účtenka nebyla nalezena. Zkontrolujte prosím odkaz.'}, 404);
+      const {businessName, businessOwner, businessAddress, businessId, account, accountName} = settings;
+      return json({receipt: {...r, id: '', bookingId: null, clientId: null, note: '', items: JSON.parse(r.items)}, settings: {businessName, businessOwner, businessAddress, businessId, account, accountName}});
+    }
     if (params.has('token')) {
       const b = await managed(params.get('token'));
       if (!b) return json({error: 'Rezervace nebyla nalezena. Zkontrolujte prosím odkaz nebo nám zavolejte.'}, 404);

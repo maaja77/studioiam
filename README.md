@@ -100,7 +100,9 @@ docker compose up -d --build
 
 ## Účtenky
 
-- U rezervace v kalendáři tlačítko **Vystavit účtenku**: předvyplní ošetření, přidáte produkty ze seznamu (Nastavení → Produkty k prodeji) nebo vlastní položku, zvolíte platbu hotově / kartou / QR.
+- U rezervace v kalendáři tlačítko **Dokončit**: předvyplní ošetření, přidáte produkty ze seznamu (Nastavení → Produkty k prodeji) nebo vlastní položku, slevu v % nebo Kč a zvolíte platbu QR / hotově / kartou.
+- Po dokončení se u nezaplacené účtenky hned ukáže velký QR kód k platbě a tlačítko Zaplaceno.
+- Účtenku s QR platbou jde klientce poslat e-mailem (potřebuje nastavené SMTP), SMS z telefonu (otevře se zpráva s odkazem), sdílením nebo odkazem. Odkaz `/uctenka?t=…` je veřejný a tajný, klientka na něm vidí účtenku, QR kód a platební údaje ke zkopírování. Používá adresu `SALON_PUBLIC_ORIGIN`, jinak `SALON_ORIGIN`, takže ta musí být pro klientky dostupná.
 - Zaplacená kauce nebo platba předem se z účtenky odečte; rezervace se označí jako proběhlá.
 - QR platba (SPD) na doplatek, číslování `RRRR/0001` po letech, VS = číslo účtenky. Storno účtenku nemaže, jen označí.
 - Záložka **Účtenky**: přehled za měsíc, nezaplacené účtenky a prodej bez rezervace. Tisk přes tlačítko Tisk (účtenka je připravená na úzký papír 80 mm i A4).

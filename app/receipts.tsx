@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
-import {Banknote, CreditCard, Plus, Printer, QrCode as QrIcon, Receipt as ReceiptIcon, Trash2, X} from 'lucide-react';
+import {Banknote, Check, Copy, CreditCard, Mail, MessageSquare, Plus, Printer, QrCode as QrIcon, Receipt as ReceiptIcon, Share2, Trash2, X} from 'lucide-react';
 import {formatRevenue, parseRevenue} from '../lib/revenue';
 import {czIban, formatIban, spdPayload} from '../lib/payment';
 import {DEFAULT_SETTINGS, salonNow, type BookingSettings} from '../lib/booking';
@@ -8,7 +8,7 @@ import {QrCode} from './qr-payment';
 import {LOGO} from './logo';
 
 export type ReceiptItem = {name: string; qty: number; unitCents: number; kind: 'service' | 'product' | 'other'};
-export type Receipt = {id: string; number: string; bookingId: string | null; clientId: string | null; clientName: string; issued: string; items: ReceiptItem[]; totalCents: number; prepaidCents: number; dueCents: number; method: string; paid: number; vs: string; status: string; note: string};
+export type Receipt = {id: string; number: string; bookingId: string | null; clientId: string | null; clientName: string; issued: string; items: ReceiptItem[]; totalCents: number; prepaidCents: number; dueCents: number; method: string; paid: number; vs: string; status: string; note: string; discountCents?: number; discountLabel?: string};
 export type Product = {id: string; name: string; priceCents: number; active: number; sort: number};
 /** Podklad pro novou účtenku, např. z rezervace v kalendáři. */
 export type ReceiptDraft = {bookingId?: string; clientId?: string | null; clientName?: string; items: ReceiptItem[]; prepaidCents?: number; prepaidLabel?: string};
@@ -42,13 +42,14 @@ export function ReceiptPaper({receipt, settings}: {receipt: Receipt; settings: B
     <table>
       <tbody>{receipt.items.map((x, i) => <tr key={i}><td>{x.name}{x.qty > 1 && <small> {x.qty} × {formatRevenue(x.unitCents)}</small>}</td><td>{formatRevenue(x.qty * x.unitCents)}</td></tr>)}</tbody>
       <tfoot>
+        {!!receipt.discountCents && <><tr><td>Mezisoučet</td><td>{formatRevenue(receipt.totalCents + receipt.discountCents)}</td></tr><tr><td>Sleva{receipt.discountLabel && ' ' + receipt.discountLabel}</td><td>−{formatRevenue(receipt.discountCents)}</td></tr></>}
         <tr><th>Celkem</th><th>{formatRevenue(receipt.totalCents)}</th></tr>
         {receipt.prepaidCents > 0 && <tr><td>Zaplaceno předem (kauce / platba předem)</td><td>−{formatRevenue(receipt.prepaidCents)}</td></tr>}
         {receipt.prepaidCents > 0 && <tr><th>Doplatek</th><th>{formatRevenue(receipt.dueCents)}</th></tr>}
       </tfoot>
     </table>
     <p className="receipt-meta">Platba: {METHOD_LABEL[receipt.method] || receipt.method}{receipt.dueCents > 0 && (receipt.paid ? ' · zaplaceno' : ' · čeká na zaplacení')}</p>
-    {qr && <div className="receipt-qr"><QrCode payload={qr} size={150} label={`QR platba ${formatRevenue(receipt.dueCents)}`}/><span>Účet {settings.account}<br/>{formatIban(iban!)}<br/>VS {receipt.vs}<br/><b>{formatRevenue(receipt.dueCents)}</b></span></div>}
+    {qr && <div className="receipt-qr"><QrCode payload={qr} size={170} label={`QR platba ${formatRevenue(receipt.dueCents)}`}/><span>Účet {settings.account}<br/>{formatIban(iban!)}<br/>VS {receipt.vs}<br/><b>{formatRevenue(receipt.dueCents)}</b></span></div>}
     {receipt.note && <p className="receipt-meta">{receipt.note}</p>}
     <footer>Děkujeme za návštěvu.</footer>
   </article>;
@@ -56,17 +57,22 @@ export function ReceiptPaper({receipt, settings}: {receipt: Receipt; settings: B
 
 function ReceiptForm({draft, products, clients, busy, onSubmit, onCancel}: {draft: ReceiptDraft; products: Product[]; clients: Client[]; busy: boolean; onSubmit: (data: Record<string, unknown>) => void; onCancel: () => void}) {
   const [items, setItems] = useState<(ReceiptItem & {price: string})[]>(() => draft.items.map(x => ({...x, price: String(x.unitCents / 100).replace('.', ',')})));
-  const [method, setMethod] = useState('cash'), [error, setError] = useState('');
+  const [method, setMethod] = useState('qr'), [error, setError] = useState('');
+  const [discount, setDiscount] = useState(''), [discountKind, setDiscountKind] = useState<'%' | 'Kč'>('%');
   const [clientId, setClientId] = useState(draft.clientId || ''), [clientName, setClientName] = useState(draft.clientName || '');
   const priced = items.map(x => { try { return parseRevenue(x.price) ?? 0; } catch { return NaN; } });
-  const total = items.reduce((sum, x, i) => sum + x.qty * (priced[i] || 0), 0), prepaid = Math.min(draft.prepaidCents || 0, total);
+  const subtotal = items.reduce((sum, x, i) => sum + x.qty * (priced[i] || 0), 0);
+  const discountNumber = Number(discount.replace(',', '.').replace(/\s/g, '')) || 0;
+  const discountCents = Math.max(0, Math.min(subtotal, Math.round(discountKind === '%' ? subtotal * Math.min(discountNumber, 100) / 100 : discountNumber * 100)));
+  const discountLabel = discountCents ? (discountKind === '%' ? `${discountNumber.toLocaleString('cs-CZ')} %` : '') : '';
+  const total = subtotal - discountCents, prepaid = Math.min(draft.prepaidCents || 0, total);
   const update = (i: number, patch: Partial<ReceiptItem & {price: string}>) => setItems(items.map((x, j) => j === i ? {...x, ...patch} : x));
 
   function submit(e: React.FormEvent) {
     e.preventDefault(); setError('');
     if (!items.length) return setError('Přidejte alespoň jednu položku.');
     if (priced.some(p => Number.isNaN(p))) return setError('Zkontrolujte ceny položek (např. 590 nebo 590,50).');
-    onSubmit({bookingId: draft.bookingId, clientId: clientId || null, clientName, method, items: items.map((x, i) => ({name: x.name, qty: x.qty, unitCents: priced[i], kind: x.kind}))});
+    onSubmit({bookingId: draft.bookingId, clientId: clientId || null, clientName, method, discountCents, discountLabel, items: items.map((x, i) => ({name: x.name, qty: x.qty, unitCents: priced[i], kind: x.kind}))});
   }
 
   return <form onSubmit={submit}>
@@ -89,7 +95,14 @@ function ReceiptForm({draft, products, clients, busy, onSubmit, onCancel}: {draf
         </select>
         <button type="button" className="secondary" onClick={() => setItems([...items, {name: '', qty: 1, unitCents: 0, price: '', kind: 'other'}])}><Plus size={16}/> Vlastní položka</button>
       </div>
+      <div className="discount-row">
+        <span>Sleva</span>
+        <input aria-label="Sleva" inputMode="decimal" placeholder="0" value={discount} onChange={e => setDiscount(e.target.value)}/>
+        <span className="segmented-mini" role="radiogroup" aria-label="Sleva v">{(['%', 'Kč'] as const).map(k => <button type="button" key={k} role="radio" aria-checked={discountKind === k} className={discountKind === k ? 'active' : ''} onClick={() => setDiscountKind(k)}>{k}</button>)}</span>
+        <span className="discount-quick">{[5, 10, 15, 20].map(p => <button type="button" key={p} className="secondary" onClick={() => { setDiscountKind('%'); setDiscount(String(p)); }}>{p} %</button>)}</span>
+      </div>
       <div className="receipt-sum">
+        {discountCents > 0 && <span>Mezisoučet {formatRevenue(subtotal)} · sleva −{formatRevenue(discountCents)}</span>}
         <span>Celkem <b>{formatRevenue(total)}</b></span>
         {prepaid > 0 && <span>{draft.prepaidLabel || 'Zaplaceno předem'} −{formatRevenue(prepaid)} · doplatek <b>{formatRevenue(total - prepaid)}</b></span>}
       </div>
@@ -98,7 +111,7 @@ function ReceiptForm({draft, products, clients, busy, onSubmit, onCancel}: {draf
       </fieldset>
     </div>
     {error && <p className="error" role="alert">{error}</p>}
-    <div className="dialog-footer"><button type="button" className="secondary" onClick={onCancel}>Zrušit</button><button className="primary" disabled={busy}><ReceiptIcon size={16}/> {busy ? 'Vystavuji…' : 'Vystavit účtenku'}</button></div>
+    <div className="dialog-footer"><button type="button" className="secondary" onClick={onCancel}>Zrušit</button><button className="primary" disabled={busy}>{draft.bookingId ? <Check size={16}/> : <ReceiptIcon size={16}/>} {busy ? 'Ukládám…' : draft.bookingId ? 'Dokončit' : 'Vystavit účtenku'}</button></div>
   </form>;
 }
 
@@ -107,12 +120,13 @@ export function ReceiptDialog({draft, receiptId, clients, onClose, onChanged}: {
   const dialog = useRef<HTMLDialogElement>(null);
   const [id, setId] = useState(receiptId || ''), [receipt, setReceipt] = useState<Receipt | null>(null), [settings, setSettings] = useState<BookingSettings>(DEFAULT_SETTINGS);
   const [products, setProducts] = useState<Product[]>([]), [busy, setBusy] = useState(false), [error, setError] = useState(''), [confirmCancel, setConfirmCancel] = useState(false);
+  const [contact, setContact] = useState({email: '', phone: ''}), [mail, setMail] = useState(false);
   useEffect(() => { dialog.current?.showModal(); }, []);
   useEffect(() => {
     const url = id ? `/api/receipts?id=${encodeURIComponent(id)}` : '/api/receipts';
-    fetch(url, {cache: 'no-store'}).then(r => r.json() as Promise<{receipt?: Receipt; products?: Product[]; settings: BookingSettings; error?: string}>).then(d => {
+    fetch(url, {cache: 'no-store'}).then(r => r.json() as Promise<{receipt?: Receipt; products?: Product[]; settings: BookingSettings; contact?: {email: string; phone: string}; mail?: boolean; error?: string}>).then(d => {
       if (d.error) throw new Error(d.error);
-      setSettings(d.settings); if (d.receipt) setReceipt(d.receipt); if (d.products) setProducts(d.products);
+      setSettings(d.settings); if (d.receipt) setReceipt(d.receipt); if (d.products) setProducts(d.products); if (d.contact) setContact(d.contact); setMail(!!d.mail);
     }).catch(e => setError((e as Error).message));
   }, [id]);
 
@@ -127,14 +141,19 @@ export function ReceiptDialog({draft, receiptId, clients, onClose, onChanged}: {
     <div className="dialog-header"><div><p className="eyebrow">{id ? 'ÚČTENKA' : 'NOVÁ ÚČTENKA'}</p><h2>{receipt ? receipt.number : draft?.clientName || 'Prodej'}</h2></div><button type="button" aria-label="Zavřít" onClick={onClose}><X size={21}/></button></div>
     {!id && draft ? <ReceiptForm draft={draft} products={products} clients={clients} busy={busy} onSubmit={create} onCancel={onClose}/>
     : receipt ? <>
-      <div className="fields"><ReceiptPaper receipt={receipt} settings={settings}/></div>
+      <div className="fields">{receipt.status === 'issued' && receipt.dueCents > 0 && !receipt.paid && czIban(settings.account) && <div className="pay-now">
+        <QrCode payload={spdPayload({iban: czIban(settings.account)!, amountCents: receipt.dueCents, vs: receipt.vs, message: 'Uctenka ' + receipt.number, recipient: settings.accountName})} size={240} label={`QR platba ${formatRevenue(receipt.dueCents)}`}/>
+        <p>Účet: {settings.account}<br/>VS: {receipt.vs}<br/><b>Částka: {formatRevenue(receipt.dueCents)}</b></p>
+        <button className="primary" disabled={busy} onClick={async () => { if (await act({kind: 'receipt', action: 'paid', data: {id, paid: true}})) await reload(); }}><Check size={16}/> Zaplaceno</button>
+      </div>}
+        <ReceiptPaper receipt={receipt} settings={settings}/>{receipt.status === 'issued' && <SendPanel receiptId={id} contact={contact} mail={mail} toPay={receipt.dueCents > 0 && !receipt.paid}/>}</div>
       {error && <p className="error" role="alert">{error}</p>}
       <div className="dialog-footer receipt-actions">
         {receipt.status === 'issued' && (confirmCancel
           ? <><span>Opravdu stornovat?</span><button className="secondary danger-text" disabled={busy} onClick={async () => { if (await act({kind: 'receipt', action: 'cancel', data: {id}})) { setConfirmCancel(false); await reload(); } }}>Ano, stornovat</button><button className="secondary" onClick={() => setConfirmCancel(false)}>Ne</button></>
           : <button className="secondary" onClick={() => setConfirmCancel(true)}>Storno</button>)}
-        {receipt.status === 'issued' && receipt.dueCents > 0 && <button className="secondary" disabled={busy} onClick={async () => { if (await act({kind: 'receipt', action: 'paid', data: {id, paid: !receipt.paid}})) await reload(); }}>{receipt.paid ? 'Označit jako nezaplacené' : 'Zaplaceno'}</button>}
-        <button className="primary" onClick={() => window.print()}><Printer size={16}/> Tisk</button>
+        {receipt.status === 'issued' && receipt.dueCents > 0 && !!receipt.paid && <button className="secondary" disabled={busy} onClick={async () => { if (await act({kind: 'receipt', action: 'paid', data: {id, paid: false}})) await reload(); }}>Označit jako nezaplacené</button>}
+        <button className="secondary" onClick={() => window.print()}><Printer size={16}/> Tisk / PDF</button><button className="primary" onClick={onClose}><Check size={16}/> Hotovo</button>
       </div>
     </> : <div className="fields">{error ? <p className="error" role="alert">{error}</p> : <p className="muted">Načítám…</p>}</div>}
   </dialog>;
@@ -189,5 +208,38 @@ export function ProductsPanel() {
       <label className="check"><input type="checkbox" name="active" defaultChecked={editing.active !== 0}/> Nabízet na účtence</label>
       <div className="form-actions"><button type="button" className="secondary" onClick={() => setEditing(null)}>Zrušit</button><button className="primary" disabled={busy}>Uložit produkt</button></div>
     </form>}
+  </section>;
+}
+
+/** Odeslání účtenky a QR platby klientce: e-mail přes server, SMS z telefonu, sdílení nebo odkaz. */
+function SendPanel({receiptId, contact, mail, toPay}: {receiptId: string; contact: {email: string; phone: string}; mail: boolean; toPay: boolean}) {
+  const [email, setEmail] = useState(contact.email), [phone, setPhone] = useState(contact.phone);
+  const [link, setLink] = useState<{link: string; sms: string} | null>(null), [status, setStatus] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  useEffect(() => { setEmail(contact.email); setPhone(contact.phone); }, [contact]);
+  useEffect(() => { post({kind: 'receipt', action: 'link', data: {id: receiptId}}).then(d => setLink(d as unknown as {link: string; sms: string})).catch(e => setError((e as Error).message)); }, [receiptId]);
+  const smsHref = link ? `sms:${phone.replace(/[^\d+]/g, '')}?body=${encodeURIComponent(link.sms)}` : '';
+  async function sendMail() {
+    setBusy(true); setError(''); setStatus('');
+    try { await post({kind: 'receipt', action: 'send', data: {id: receiptId, email}}); setStatus(`Účtenka odeslána na ${email}.`); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  return <section className="send-panel" aria-label="Poslat klientce">
+    <h3>Poslat klientce {toPay ? 'QR platbu a účtenku' : 'účtenku'}</h3>
+    <form className="send-row" onSubmit={e => { e.preventDefault(); sendMail(); }}>
+      <input type="email" aria-label="E-mail klientky" placeholder="E-mail klientky" required value={email} onChange={e => setEmail(e.target.value)}/>
+      <button className="secondary" disabled={busy || !email}><Mail size={16}/> {busy ? 'Odesílám…' : 'Poslat e-mailem'}</button>
+    </form>
+    {!mail && <p className="muted-inline">E-maily zatím nejsou na serveru nastavené. Použijte SMS nebo sdílení.</p>}
+    <div className="send-row">
+      <input type="tel" aria-label="Telefon klientky" placeholder="Telefon klientky" value={phone} onChange={e => setPhone(e.target.value)}/>
+      <a className={'secondary' + (link && phone ? '' : ' disabled')} aria-disabled={!link || !phone} href={link && phone ? smsHref : undefined}><MessageSquare size={16}/> Poslat SMS</a>
+    </div>
+    <div className="send-row links">
+      {link && typeof navigator !== 'undefined' && 'share' in navigator && <button type="button" className="secondary" onClick={() => navigator.share({title: 'Účtenka', text: link.sms}).catch(() => {})}><Share2 size={16}/> Sdílet (WhatsApp, Messenger…)</button>}
+      {link && <a className="secondary" href={link.link} target="_blank" rel="noopener">Zobrazit jako klientka</a>}
+      {link && <button type="button" className="secondary" onClick={() => navigator.clipboard?.writeText(link.link).then(() => setStatus('Odkaz zkopírován.'), () => setStatus(link.link))}><Copy size={16}/> Kopírovat odkaz</button>}
+    </div>
+    <p className="muted-inline">SMS se otevře v telefonu s předvyplněným textem a odkazem na účtenku s QR kódem.</p>
+    {status && <p className="notice" role="status">{status}</p>}
+    {error && <p className="error" role="alert">{error}</p>}
   </section>;
 }

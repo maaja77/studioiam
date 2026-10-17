@@ -4,6 +4,7 @@ import React from 'react';
 import {createRoot} from 'react-dom/client';
 import Home from '../../app/page';
 import PublicBooking from '../../app/public-booking';
+import PublicReceipt from '../../app/public-receipt';
 import * as bookings from '../../app/api/bookings/route';
 import * as publicApi from '../../app/api/public/route';
 import * as receiptsApi from '../../app/api/receipts/route';
@@ -86,6 +87,13 @@ function DemoLogin({onLogin}: {onLogin: () => void}) {
 
 function Demo() {
   const [view, setView] = React.useState<View>(() => location.hash === '#rezervace' ? 'public' : location.hash === '#prihlaseni' ? 'login' : 'admin');
+  // Odkaz na účtenku pro klientku v náhledu neotevře novou stránku, ale ukáže ji tady.
+  const [receipt, setReceipt] = React.useState('');
+  React.useEffect(() => {
+    const on = (e: MouseEvent) => { const a = (e.target as HTMLElement).closest?.('a'); const m = a?.href.match(/\/uctenka\?t=([0-9a-f-]{36})/); if (m) { e.preventDefault(); setReceipt(m[1]); } };
+    document.addEventListener('click', on, true); return () => document.removeEventListener('click', on, true);
+  }, []);
+  if (receipt) return <><div className="demo-bar" role="note"><span><strong>Ukázka:</strong> takhle účtenku uvidí klientka po otevření odkazu.</span><button type="button" onClick={() => setReceipt('')}>Zpět do administrace</button></div><PublicReceipt token={receipt}/></>;
   return <><DemoBar view={view} setView={setView}/>{view === 'admin' ? <Home onLogout={() => setView('login')}/> : view === 'login' ? <DemoLogin onLogin={() => setView('admin')}/> : <PublicBooking/>}</>;
 }
 
