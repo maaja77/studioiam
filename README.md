@@ -238,6 +238,12 @@ calendar.google.com → Další kalendáře → Z adresy URL) a změny si stahuj
 - Záložka **Účtenky**: přehled za měsíc, nezaplacené účtenky a prodej bez rezervace. Tisk přes tlačítko Tisk (účtenka je připravená na úzký papír 80 mm i A4).
 - Údaje na účtence (název, provozovatel, adresa, IČO, neplátce DPH) se nastaví v Nastavení.
 
+### Podklady pro účetní
+
+- Účtenky → **Pro účetní**: souhrn vybraného měsíce podle způsobu platby (hotově, kartou, QR / převod, kauce zaplacené předem) a podle druhu (ošetření, produkty, prodej dárkových poukazů), seznam účtenek včetně storen, nezaplacené QR účtenky a propadlé kauce.
+- **Stáhnout CSV** uloží soubor pro Excel (středník, UTF-8), **Vytisknout / PDF** vytiskne přehled nebo ho uloží jako PDF.
+- Část účtenky uhrazená dárkovým poukazem se do tržeb nepočítá, tržba je v měsíci prodeje poukazu. Jména klientek v podkladech nejsou.
+
 ### Platby z banky (párování převodů)
 
 Účtenky → **Platby z banky**: nahrajete výpis pohybů z internetového bankovnictví (ČSOB: Pohyby na účtu → Export → CSV)

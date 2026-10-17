@@ -434,3 +434,11 @@ dialog.care-dialog{width:min(680px,calc(100% - 24px))}
 .reviews-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.reviews-actions .secondary{min-height:34px;padding:5px 10px;font-size:13px;display:inline-flex;align-items:center;gap:5px;text-decoration:none}
 @media(max-width:900px){.today-layout{grid-template-columns:1fr}}
 @media(max-width:640px){.today-list li{grid-template-columns:50px minmax(0,1fr);padding:14px 4px}.today-actions{grid-column:2;flex-direction:row}}
+/* Podklady pro účetní */
+.accounting-head h2{margin:0 0 4px;font-size:20px;text-transform:none}.accounting-head p{margin:0 0 16px;color:var(--muted);font-size:14px}
+.accounting-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}.accounting-print .panel{margin-bottom:16px}.accounting-print h3{margin:0 0 8px;font-size:16px}
+.accounting-sum th{font-weight:400;color:var(--ink);font-size:14px;border-bottom:1px solid var(--line)}.accounting-sum td{text-align:right;white-space:nowrap}.accounting-sum tr.total th,.accounting-sum tr.total td{font-weight:700;border-bottom:0}
+.accounting-table .num{text-align:right;white-space:nowrap}.accounting-table tr.cancelled td{color:var(--muted);text-decoration:line-through}.accounting-table tr.cancelled td:nth-child(3){text-decoration:none}
+.accounting-table{min-width:560px}.accounting .table-scroll{overflow-x:auto}.accounting-notes ul{margin:0;padding-left:18px;font-size:14px;display:flex;flex-direction:column;gap:4px}
+@media(max-width:760px){.accounting-grid{grid-template-columns:1fr}}
+@media print{.accounting-print,.accounting-print *{visibility:visible!important}.accounting-print{position:absolute;left:0;top:0;width:100%}.accounting-print .panel{border:0;padding:0;box-shadow:none;break-inside:avoid}.accounting .table-scroll{overflow:visible}.accounting-table{min-width:0;font-size:12px}}
