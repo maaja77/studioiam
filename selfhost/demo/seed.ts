@@ -86,6 +86,25 @@ export async function seedDemo(run: Run, put: Put) {
   };
   receipt(1, 'b-9', 'demo-4', 'Petra Svobodová', workday(-1) + 'T17:05', [{name: dna.name, qty: 1, unitCents: dna.price, kind: 'service'}, {name: 'Krém s SPF 50', qty: 1, unitCents: 79000, kind: 'product'}], 'card', 1);
   receipt(2, null, 'demo-1', 'Tereza Nováková', day(0) + 'T10:30', [{name: 'Čisticí gel pro citlivou pleť', qty: 2, unitCents: 59000, kind: 'product'}], 'qr', 0);
+  // Historie za posledních devět měsíců pro statistiky (vymyšlená ošetření a účtenky).
+  const popular = ['A-QS Hacker', 'Carelika Basic Skin Care', 'Čištění pleti', 'Derma Collage', 'Hyaluron Collagen 3D Lift', 'Lash Lifting řas', 'Laminace obočí', 'Kosmetická masáž + gelová maska', 'Mandelic Forte Peel', 'DNA Glow Rebirth', 'Mikrojehličkování – základní ošetření'];
+  const names = ['Eva K.', 'Jana P.', 'Klára M.', 'Lenka S.', 'Monika V.', 'Hana R.', 'Ivana B.', 'Zuzana T.'];
+  const seqs = new Map<number, number>([[year, 2]]); let n = 0;
+  for (let back = 1; back <= 9; back++) {
+    const visitsInMonth = 14 + ((back * 7) % 9);
+    for (let k = 0; k < visitsInMonth; k++) {
+      const x = service(popular[(k * 3 + back) % popular.length]), offset = -back * 30 + (k % 26) - 12;
+      const [start, end] = at(offset, ['09:00', '11:00', '13:30', '15:30', '17:30'][k % 5], x.minutes), id = 'h-' + (++n), who = names[(k + back) % names.length];
+      const status = k % 13 === 5 ? 'no_show' : k % 11 === 7 ? 'cancelled' : 'done';
+      run('INSERT INTO bookings (id,service_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', [id, x.id, start, end, x.name, x.price, who, '', '', '', status, k % 2 ? 'online' : 'salon', now]);
+      if (status !== 'done') continue;
+      const items = [{name: x.name, qty: 1, unitCents: x.price, kind: 'service'}, ...(k % 4 === 0 ? [{name: 'Krém s SPF 50', qty: 1, unitCents: 79000, kind: 'product'}] : [])];
+      const gross = items.reduce((a, y) => a + y.unitCents, 0), discount = k % 6 === 0 ? Math.round(gross / 1000) * 100 : 0, total = gross - discount, y = Number(start.slice(0, 4));
+      const seq = (seqs.get(y) || 0) + 1; seqs.set(y, seq);
+      run('INSERT INTO receipts (id,year,seq,number,booking_id,client_id,client_name,issued,items,total_cents,prepaid_cents,due_cents,method,paid,vs,status,note,discount_cents,discount_label,created) VALUES (?,?,?,?,?,?,?,?,?,?,0,?,?,1,?,?,?,?,?,?)',
+        ['rh-' + n, y, seq, `${y}/${String(seq).padStart(4, '0')}`, id, null, who, end, JSON.stringify(items), total, total, ['cash', 'card', 'qr'][k % 3], `${y}${String(seq).padStart(4, '0')}`, 'issued', '', discount, discount ? '10 %' : '', now]);
+    }
+  }
   run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, account: '331122037/0300'})]);
 
   const photos: [string, string, string, string, number][] = [

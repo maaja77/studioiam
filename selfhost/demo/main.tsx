@@ -8,6 +8,7 @@ import PublicReceipt from '../../app/public-receipt';
 import * as bookings from '../../app/api/bookings/route';
 import * as publicApi from '../../app/api/public/route';
 import * as receiptsApi from '../../app/api/receipts/route';
+import * as statsApi from '../../app/api/stats/route';
 import * as records from '../../app/api/records/route';
 import * as photos from '../../app/api/photos/route';
 import {resetDemo} from './runtime';
@@ -25,6 +26,7 @@ async function handle(url: URL, request: Request) {
   if (url.pathname === '/api/records') return m === 'GET' ? records.GET() : records.POST(request);
   if (url.pathname === '/api/bookings') return m === 'GET' ? bookings.GET(request) : bookings.POST(request);
   if (url.pathname === '/api/receipts') return m === 'GET' ? receiptsApi.GET(request) : receiptsApi.POST(request);
+  if (url.pathname === '/api/stats') return statsApi.GET(request);
   if (url.pathname === '/api/public') return m === 'GET' ? publicApi.GET(request) : publicApi.POST(request);
   if (url.pathname === '/api/photos') return m === 'GET' ? photos.GET(request) : m === 'POST' ? photos.POST(request) : photos.DELETE(request);
   return Response.json({error: 'Not found'}, {status: 404});
