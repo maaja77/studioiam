@@ -382,3 +382,4 @@ dd .voucher-state.expiring{background:#fdf6e8}dd .voucher-state.expired{backgrou
 .visit-products small{color:var(--muted);font-size:12px}
 .visit-product-list{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}.visit-product-list li{background:#eef5f4;border-radius:14px;padding:3px 10px;font-size:14px}.visit-product-list small{color:var(--muted)}
 @media(max-width:640px){.visit-product-row input.amount{flex-basis:92px}}
+.program-picker{display:flex;align-items:center;gap:10px;margin:-6px 0 22px;font-size:14px;color:var(--muted)}.program-picker select{border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:14px;background:white;color:var(--ink)}
