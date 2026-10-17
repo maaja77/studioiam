@@ -173,6 +173,13 @@ export async function seedDemo(run: Run, put: Put) {
     run("INSERT INTO products (id,name,price_cents,active,sort,stock,min_stock,cost_cents,kind,created) VALUES (?,?,0,1,?,?,?,?,'pro',?)", ['pro-' + i, name, 10 + i, stock, min, cost, now]));
   // Ukázková nespolehlivá klientka s pevnou kaucí 500 Kč.
   run("UPDATE clients SET unreliable=1,deposit_required=1,deposit_rule='k:50000' WHERE id='demo-2'", []);
+  // Oblíbená klientka (hvězdička) bez kauce, vymyšlená dovolená příští týden a ošetření se speciální kaucí, pauzou, dny a fotkou.
+  run("UPDATE clients SET vip=1 WHERE id='demo-1'", []);
+  const nextMonday = [1, 2, 3, 4, 5, 6, 7].find(k => new Date(day(k) + 'T12:00:00Z').getUTCDay() === 1)!, awayFrom = day(nextMonday + 2), awayTo = day(nextMonday + 4);
+  run("INSERT INTO absences (id,start_at,end_at,reason,note,created) VALUES ('abs-1',?,?,'Dovolená','',?)", [awayFrom + 'T00:00', awayTo + 'T23:59', now]);
+  run('UPDATE services SET deposit_cents=50000,pause_min=15,photo=1 WHERE id=?', [service('Mikrojehličkování – PDRN Multipeptide').id]);
+  run('UPDATE services SET photo=1 WHERE id=?', [service('Nevím, jaké ošetření vybrat').id]);
+  run("UPDATE services SET weekdays='24' WHERE id=?", [service('Laminace obočí').id]);
   // Řady produktů (ukázkové): domácí péče i kabinetní produkty podle linií; vzorek masky zůstává bez řady.
   ([['p-0', 'Neuro Cannabis'], ['p-1', 'PDRN'], ['p-2', 'C-Fusion'], ['pro-0', 'A-QS Hacker'], ['pro-1', 'PDRN'], ['pro-2', 'Derma Collage'], ['pro-3', 'Neuro Gaba & Nana']] as const).forEach(([id, line]) => run('UPDATE products SET line=? WHERE id=?', [line, id]));
   // Spotřební materiál (vymyšlené ceny za balení) s výchozí spotřebou na klientku a odpisem podle účtenek za posledních 30 dní.
@@ -214,6 +221,8 @@ export async function seedDemo(run: Run, put: Put) {
     ['v-7', 'C5NA-3RTY', 'value', '', 200000, 200000, 'Ondřej Svoboda', '777 000 222, ondrej@example.cz', 'Hana', 'K narozeninám', day(-1), day(182), 'pending', null, 'online', 'ondrej@example.cz', 'email', '9' + day(-1).slice(2).replace(/-/g, '') + '417', day(4), 'd'.repeat(40), now]);
 
   const bookingSettings = {...DEFAULT_SETTINGS, smsReminders: true, voucherOnline: true, account: '331122037/0300', accountName: 'STUDIO I AM', businessName: 'STUDIO I AM', businessOwner: 'Andrea Marešová', businessAddress: 'Nerudova 884/11, 500 02 Hradec Králové', businessId: '73975052', businessPhone: '775 963 462', programEnabled: true, reviewUrl: 'https://g.page/r/ukazka-recenze/review'};
+  const short = (d: string) => d.slice(8).replace(/^0/, '') + '. ' + d.slice(5, 7).replace(/^0/, '') + '.';
+  Object.assign(bookingSettings, {depositVipFree: true, depositForfeitHours: 12, bookingNotice: `Od ${short(awayFrom)} do ${short(awayTo)} máme dovolenou. Termíny po ní už můžete rezervovat.`, bookingNoticeUntil: awayTo});
   run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify(bookingSettings)]);
   // Ukázkové dotazníky: Tereza vyplnila (s upozorněním), Lucie má odkaz, který čeká na vyplnění.
   const answers = Object.fromEntries(INTAKE_QUESTIONS.map(q => [q.id, {yes: q.id === 'allergy' || q.id === 'lenses', detail: q.id === 'allergy' ? 'parfemace, lanolin' : ''}]));

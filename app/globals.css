@@ -175,7 +175,7 @@ dialog[open]{margin:auto}
 .cal-legend li{display:flex;align-items:center;gap:6px}
 .cal-legend span{width:11px;height:11px;border-radius:3px}
 .cal-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:white;box-shadow:0 5px 25px oklch(from var(--teal) 0.381 calc(c * 0.635) h / 0.063)}
-.cal{display:grid;grid-template-columns:52px repeat(7,minmax(112px,1fr));min-width:max-content;width:100%}
+.cal{display:grid;grid-template-columns:52px repeat(var(--days,7),minmax(112px,1fr));min-width:max-content;width:100%}.cal.view-day{grid-template-columns:52px minmax(240px,1fr);min-width:0}.cal.view-work{grid-template-columns:52px repeat(var(--days,5),minmax(140px,1fr))}
 .cal-times{position:sticky;left:0;z-index:3;background:white;border-right:1px solid var(--line)}
 .cal-corner{height:64px;border-bottom:1px solid var(--line)}
 .cal-times span{position:absolute;right:7px;margin-top:58px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -207,7 +207,7 @@ dialog[open]{margin:auto}
 .service-list .color-dot{flex-shrink:0;width:12px;height:12px;border-radius:4px;margin-top:5px}
 .service-desc{display:block;color:var(--muted);font-size:12px;margin-top:2px}
 .service-form input[type=color]{height:44px;padding:4px;width:100%}
-@media(max-width:720px){.cal{grid-template-columns:44px repeat(7,minmax(118px,1fr))}}
+@media(max-width:720px){.cal{grid-template-columns:44px repeat(var(--days,7),minmax(118px,1fr))}.cal.view-day{grid-template-columns:44px minmax(0,1fr)}}
 .service-list li>div{flex:1;min-width:0}
 .pb-search{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--muted);background:#fdfbf8}
 .pb-search input{border:0;background:transparent;width:100%;min-width:0;font-size:16px;outline:none;color:var(--ink)}
@@ -480,3 +480,29 @@ dialog.care-dialog{width:min(680px,calc(100% - 24px))}
 .program-list b{display:inline-flex;align-items:center;gap:6px;color:var(--teal)}.program-list small{display:block;color:var(--muted);font-size:13px}.program-list-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .program-form-panel{display:grid;gap:12px;margin:14px 0;padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--background)}.program-form-panel h3{margin:0;font-size:17px}.program-form-panel .field small{color:var(--muted);font-size:12px}
 .program-form .field{margin-bottom:6px}
+
+/* Pohledy kalendáře, nepřítomnost, oblíbené klientky a fotky z online rezervace */
+.cap{text-transform:capitalize}
+.cal-jump input{border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit;font-size:14px;background:white}
+.cal.view-day .cal-event{font-size:13px}.cal.view-day .cal-event b{font-size:14px}
+.cal-absence{position:absolute;left:0;right:0;z-index:0;display:flex;align-items:flex-start;justify-content:center;gap:5px;padding-top:6px;border:0;border-radius:0;font-size:12px;font-weight:700;color:#5d4a7a;background:repeating-linear-gradient(135deg,#efe9f7 0 7px,#e4dbf1 7px 14px);cursor:pointer;opacity:.95}
+.cal-absence:hover{filter:brightness(.98)}
+.absence-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px;padding:8px 12px;border-radius:10px;background:#f3eefa;color:#4b3a66;font-size:14px}
+.caution-box{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:#fff4e0;color:#6e4510;font-size:14px}.caution-box svg{flex:none;margin-top:2px}
+.cal-event .tags em.tag-vip{background:#fff6d6;color:#8a6400}
+.vip-line{color:#8a6400;font-size:14px}.vip-badge{color:#8a6400!important}
+.booking-photos p{margin:0 0 6px;display:flex;align-items:center;gap:6px}
+.booking-photo-row{display:flex;flex-wrap:wrap;gap:10px}.booking-photo-row figure{margin:0;display:grid;gap:4px;justify-items:start}
+.photo-thumb{display:block;width:96px;height:96px;padding:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#f3f5f5;cursor:zoom-in}.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-zoom{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;border:0;background:#000c;cursor:zoom-out}.photo-zoom img{max-width:100%;max-height:100%;border-radius:8px}
+.weekday-pick{display:flex;flex-wrap:wrap;gap:6px 14px;border:0;padding:0;margin:0}.weekday-pick legend{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px;padding:0}
+.deposit-rules{display:grid;gap:8px;border:0;padding:0;margin:0 0 14px}.deposit-rules legend{font-weight:700;margin-bottom:8px;padding:0}
+.notice-settings{display:grid;gap:10px;margin:16px 0}.notice-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}.notice-row .field{max-width:220px}
+.pb-notice{margin:0 0 18px;padding:12px 16px;border-radius:12px;background:oklch(from var(--teal) 0.954 calc(c * 0.179) h);color:oklch(from var(--teal) 0.32 c h);border:1px solid oklch(from var(--teal) 0.871 calc(c * 0.197) h);white-space:pre-line;font-size:15px}
+.pb-photos{display:grid;gap:8px}.pb-photo-list{display:flex;flex-wrap:wrap;gap:8px}.pb-photo-list span{position:relative}.pb-photo-list img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block}.pb-photo-list button{position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;padding:0;display:grid;place-items:center;background:white;border:1px solid var(--line);cursor:pointer}
+.pb-forfeit{font-size:13px}
+.pb-photo-add{display:inline-flex;align-items:center;gap:6px;width:max-content;cursor:pointer}
+.vip-toggle{display:inline-grid;place-items:center;vertical-align:middle;margin-left:8px;width:32px;height:32px;padding:0;border:1px solid var(--line);border-radius:50%;background:white;color:#b5a780;cursor:pointer}.vip-toggle.on{color:#c99700;border-color:#f0dc9a;background:#fff8e1}.vip-toggle:hover{color:#c99700}
+.vip-star{color:#c99700;margin-left:5px;vertical-align:-1px}
+.items-table tfoot td{border-top:2px solid var(--line);padding-top:8px;font-weight:700}.items-table .other-row td{color:var(--muted)}.items-table .other-row .bar{opacity:.45}
+@media(max-width:720px){.week-nav>.segmented-mini{flex-basis:100%;display:flex}.week-nav>.segmented-mini button{flex:1}.week-nav b{font-size:15px}}

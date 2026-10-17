@@ -191,6 +191,12 @@ Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potře
 - **Kauce u jednotlivé klientky:** na kartě klientky (Upravit kauci) jde zapnout kauci u všech rezervací a nastavit její výši: podle nastavení salonu, vlastní procento, pevná částka (nejvýš do ceny ošetření) nebo celá cena předem. Výše platí pro každou její kauci, i u dražších ošetření.
 - **Nespolehlivé klientky:** tlačítkem Označit jako nespolehlivou na kartě klientka platí kauci vždy (ve výši nastavené u ní). V seznamu klientek, v kalendáři i v přehledu Dnes je u ní upozornění. Rezervaci jde v kalendáři zrušit, nebo úplně smazat (Smazat rezervaci; ne s vystavenou účtenkou). Klientce se nic neposílá.
 - **Balíčky a programy:** u ošetření lze nastavit počet ošetření v balíčku a platbu předem. Klientka online rezervuje 1. termín a hned dostane QR platbu na celou částku; termín čeká na platbu stejně jako u kauce. Další termíny balíčku domluví salon.
+- **Pohledy kalendáře:** Den, Pracovní dny (dny s otevírací dobou nebo s rezervacemi) a Týden; prohlížeč si volbu pamatuje. Políčkem s datem se dá skočit na libovolný den.
+- **Nepřítomnost:** tlačítkem Nepřítomnost v kalendáři se zadá dovolená, nemoc, školení nebo technické důvody (celé dny, nebo od–do s časem). V tu dobu se online nenabízí žádné termíny; v kalendáři je období šrafované a odejde i do kalendáře v telefonu. Rezervace, které v tom období už jsou, zůstanou a aplikace na ně upozorní.
+- **Nastavení u ošetření:** speciální kauce (pevná částka, kterou při online rezervaci platí každá klientka), pauza po ošetření (blokuje čas na úklid, klientka ji nevidí), dny v týdnu, kdy jde ošetření rezervovat online, a fotka od klientky (nežádat, nabídnout, vyžadovat).
+- **Pravidla kauce:** v Nastavení → Kauce a platby jde kauci vyžadovat od všech klientek, od nových klientek (bez návštěvy v kartotéce a bez proběhlé rezervace) a oblíbené klientky (★ na kartě) od kauce osvobodit. Kauce na kartě klientky a nespolehlivé klientky mají přednost. Lhůta „kauce propadá při zrušení méně než X h předem“ označí zaplacenou kauci jako propadlou, když klientka nepřijde nebo se termín zruší pozdě; klientky lhůtu vidí na rezervační stránce a v e-mailu.
+- **Oznámení na rezervační stránce:** v Nastavení → Rezervace na vašem webu jde napsat krátký text (např. o dovolené) a datum, do kdy se má ukazovat.
+- **Fotky od klientky:** u ošetření s fotkou klientka přiloží až 3 fotky (prohlížeč je zmenší na 1600 px). Uloží se k rezervaci mezi ostatní fotky na serveru (`data/objects`), ne do Gitu; v detailu rezervace se dají zvětšit a uložit na kartu klientky. Smazáním rezervace se smažou i fotky.
 - **Změna termínu klientkou:** po rezervaci (a e-mailem, pokud ho vyplní) dostane klientka tajný odkaz `/rezervace?t=…`, přes který termín zruší nebo přesune, nejpozději 24 h předem (nastavitelné). Salon dostane e-mail a do poznámky rezervace se zapíše, co klientka změnila. V administraci jde termín změnit kdykoliv.
 
 ## Barevný vzhled
@@ -256,6 +262,10 @@ calendar.google.com → Další kalendáře → Z adresy URL) a změny si stahuj
 - QR platba (SPD) na doplatek, číslování `RRRR/0001` po letech, VS = číslo účtenky. Storno účtenku nemaže, jen označí.
 - Záložka **Účtenky**: přehled za měsíc, nezaplacené účtenky a prodej bez rezervace. Tisk přes tlačítko Tisk (účtenka je připravená na úzký papír 80 mm i A4).
 - Údaje na účtence (název, provozovatel, adresa, IČO, neplátce DPH) se nastaví v Nastavení.
+
+### Tržby podle položek
+
+V **Statistikách** je pro zvolený měsíc, rok nebo celou historii přehled tržeb podle položek účtenek (ošetření, produkty, poukazy) s podílem na celku; tlačítko Stáhnout pro Excel uloží tabulku jako CSV (středník, UTF-8).
 
 ### Podklady pro účetní
 

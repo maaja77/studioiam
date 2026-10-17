@@ -5,7 +5,7 @@ import {icalendar} from '../../../lib/ical';
 import {addDays, addMinutes, isDate, isTime, parseSettings, salonName, salonNow, validateSettings, type BookingSettings} from '../../../lib/booking';
 import {renderSms, smsPhone} from '../../../lib/sms';
 import {parseRevenue} from '../../../lib/revenue';
-import {releaseExpiredDeposits} from '../public/route';
+import {bookingPhotoKey, lateCancel, releaseExpiredDeposits} from '../public/route';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
 const STATUSES = ['confirmed', 'pending', 'done', 'no_show', 'cancelled'];
@@ -22,15 +22,24 @@ export async function GET(request: Request) {
   try {
     await releaseExpiredDeposits();
     const params = new URL(request.url).searchParams, db = database();
+    // Fotka, kterou klientka přiložila k online rezervaci (jen pro přihlášený salon).
+    if (params.has('photo')) {
+      const n = Number(params.get('n')), b = await db.prepare('SELECT photos FROM bookings WHERE id=?').bind(params.get('photo')).first<{photos: number}>();
+      const object = b && Number.isInteger(n) && n >= 0 && n < b.photos ? await photoStorage().get(bookingPhotoKey(params.get('photo')!, n)) : null;
+      if (!object) return json({error: 'Fotka nebyla nalezena.'}, 404);
+      const bytes = new Uint8Array(await new Response(object.body as BodyInit).arrayBuffer());
+      return new Response(bytes, {headers: {'Content-Type': imageType(bytes) || 'application/octet-stream', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff'}});
+    }
     const from = isDate(params.get('from')) ? params.get('from')! : '0000-01-01', to = isDate(params.get('to')) ? params.get('to')! : '9999-12-31';
-    const [bookings, services, setting, calendar] = await db.batch([
-      db.prepare('SELECT b.id,b.service_id AS serviceId,b.client_id AS clientId,b.start_at AS start,b.end_at AS end,b.service_name AS serviceName,b.price_cents AS priceCents,b.name,b.phone,b.email,b.note,b.status,b.source,b.deposit_cents AS depositCents,b.deposit_status AS depositStatus,b.deposit_due AS depositDue,b.vs,b.payment_kind AS paymentKind,b.reminded_start AS remindedStart,b.reminded_at AS remindedAt,(SELECT f.status FROM intake_forms f WHERE f.client_id=b.client_id OR f.booking_id=b.id ORDER BY f.created DESC LIMIT 1) AS intake,b.created,s.color,s.category,(SELECT r.id FROM receipts r WHERE r.booking_id=b.id AND r.status=\'issued\' ORDER BY r.created DESC LIMIT 1) AS receiptId FROM bookings b LEFT JOIN services s ON s.id=b.service_id WHERE b.start_at>=? AND b.start_at<? ORDER BY b.start_at').bind(from, to + 'T99'),
-      db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,active,sort,category,description,color,sessions,prepay FROM services ORDER BY sort,name'),
+    const [bookings, services, setting, calendar, absences] = await db.batch([
+      db.prepare('SELECT b.id,b.service_id AS serviceId,b.client_id AS clientId,b.start_at AS start,b.end_at AS end,b.service_name AS serviceName,b.price_cents AS priceCents,b.name,b.phone,b.email,b.note,b.status,b.source,b.deposit_cents AS depositCents,b.deposit_status AS depositStatus,b.deposit_due AS depositDue,b.vs,b.payment_kind AS paymentKind,b.reminded_start AS remindedStart,b.reminded_at AS remindedAt,(SELECT f.status FROM intake_forms f WHERE f.client_id=b.client_id OR f.booking_id=b.id ORDER BY f.created DESC LIMIT 1) AS intake,b.created,b.photos,s.color,s.category,(SELECT r.id FROM receipts r WHERE r.booking_id=b.id AND r.status=\'issued\' ORDER BY r.created DESC LIMIT 1) AS receiptId FROM bookings b LEFT JOIN services s ON s.id=b.service_id WHERE b.start_at>=? AND b.start_at<? ORDER BY b.start_at').bind(from, to + 'T99'),
+      db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,active,sort,category,description,color,sessions,prepay,deposit_cents AS depositCents,pause_min AS pauseMin,weekdays,photo FROM services ORDER BY sort,name'),
       db.prepare("SELECT value FROM settings WHERE key='booking'"),
       db.prepare("SELECT value FROM settings WHERE key='calendar'"),
+      db.prepare('SELECT id,start_at AS start,end_at AS "end",reason,note FROM absences WHERE start_at<? AND end_at>? ORDER BY start_at').bind(to + 'T99', from),
     ]) as {results: Record<string, unknown>[]}[];
     const token = (calendar.results[0] as {value?: string} | undefined)?.value;
-    return json({bookings: bookings.results, services: services.results, settings: parseSettings((setting.results[0] as {value?: string} | undefined)?.value),
+    return json({bookings: bookings.results, services: services.results, absences: absences.results, settings: parseSettings((setting.results[0] as {value?: string} | undefined)?.value),
       features: {studioPriceList: salonProfile() === 'studioiam', sms: smsName(),
         calendarUrl: token ? `${publicOrigin(new URL(request.url).origin)}/kalendar/${token}.ics` : ''}});
   } catch (e) { console.error(e); return json({error: 'Rezervace se nepodařilo načíst. Zkuste to znovu.'}, 503); }
@@ -89,10 +98,39 @@ export async function POST(request: Request) {
       if (price === null) return json({error: 'Vyplňte cenu ošetření.'}, 400);
       const sessions = d.sessions === undefined ? 1 : Number(d.sessions);
       if (!Number.isInteger(sessions) || sessions < 1 || sessions > 50) return json({error: 'Počet ošetření v balíčku musí být 1–50.'}, 400);
+      // Speciální kauce ošetření (prázdné = podle pravidel salonu), pauza po ošetření a dny, kdy jde ošetření rezervovat online.
+      let deposit: number | null = null;
+      try { deposit = parseRevenue(typeof d.deposit === 'number' ? String(d.deposit) : d.deposit ?? ''); } catch { return json({error: 'Zkontrolujte speciální kauci (částka v Kč).'}, 400); }
+      if (deposit !== null && deposit !== 0 && deposit < 10000) return json({error: 'Speciální kauce musí být aspoň 100 Kč (nebo pole nechte prázdné).'}, 400);
+      const pause = d.pauseMin === undefined || d.pauseMin === '' ? 0 : Number(d.pauseMin);
+      if (!Number.isInteger(pause) || pause < 0 || pause > 240) return json({error: 'Pauza po ošetření musí být 0–240 minut.'}, 400);
+      const weekdays = [...new Set(field('weekdays', 7).replace(/[^0-6]/g, ''))].sort().join(''), photo = [0, 1, 2].includes(Number(d.photo)) ? Number(d.photo) : 0;
+      if (field('weekdays', 7) && !weekdays) return json({error: 'Vyberte aspoň jeden den v týdnu.'}, 400);
       const id = field('id') || crypto.randomUUID(), color = /^#[0-9a-f]{6}$/i.test(field('color')) ? field('color').toLowerCase() : '';
-      await db.prepare('INSERT INTO services (id,name,duration_min,price_cents,active,sort,category,description,color,sessions,prepay,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,duration_min=excluded.duration_min,price_cents=excluded.price_cents,active=excluded.active,sort=excluded.sort,category=excluded.category,description=excluded.description,color=excluded.color,sessions=excluded.sessions,prepay=excluded.prepay')
-        .bind(id, name, duration, price, d.active === false ? 0 : 1, Number.isInteger(d.sort) ? d.sort as number : 0, field('category', 80), field('description', 600), color, sessions, d.prepay === true ? 1 : 0, new Date().toISOString()).run();
+      await db.prepare('INSERT INTO services (id,name,duration_min,price_cents,active,sort,category,description,color,sessions,prepay,deposit_cents,pause_min,weekdays,photo,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,duration_min=excluded.duration_min,price_cents=excluded.price_cents,active=excluded.active,sort=excluded.sort,category=excluded.category,description=excluded.description,color=excluded.color,sessions=excluded.sessions,prepay=excluded.prepay,deposit_cents=excluded.deposit_cents,pause_min=excluded.pause_min,weekdays=excluded.weekdays,photo=excluded.photo')
+        .bind(id, name, duration, price, d.active === false ? 0 : 1, Number.isInteger(d.sort) ? d.sort as number : 0, field('category', 80), field('description', 600), color, sessions, d.prepay === true ? 1 : 0, deposit || null, pause, weekdays.length === 7 ? '' : weekdays, photo, new Date().toISOString()).run();
       return json({ok: true, id});
+    }
+
+    // Nepřítomnost (dovolená, nemoc, technické důvody): v celém rozsahu se online nedá rezervovat.
+    if (body.kind === 'absence') {
+      if (body.action === 'delete') { await db.prepare('DELETE FROM absences WHERE id=?').bind(field('id')).run(); return json({ok: true}); }
+      const start = `${field('fromDate')}T${field('fromTime') || '00:00'}`, end = `${field('toDate')}T${field('toTime') || '23:59'}`;
+      if (!isDate(field('fromDate')) || !isDate(field('toDate')) || !isTime(start.slice(11)) || !isTime(end.slice(11))) return json({error: 'Vyplňte začátek a konec nepřítomnosti.'}, 400);
+      if (end <= start) return json({error: 'Konec nepřítomnosti musí být po začátku.'}, 400);
+      if (end > addDays(start.slice(0, 10), 366)) return json({error: 'Nepřítomnost může trvat nejvýš rok.'}, 400);
+      const id = field('id') || crypto.randomUUID();
+      await db.prepare('INSERT INTO absences (id,start_at,end_at,reason,note,created) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET start_at=excluded.start_at,end_at=excluded.end_at,reason=excluded.reason,note=excluded.note')
+        .bind(id, start, end, field('reason', 40), field('note', 300), new Date().toISOString()).run();
+      const clash = await db.prepare("SELECT count(*) AS n FROM bookings WHERE status IN ('confirmed','pending') AND source<>'block' AND start_at<? AND end_at>?").bind(end, start).first<{n: number}>();
+      return json({ok: true, id, clash: clash?.n || 0});
+    }
+
+    // Oblíbená klientka (hvězdička): podle nastavení salonu nemusí platit kauci.
+    if (body.kind === 'vip') {
+      const res = await db.prepare('UPDATE clients SET vip=? WHERE id=?').bind(d.vip ? 1 : 0, field('clientId')).run();
+      if (!res.meta.changes) return json({error: 'Klient nebyl nalezen.'}, 404);
+      return json({ok: true});
     }
 
     if (body.kind === 'block') {
@@ -154,18 +192,35 @@ export async function POST(request: Request) {
 
     if (body.action === 'delete') {
       if (await db.prepare("SELECT id FROM receipts WHERE booking_id=? AND status='issued'").bind(id).first()) return json({error: 'K rezervaci je vystavená účtenka, smazat ji nejde. Můžete ji zrušit.'}, 409);
+      const photos = (await db.prepare('SELECT photos FROM bookings WHERE id=?').bind(id).first<{photos: number}>())?.photos || 0;
+      if (photos) await photoStorage().delete(Array.from({length: photos}, (_, i) => bookingPhotoKey(id, i)));
       await db.batch([db.prepare('DELETE FROM bookings WHERE id=?').bind(id), db.prepare('DELETE FROM intake_forms WHERE booking_id=? AND client_id IS NULL').bind(id)]); return json({ok: true});
+    }
+
+    // Fotka z online rezervace do fotek na kartě klientky (kopie, u rezervace zůstává).
+    if (body.action === 'photoToClient') {
+      const n = Number(d.n), b = await db.prepare('SELECT client_id AS clientId,start_at AS start,photos FROM bookings WHERE id=?').bind(id).first<{clientId: string | null; start: string; photos: number}>();
+      if (!b?.clientId) return json({error: 'Rezervace nemá kartu klientky. Nejdřív ji založte.'}, 400);
+      const object = Number.isInteger(n) && n >= 0 && n < b.photos ? await photoStorage().get(bookingPhotoKey(id, n)) : null;
+      if (!object) return json({error: 'Fotka nebyla nalezena.'}, 404);
+      const bytes = new Uint8Array(await new Response(object.body as BodyInit).arrayBuffer()), photoId = crypto.randomUUID();
+      await photoStorage().put('photos/' + photoId, bytes);
+      await db.prepare('INSERT INTO photos (id,client_id,object_key,mime,date,caption,created) VALUES (?,?,?,?,?,?,?)').bind(photoId, b.clientId, 'photos/' + photoId, imageType(bytes) || 'image/jpeg', b.start.slice(0, 10), 'Fotka z online rezervace', new Date().toISOString()).run();
+      return json({ok: true});
     }
 
     if (body.action === 'status') {
       const status = field('status');
       if (!STATUSES.includes(status)) return json({error: 'Neplatný stav rezervace.'}, 400);
-      const booking = await db.prepare('SELECT client_id AS clientId FROM bookings WHERE id=?').bind(id).first<{clientId: string | null}>();
+      const booking = await db.prepare('SELECT client_id AS clientId,start_at AS start,deposit_status AS depositStatus,payment_kind AS paymentKind FROM bookings WHERE id=?').bind(id).first<{clientId: string | null; start: string; depositStatus: string | null; paymentKind: string | null}>();
       if (!booking) return json({error: 'Rezervace nebyla nalezena.'}, 404);
       const statements = [db.prepare('UPDATE bookings SET status=? WHERE id=?').bind(status, id)];
+      // Pravidlo salonu: zaplacená kauce propadá, když klientka nepřijde nebo ruší pozdě (jen je-li lhůta nastavená).
+      const settings = await current(), forfeit = booking.depositStatus === 'paid' && booking.paymentKind !== 'prepay' && settings.depositForfeitHours > 0 && (status === 'no_show' || (status === 'cancelled' && lateCancel(booking.start, settings)));
+      if (forfeit) statements.push(db.prepare("UPDATE bookings SET deposit_status='forfeited' WHERE id=?").bind(id));
       if (status === 'no_show' && d.block === true && booking.clientId) statements.push(db.prepare('UPDATE clients SET blocked=1 WHERE id=?').bind(booking.clientId));
       await db.batch(statements);
-      return json({ok: true});
+      return json({ok: true, forfeited: forfeit});
     }
 
     if (body.action === 'deposit') {
@@ -267,10 +322,11 @@ export async function calendarFeed(token: string) {
   const today = salonNow().slice(0, 10), settings = parseSettings((await db.prepare("SELECT value FROM settings WHERE key='booking'").first<{value: string}>())?.value);
   const rows = await db.prepare("SELECT id,start_at AS start,end_at AS \"end\",service_name AS serviceName,name,phone,status,source FROM bookings WHERE start_at>=? AND start_at<? AND status IN ('confirmed','pending','done') ORDER BY start_at")
     .bind(addDays(today, -60), addDays(today, 400)).all<{id: string; start: string; end: string; serviceName: string; name: string; phone: string; status: string; source: string}>();
+  const away = await db.prepare('SELECT id,start_at AS start,end_at AS "end",reason FROM absences WHERE end_at>=? AND start_at<?').bind(addDays(today, -60), addDays(today, 400)).all<{id: string; start: string; end: string; reason: string}>();
   // Do kalendáře jde jen jméno, ošetření a telefon; poznámky ani údaje z karty klientky ne.
-  return icalendar(`Rezervace – ${salonName(settings)}`, rows.results.map(b => ({
+  return icalendar(`Rezervace – ${salonName(settings)}`, [...away.results.map(a => ({uid: `${a.id}@salon-nepritomnost`, start: a.start, end: a.end, tentative: false, summary: a.reason || 'Nepřítomnost', description: 'Online rezervace jsou v tuto dobu vypnuté'})), ...rows.results.map(b => ({
     uid: `${b.id}@salon-rezervace`, start: b.start, end: b.end, tentative: b.status === 'pending',
     summary: b.source === 'block' ? b.serviceName : `${b.name} – ${b.serviceName}`,
     description: b.source === 'block' ? 'Blokovaný čas' : [b.phone && `Tel. ${b.phone}`, b.source === 'online' && 'rezervace z webu', FEED_STATUS[b.status]].filter(Boolean).join('\n'),
-  })));
+  }))]);
 }
