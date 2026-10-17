@@ -6,6 +6,7 @@ import {parseSettings, salonName, salonNow} from '../../../lib/booking';
 import {parseRevenue} from '../../../lib/revenue';
 import {normalizeCode, voucherCover, voucherState, type Voucher} from '../../../lib/vouchers';
 import {VOUCHER_COLUMNS} from '../vouchers/route';
+import {recipeFor, type SupplyRow} from '../../../lib/supplies';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
 export const METHODS = ['cash', 'card', 'qr'];
@@ -32,30 +33,44 @@ export async function GET(request: Request) {
     const month = /^\d{4}-\d{2}$/.test(params.get('month') || '') ? params.get('month')! : salonNow().slice(0, 7);
     const [list, products] = await db.batch([
       db.prepare(`SELECT ${RECEIPT_COLUMNS} FROM receipts WHERE issued>=? AND issued<? ORDER BY issued DESC`).bind(month + '-01', month + '-99'),
-      db.prepare('SELECT id,name,price_cents AS priceCents,active,sort,stock FROM products ORDER BY sort,name'),
+      db.prepare("SELECT id,name,price_cents AS priceCents,active,sort,stock FROM products WHERE kind='sale' ORDER BY sort,name"),
     ]) as {results: Row[]}[];
     return json({month, receipts: list.results.map(decode), products: products.results, settings: await settings()});
   } catch (e) { console.error(e); return json({error: 'Účtenky se nepodařilo načíst. Zkuste to znovu.'}, 503); }
 }
 
 type DB = ReturnType<typeof database>;
-/** Prodané produkty se sledovaným skladem se odečtou ze skladu (podle produktu, u ručně dopsané položky podle názvu). */
+/** Prodané produkty se sledovaným skladem se odečtou ze skladu (podle produktu, u ručně dopsané položky podle názvu).
+ *  U ošetření se odečte spotřební materiál podle nastavené spotřeby na klientku. */
 async function stockForSale(db: DB, items: ReceiptItem[], receiptId: string, issued: string, number: string) {
-  const products = items.some(x => x.kind === 'product') ? (await db.prepare('SELECT id,name FROM products WHERE stock IS NOT NULL').all<{id: string; name: string}>()).results : [];
+  const products = items.some(x => x.kind === 'product') ? (await db.prepare("SELECT id,name FROM products WHERE stock IS NOT NULL AND kind='sale'").all<{id: string; name: string}>()).results : [];
   const key = (t: string) => t.trim().toLocaleLowerCase('cs'), now = new Date().toISOString();
-  return items.flatMap(x => {
+  const supplies: ReturnType<ReturnType<DB['prepare']>['bind']>[] = [];
+  if (items.some(x => x.kind === 'service')) {
+    const [services, rows, tracked] = await db.batch([db.prepare('SELECT id,name FROM services'), db.prepare('SELECT service_key AS serviceKey,product_id AS productId,qty FROM service_supplies'),
+      db.prepare("SELECT id FROM products WHERE kind='supply' AND stock IS NOT NULL")]) as {results: Record<string, unknown>[]}[];
+    const total = new Map<string, number>();
+    for (const x of items) {
+      if (x.kind !== 'service') continue;
+      const service = (services.results as {id: string; name: string}[]).find(s => key(s.name) === key(x.name));
+      for (const [id, qty] of recipeFor(service?.id || null, rows.results as SupplyRow[])) if (tracked.results.some(t => t.id === id)) total.set(id, (total.get(id) || 0) + qty * x.qty);
+    }
+    for (const [id, qty] of total) supplies.push(db.prepare('UPDATE products SET stock=stock-? WHERE id=?').bind(qty, id),
+      db.prepare("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,receipt_id,note,created) SELECT ?,id,?,'supply',?,stock,?,?,? FROM products WHERE id=?").bind(crypto.randomUUID(), issued, -qty, receiptId, `Ošetření, účtenka ${number}`, now, id));
+  }
+  return [...supplies, ...items.flatMap(x => {
     if (x.kind !== 'product') return [];
     const p = products.find(y => y.id === x.productId) || (!x.productId ? products.find(y => key(y.name) === key(x.name)) : undefined);
     return p ? [db.prepare('UPDATE products SET stock=stock-? WHERE id=?').bind(x.qty, p.id),
       db.prepare("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,receipt_id,note,created) SELECT ?,id,?,'sale',?,stock,?,?,? FROM products WHERE id=?").bind(crypto.randomUUID(), issued, -x.qty, receiptId, `Účtenka ${number}`, now, p.id)] : [];
-  });
+  })];
 }
-/** Storno účtenky vrátí prodané kusy na sklad. */
+/** Storno účtenky vrátí prodané kusy i odepsaný spotřební materiál na sklad. */
 async function stockReturn(db: DB, receiptId: string) {
-  const moves = (await db.prepare("SELECT product_id AS productId,delta FROM stock_moves WHERE receipt_id=? AND kind='sale'").bind(receiptId).all<{productId: string; delta: number}>()).results;
+  const moves = (await db.prepare("SELECT product_id AS productId,delta,kind FROM stock_moves WHERE receipt_id=? AND (kind='sale' OR (kind='supply' AND delta<0))").bind(receiptId).all<{productId: string; delta: number; kind: string}>()).results;
   const now = new Date().toISOString(), date = salonNow();
   return moves.flatMap(m => [db.prepare('UPDATE products SET stock=stock+? WHERE id=? AND stock IS NOT NULL').bind(-m.delta, m.productId),
-    db.prepare("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,receipt_id,note,created) SELECT ?,id,?,'return',?,stock,?,?,? FROM products WHERE id=? AND stock IS NOT NULL").bind(crypto.randomUUID(), date, -m.delta, receiptId, 'Storno účtenky', now, m.productId)]);
+    db.prepare("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,receipt_id,note,created) SELECT ?,id,?,?,?,stock,?,?,? FROM products WHERE id=? AND stock IS NOT NULL").bind(crypto.randomUUID(), date, m.kind === 'sale' ? 'return' : 'supply', -m.delta, receiptId, 'Storno účtenky', now, m.productId)]);
 }
 
 export async function POST(request: Request) {

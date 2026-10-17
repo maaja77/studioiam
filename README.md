@@ -272,6 +272,12 @@ Ručně se zapisuje naskladnění (s nákupní cenou), spotřeba v salonu (teste
 U každého produktu je historie pohybů a odhad, na jak dlouho zásoba vystačí podle prodejů za 90 dní. Když počet klesne
 na nastavené minimum, ukáže se upozornění a odznak u záložky; na účtence se zobrazí, kolik kusů je skladem.
 
+### Spotřební materiál
+
+- Sklad → **Spotřební materiál**: tampony, kapesníky, rukavice a další materiál, který se neprodává. Cena se zadává za balení s počtem kusů, sklad se počítá v kusech a naskladňuje po baleních. Tlačítko **Založit materiál** založí běžný seznam.
+- Sklad → **Spotřeba na ošetření**: kolik kusů čeho se použije na jednu klientku. Výchozí spotřeba platí pro každé ošetření, u jednotlivých ošetření jde upravit (třeba nitrilové rukavice jen u mikrojehličkování). U každého ošetření je cena materiálu na klientku a průměr za posledních 30 dní.
+- Materiál se ze skladu odečte při vystavení účtenky s ošetřením (podle názvu ošetření v ceníku), storno účtenky ho vrátí. Když materiál dochází, ukáže se to ve Skladu i v přehledu Dnes.
+
 ### Faktury za zboží
 
 - Sklad → **Faktury za zboží**: dodavatel, číslo, datum, splatnost, částka, stav zaplacení a soubor faktury (PDF nebo fotka, nejvýše 10 MB; ukládá se na server vedle fotek a zálohuje se s nimi).

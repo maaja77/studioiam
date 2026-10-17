@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     const raw = Array.isArray(d.items) ? d.items as ItemInput[] : [];
     if (raw.length > 80) return json({error: 'Faktura může mít nejvýše 80 položek.'}, 400);
     const productIds = raw.map(i => typeof i.productId === 'string' ? i.productId : '').filter(Boolean);
-    const products = productIds.length ? (await db.prepare(`SELECT id,name,stock FROM products WHERE id IN (${productIds.map(() => '?').join(',')})`).bind(...productIds).all<{id: string; name: string; stock: number | null}>()).results : [];
+    const products = productIds.length ? (await db.prepare(`SELECT id,name,stock,kind,pack_size AS packSize FROM products WHERE id IN (${productIds.map(() => '?').join(',')})`).bind(...productIds).all<{id: string; name: string; stock: number | null; kind: string; packSize: number | null}>()).results : [];
     const invoiceId = crypto.randomUUID(), statements = [], moveDate = date === salonNow().slice(0, 10) ? salonNow() : date + 'T12:00';
     const label = `Faktura ${number || 'bez čísla'} (${supplier})`.slice(0, 200);
     let stocked = 0;
@@ -121,11 +121,13 @@ export async function POST(request: Request) {
       if (!Number.isInteger(qty) || qty < 1 || qty > 99999) return json({error: `Položka ${n + 1}: zadejte počet kusů (1 a víc).`}, 400);
       if (cost === undefined) return json({error: `Položka ${n + 1}: zadejte nákupní cenu za kus v Kč, nebo ji nechte prázdnou.`}, 400);
       let productId = typeof item.productId === 'string' && item.productId ? item.productId : null, name = typeof item.name === 'string' ? item.name.trim().slice(0, 150) : '';
-      let tracked = false;
+      let tracked = false, pieces = qty;
       if (productId) {
         const p = products.find(x => x.id === productId);
         if (!p) return json({error: `Položka ${n + 1}: produkt ve Skladu nebyl nalezen.`}, 400);
         name = name || p.name; tracked = p.stock !== null;
+        // Spotřební materiál je na faktuře po baleních, sklad v kusech; nákupní cena zůstává za balení.
+        if (p.kind === 'supply' && p.packSize) pieces = qty * p.packSize;
       } else if (item.newProduct === true) {
         // Nový produkt ze Skladu: sleduje se od 0 kusů a hned se naskladní.
         if (!name) return json({error: `Položka ${n + 1}: vyplňte název nového produktu.`}, 400);
@@ -139,8 +141,8 @@ export async function POST(request: Request) {
       if (productId && cost) statements.push(db.prepare('UPDATE products SET cost_cents=? WHERE id=?').bind(cost, productId));
       if (productId && tracked) {
         stocked++;
-        statements.push(db.prepare('UPDATE products SET stock=stock+? WHERE id=?').bind(qty, productId),
-          db.prepare("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,receipt_id,invoice_id,note,created) SELECT ?,id,?,'delivery',?,stock,NULL,?,?,? FROM products WHERE id=?").bind(crypto.randomUUID(), moveDate, qty, invoiceId, label, now, productId));
+        statements.push(db.prepare('UPDATE products SET stock=stock+? WHERE id=?').bind(pieces, productId),
+          db.prepare("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,receipt_id,invoice_id,note,created) SELECT ?,id,?,'delivery',?,stock,NULL,?,?,? FROM products WHERE id=?").bind(crypto.randomUUID(), moveDate, pieces, invoiceId, label, now, productId));
       }
     }
     if (key) await photoStorage().put(key, bytes!, {httpMetadata: {contentType: mime}});

@@ -454,3 +454,10 @@ dialog.care-dialog{width:min(680px,calc(100% - 24px))}
 .invoice-item select,.invoice-item input{width:100%;min-width:0}.invoice-new{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:13px}.invoice-new input{max-width:140px}.invoice-hint{grid-column:1/-1;color:#8a5212;font-size:12px}
 @media(max-width:700px){.invoice-item{grid-template-columns:1fr 70px 100px 36px;padding-bottom:8px;border-bottom:1px solid var(--line)}.invoice-item>label:first-child{grid-column:1/-1}.invoice-item.head{display:none}.invoice-row{flex-wrap:wrap}.invoice-actions{width:100%;justify-content:flex-end}}
 .invoice-item input,.invoice-item select,.invoice-new input{border:1px solid #cad8d6;border-radius:7px;padding:8px 10px;background:white;font-size:16px;color:var(--ink)}
+/* Spotřební materiál */
+.stock-tabs{display:inline-flex;margin:0 0 16px;max-width:100%;overflow-x:auto}.stock-tabs button{white-space:nowrap;display:inline-flex;align-items:center;gap:6px}.tab-badge{background:#c9932b;color:white;border-radius:9px;font-size:11px;min-width:18px;padding:0 5px;line-height:18px}
+.supply-recipes .panel{margin-bottom:16px}.supply-recipes h2{margin:0 0 4px}.recipe-group h3{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 4px}
+.recipe-services{list-style:none;margin:0;padding:0}.recipe-services>li{border-top:1px solid var(--line);padding:8px 0}.recipe-service{display:flex;align-items:center;gap:10px}.recipe-service>span:first-child{flex:1;min-width:0;display:flex;flex-direction:column}
+.recipe-service small{color:var(--muted);font-size:13px}.recipe-cost{font-weight:600;white-space:nowrap;display:flex;flex-direction:column;align-items:flex-end}.recipe-cost small{color:#8a5212;font-weight:400;font-size:12px}
+.recipe-table .num{text-align:right;white-space:nowrap}.recipe-table td small{color:var(--muted);font-size:12px}.recipe-table tr.unused td{color:var(--muted)}.recipe-table tr.total td{font-weight:700}
+.recipe-table input{width:72px;border:1px solid #cad8d6;border-radius:7px;padding:6px 8px;font-size:16px;text-align:right}.recipe-form{display:flex;flex-direction:column;gap:10px;margin-top:8px}

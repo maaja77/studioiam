@@ -3,6 +3,7 @@ import {CATEGORY_COLORS, PRICE_LIST} from '../../lib/price-list';
 import {DEFAULT_SETTINGS} from '../../lib/booking';
 import {consentText, INTAKE_QUESTIONS, PHOTO_CONSENT} from '../../lib/intake';
 import {DEMO_SIGNATURE} from './demo-signature';
+import {ALL_SERVICES, STARTER_SUPPLIES} from '../../lib/supplies';
 
 // Ukázkové popisy pro náhled; skutečné popisy si salon doplní v Nastavení.
 const DESCRIPTIONS: Record<string, string> = {
@@ -155,6 +156,17 @@ export async function seedDemo(run: Run, put: Put) {
         ['rh-' + n, y, seq, `${y}/${String(seq).padStart(4, '0')}`, id, null, who, end, JSON.stringify(items), total, total, ['cash', 'card', 'qr'][k % 3], `${y}${String(seq).padStart(4, '0')}`, 'issued', '', discount, discount ? '10 %' : '', now]);
     }
   }
+  // Spotřební materiál (vymyšlené ceny za balení) s výchozí spotřebou na klientku a odpisem podle účtenek za posledních 30 dní.
+  const supplyStock = [180, 64, 150, 9, 70, 40, 60, 30], supplyCost = [8900, 4500, 3900, 12900, 21900, 18900, 15900, 4900];
+  STARTER_SUPPLIES.forEach((x, i) => {
+    run("INSERT INTO products (id,name,price_cents,active,sort,stock,min_stock,cost_cents,kind,pack_size,created) VALUES (?,?,0,1,?,?,?,?,'supply',?,?)", ['sup-' + i, x.name, 20 + i, supplyStock[i], x.pack / 2, supplyCost[i], x.pack, now]);
+    if (!x.only) {
+      run('INSERT INTO service_supplies (id,service_key,product_id,qty,created) VALUES (?,?,?,?,?)', ['ss-' + i, ALL_SERVICES, 'sup-' + i, x.perClient, now]);
+      run("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,receipt_id,note,created) SELECT 'smh-' || ? || '-' || id,?,issued,'supply',?,NULL,id,'Ošetření, účtenka ' || number,? FROM receipts WHERE issued>=? AND items LIKE '%\"service\"%'", [i, 'sup-' + i, -x.perClient, now, day(-30)]);
+    } else PRICE_LIST.forEach(([, name], k) => { if (x.only!.test(name)) run('INSERT INTO service_supplies (id,service_key,product_id,qty,created) VALUES (?,?,?,?,?)', [`ss-${i}-${k}`, 's-' + k, 'sup-' + i, x.perClient, now]); });
+  });
+  // Lash lifting a laminace bez Perlanu a vyšetřovacího papíru.
+  PRICE_LIST.forEach(([category], k) => { if (category === 'Laminace a Lash Lifting') for (const i of [4, 5]) run('INSERT INTO service_supplies (id,service_key,product_id,qty,created) VALUES (?,?,?,0,?)', [`ss-l${i}-${k}`, 's-' + k, 'sup-' + i, now]); });
   // Dárkové poukazy (vymyšlená jména): platné, brzy vyprší, prošlý, částečně a úplně vyčerpaný, na ošetření.
   const vouchers: [string, string, 'value' | 'service', string, number, number, string, string, number, number][] = [
     ['v-1', 'KQ4M-7XPA', 'value', '', 150000, 150000, 'Tereza Malá', 'Jana Malá', -20, 163],
