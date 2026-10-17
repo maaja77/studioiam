@@ -4,13 +4,16 @@ import {DEFAULT_SMS_TEMPLATE} from './sms';
 import {parseAmounts} from './vouchers';
 // Časy se ukládají jako místní čas salonu (Europe/Prague) ve tvaru YYYY-MM-DDTHH:MM.
 
+/** Výchozí SMS klientce, která dlouho nepřišla. Obchodní sdělení musí dát možnost odmítnout další zprávy. */
+export const DEFAULT_LAPSED_TEXT = 'Dobrý den, už je to nějaký čas od Vaší poslední návštěvy v {salon}. Rádi Vás zase uvidíme, objednat se můžete online: {odkaz}. Pokud už podobné zprávy nechcete, odepište prosím NE.';
+
 export type Hours = Record<string, [string, string] | null>; // klíč 0 = neděle … 6 = sobota
 export type BookingSettings = {hours: Hours; leadHours: number; horizonDays: number; stepMinutes: number;
   depositFromKc: number; depositPercent: number; depositHoldHours: number; account: string; accountName: string; changeLimitHours: number;
   businessName: string; businessOwner: string; businessAddress: string; businessId: string; businessPhone: string; businessEmail: string;
   programEnabled: boolean; logoVersion: number; voucherMonths: number;
   smsReminders: boolean; smsTime: string; smsTemplate: string; smsAscii: boolean; intakeOnline: boolean;
-  voucherOnline: boolean; voucherAmounts: string; voucherMinKc: number; voucherServices: boolean};
+  voucherOnline: boolean; voucherAmounts: string; voucherMinKc: number; voucherServices: boolean; lapsedText: string};
 export type BusyRange = {start: string; end: string};
 
 export const DEFAULT_SETTINGS: BookingSettings = {
@@ -42,6 +45,7 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   voucherAmounts: '1000, 1500, 2000, 3000',
   voucherMinKc: 500,
   voucherServices: true,
+  lapsedText: DEFAULT_LAPSED_TEXT,
 };
 /** Jméno salonu pro nadpisy a e-maily, dokud ho salon nevyplní v Nastavení. */
 export const salonName = (s: Pick<BookingSettings, 'businessName'>) => s.businessName.trim() || 'Salon';
@@ -116,7 +120,7 @@ export function validateSettings(v: unknown): BookingSettings | string {
   if (voucherOnline && !voucherAmounts && !voucherMinKc && !voucherServices) return 'Nabídněte na webu aspoň jednu částku nebo poukazy na ošetření.';
   return {businessName: text('businessName', 80), businessOwner: text('businessOwner', 80), businessAddress: text('businessAddress', 160), businessId, businessPhone, businessEmail,
     programEnabled: raw.programEnabled === true, voucherMonths,
-    smsReminders: raw.smsReminders === true, smsTime, smsTemplate, smsAscii: raw.smsAscii !== false, intakeOnline: raw.intakeOnline !== false, voucherOnline, voucherAmounts, voucherMinKc, voucherServices, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0,
+    smsReminders: raw.smsReminders === true, smsTime, smsTemplate, smsAscii: raw.smsAscii !== false, intakeOnline: raw.intakeOnline !== false, voucherOnline, voucherAmounts, voucherMinKc, voucherServices, lapsedText: text('lapsedText', 480) || DEFAULT_LAPSED_TEXT, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0,
     hours, leadHours: lead, horizonDays: horizon, stepMinutes: step, depositFromKc: depositFrom, depositPercent: percent, depositHoldHours: hold, account, accountName, changeLimitHours: change};
 }
 

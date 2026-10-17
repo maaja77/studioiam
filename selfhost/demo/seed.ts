@@ -36,6 +36,11 @@ export async function seedDemo(run: Run, put: Put) {
     ['demo-2', 'Lucie Horáková', '+420 602 345 678', '', 'Suchá, dehydratovaná pleť, jemné vrásky kolem očí.', '', 'Zájem o anti-age péči.', 0],
     ['demo-3', 'Markéta Dvořáková', '+420 603 456 789', 'marketa@example.cz', 'Mastná pleť se sklonem k akné.', 'Užívá isotretinoin, zatím bez peelingů.', '', 0],
     ['demo-4', 'Petra Svobodová', '+420 604 567 890', '', 'Normální pleť.', 'Alergie na latex.', 'Dárkový poukaz od dcery.', 0],
+    // Klientky, které dlouho nepřišly (přehled Dlouho nebyly).
+    ['demo-5', 'Veronika Černá', '+420 605 111 222', '', 'Smíšená pleť.', '', '', 0],
+    ['demo-6', 'Kristýna Malá', '+420 606 333 444', 'kristyna@example.cz', 'Citlivá pleť, kuperóza.', '', 'Chodila pravidelně na masáže.', 0],
+    ['demo-7', 'Hana Pokorná', '+420 607 555 666', '', 'Zralá pleť.', '', '', 0],
+    ['demo-8', 'Jitka Royová', '+420 608 777 888', '', 'Normální pleť.', '', '', 0],
   ];
   for (const c of clients) run('INSERT INTO clients (id,name,phone,email,skin,cautions,notes,created,clean_skin_active) VALUES (?,?,?,?,?,?,?,?,?)', [...c.slice(0, 7), now, c[7]] as (string | number)[]);
 
@@ -45,7 +50,14 @@ export async function seedDemo(run: Run, put: Put) {
     ['v-3', 'demo-2', day(-14), 'Hydratační ošetření s maskou', 'Hyaluronové sérum, alginátová maska', 'Doporučena domácí hydratace.', 115000, 0, null, null],
     ['v-4', 'demo-3', day(-5), 'Konzultace a jemné čištění', 'Enzymatický peeling', 'Bez mechanického čištění kvůli léčbě.', 60000, 0, null, null],
     ['v-5', 'demo-4', day(-40), 'Lifting řas a laminace obočí', '', '', 90000, 0, null, null],
+    ['v-6', 'demo-5', day(-110), 'Čištění pleti', '', '', 89000, 0, null, null],
+    ['v-7', 'demo-6', day(-250), 'Kosmetická masáž + gelová maska', '', '', 59000, 0, null, null],
+    ['v-8', 'demo-6', day(-160), 'Kosmetická masáž + gelová maska', '', '', 59000, 0, null, null],
+    ['v-9', 'demo-6', day(-125), 'Mandelic Forte Peel', '', '', 129000, 0, null, null],
+    ['v-10', 'demo-7', day(-200), 'Hyaluron Collagen 3D Lift', '', '', 149000, 0, null, null],
+    ['v-11', 'demo-8', day(-95), 'Laminace obočí', '', '', 69000, 0, null, null],
   ];
+  run("UPDATE clients SET contacted_at=? WHERE id='demo-7'", [day(-6)]);
   for (const v of visits) run('INSERT INTO visits (id,client_id,date,treatment,products,notes,revenue_cents,clean_skin,program_price_cents,program_step) VALUES (?,?,?,?,?,?,?,?,?,?)', v);
 
   PRICE_LIST.forEach(([category, name, minutes, price, extra], i) => run('INSERT INTO services (id,name,duration_min,price_cents,active,sort,category,description,color,sessions,prepay,created) VALUES (?,?,?,?,1,?,?,?,?,?,?,?)', ['s-' + i, name, minutes, price * 100, i, category, DESCRIPTIONS[name] || '', CATEGORY_COLORS[category] || '', extra?.sessions ?? 1, extra?.prepay ? 1 : 0, now]));
@@ -80,8 +92,16 @@ export async function seedDemo(run: Run, put: Put) {
   run("INSERT INTO bookings (id,service_id,client_id,start_at,end_at,service_name,price_cents,name,phone,email,note,status,source,deposit_cents,deposit_status,deposit_due,vs,created) VALUES (?,?,?,?,?,?,?,?,?,?,?,'confirmed','online',70000,'paid',?,?,?)",
     ['b-7', architect.id, 'demo-2', kStart, kEnd, architect.name, architect.price, 'Lucie Horáková', '+420 602 345 678', '', '', kStart, kStart.slice(2, 10).replace(/-/g, '') + '1042', now]);
   // Ukázkové produkty a účtenky.
-  const products: [string, number][] = [['Čisticí gel pro citlivou pleť', 590], ['Hydratační sérum s kyselinou hyaluronovou', 1290], ['Krém s SPF 50', 790], ['Pleťová maska – vzorek', 120]];
-  products.forEach(([name, price], i) => run('INSERT INTO products (id,name,price_cents,active,sort,created) VALUES (?,?,?,1,?,?)', ['p-' + i, name, price * 100, i, now]));
+  // Sklad: [název, cena, kusů, minimum, nákupní cena]; vzorky masek se nesledují.
+  const products: [string, number, number | null, number | null, number | null][] = [['Čisticí gel pro citlivou pleť', 590, 6, 2, 320], ['Hydratační sérum s kyselinou hyaluronovou', 1290, 1, 2, 690], ['Krém s SPF 50', 790, 9, 3, 410], ['Pleťová maska – vzorek', 120, null, null, null]];
+  products.forEach(([name, price, stock, min, cost], i) => {
+    run('INSERT INTO products (id,name,price_cents,active,sort,stock,min_stock,cost_cents,created) VALUES (?,?,?,1,?,?,?,?,?)', ['p-' + i, name, price * 100, i, stock, min, cost === null ? null : cost * 100, now]);
+    if (stock !== null) {
+      run("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,note,created) VALUES (?,?,?,'start',?,?,'Počáteční stav',?)", ['sm-a' + i, 'p-' + i, day(-60) + 'T09:00', stock + 4, stock + 4, now]);
+      run("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,note,created) VALUES (?,?,?,'sale',-3,?,'Účtenky',?)", ['sm-b' + i, 'p-' + i, day(-20) + 'T15:00', stock + 1, now]);
+      run("INSERT INTO stock_moves (id,product_id,date,kind,delta,stock_after,note,created) VALUES (?,?,?,'use',-1,?,'Tester',?)", ['sm-c' + i, 'p-' + i, day(-7) + 'T10:00', stock, now]);
+    }
+  });
   const year = Number(day(0).slice(0, 4)), dna = service('DNA Glow Rebirth');
   const receipt = (seq: number, bookingId: string | null, clientId: string | null, clientName: string, issued: string, items: {name: string; qty: number; unitCents: number; kind: string}[], method: string, paid: number) => {
     const total = items.reduce((a, x) => a + x.qty * x.unitCents, 0);

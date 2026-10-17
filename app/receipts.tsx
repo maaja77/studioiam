@@ -8,9 +8,9 @@ import {QrCode} from './qr-payment';
 import {voucherCover, voucherState, type Voucher} from '../lib/vouchers';
 import {logoSrc} from './logo';
 
-export type ReceiptItem = {name: string; qty: number; unitCents: number; kind: 'service' | 'product' | 'voucher' | 'other'};
+export type ReceiptItem = {name: string; qty: number; unitCents: number; kind: 'service' | 'product' | 'voucher' | 'other'; productId?: string};
 export type Receipt = {id: string; number: string; bookingId: string | null; clientId: string | null; clientName: string; issued: string; items: ReceiptItem[]; totalCents: number; prepaidCents: number; dueCents: number; method: string; paid: number; vs: string; status: string; note: string; discountCents?: number; discountLabel?: string; voucherCents?: number; voucherCode?: string | null};
-export type Product = {id: string; name: string; priceCents: number; active: number; sort: number};
+export type Product = {id: string; name: string; priceCents: number; active: number; sort: number; stock?: number | null};
 /** Podklad pro novou účtenku, např. z rezervace v kalendáři. */
 export type ReceiptDraft = {bookingId?: string; clientId?: string | null; clientName?: string; items: ReceiptItem[]; prepaidCents?: number; prepaidLabel?: string};
 type Client = {id: string; name: string};
@@ -89,7 +89,7 @@ function ReceiptForm({draft, products, clients, busy, onSubmit, onCancel}: {draf
     if (priced.some(p => Number.isNaN(p))) return setError('Zkontrolujte ceny položek (např. 590 nebo 590,50).');
     if (voucherInput.trim() && !voucher) return setError('Poukaz nejdřív ověřte tlačítkem Použít, nebo kód smažte.');
     if (voucherProblem) return setError(`Poukaz ${voucher!.v.code} ${voucherProblem}. Smažte kód, nebo poukazu prodlužte platnost v části Poukazy.`);
-    onSubmit({bookingId: draft.bookingId, clientId: clientId || null, clientName, method, discountCents, discountLabel, voucherCode: covered ? voucher!.v.code : '', items: items.map((x, i) => ({name: x.name, qty: x.qty, unitCents: priced[i], kind: x.kind}))});
+    onSubmit({bookingId: draft.bookingId, clientId: clientId || null, clientName, method, discountCents, discountLabel, voucherCode: covered ? voucher!.v.code : '', items: items.map((x, i) => ({name: x.name, qty: x.qty, unitCents: priced[i], kind: x.kind, productId: x.productId}))});
   }
 
   return <form onSubmit={submit}>
@@ -104,11 +104,12 @@ function ReceiptForm({draft, products, clients, busy, onSubmit, onCancel}: {draf
           <input aria-label="Počet" type="number" min={1} max={99} value={x.qty} onChange={e => update(i, {qty: Math.max(1, Math.min(99, Number(e.target.value) || 1))})}/>
           <input aria-label="Cena za kus v Kč" inputMode="decimal" value={x.price} required onChange={e => update(i, {price: e.target.value})}/>
           <button type="button" aria-label={'Odebrat ' + x.name} onClick={() => setItems(items.filter((_, j) => j !== i))}><Trash2 size={16}/></button>
+          {(() => { const stock = products.find(p => p.id === x.productId)?.stock; return stock != null && x.qty > stock ? <small className="stock-warn">Na skladě {stock <= 0 ? 'nic není' : `jen ${stock} ks`}, účtenka sklad pošle do minusu.</small> : null; })()}
         </div>)}
       </div>
       <div className="receipt-add">
-        <select aria-label="Přidat produkt" value="" onChange={e => { const p = products.find(x => x.id === e.target.value); if (p) setItems([...items, {name: p.name, qty: 1, unitCents: p.priceCents, price: String(p.priceCents / 100).replace('.', ','), kind: 'product'}]); }}>
-          <option value="">+ Přidat produkt…</option>{products.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name} · {formatRevenue(p.priceCents)}</option>)}
+        <select aria-label="Přidat produkt" value="" onChange={e => { const p = products.find(x => x.id === e.target.value); if (p) setItems([...items, {name: p.name, qty: 1, unitCents: p.priceCents, price: String(p.priceCents / 100).replace('.', ','), kind: 'product', productId: p.id}]); }}>
+          <option value="">+ Přidat produkt…</option>{products.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name} · {formatRevenue(p.priceCents)}{p.stock != null && ` · skladem ${p.stock} ks`}</option>)}
         </select>
         <button type="button" className="secondary" onClick={() => setItems([...items, {name: '', qty: 1, unitCents: 0, price: '', kind: 'other'}])}><Plus size={16}/> Vlastní položka</button>
       </div>
@@ -212,29 +213,6 @@ export default function Receipts({clients}: {clients: Client[]}) {
       </button></li>)}</ul></div>
     {open && <ReceiptDialog draft={open.draft} receiptId={open.id} clients={clients} onClose={() => setOpen(null)} onChanged={load}/>}
   </div>;
-}
-
-/** Produkty k prodeji, spravované v Nastavení. */
-export function ProductsPanel() {
-  const [products, setProducts] = useState<Product[]>([]), [editing, setEditing] = useState<Partial<Product> | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false);
-  async function load() { const r = await fetch('/api/receipts', {cache: 'no-store'}); const d = await r.json() as {products?: Product[]}; setProducts(d.products || []); }
-  useEffect(() => { load(); }, []);
-  async function run(body: unknown) { setBusy(true); setError(''); try { await post(body); setEditing(null); await load(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }
-  return <section className="panel">
-    <div className="panel-heading"><h2>Produkty k prodeji</h2><button className="primary" onClick={() => setEditing({active: 1})}><Plus size={17}/> Přidat produkt</button></div>
-    {error && <div className="error" role="alert">{error}</div>}
-    {!products.length && <p className="muted-inline">Zatím žádné produkty. Přidejte kosmetiku, kterou klientkám prodáváte, a na účtence ji pak jen vyberete. Jednorázovou položku jde na účtenku dopsat i ručně.</p>}
-    <ul className="service-list">{products.map(p => <li key={p.id} className={p.active ? '' : 'inactive'}>
-      <div><b>{p.name}</b><small>{formatRevenue(p.priceCents)}{!p.active && ' · skryté'}</small></div>
-      <span className="actions"><button aria-label={'Upravit ' + p.name} onClick={() => setEditing(p)}>Upravit</button><button aria-label={'Smazat ' + p.name} disabled={busy} onClick={() => run({kind: 'product', action: 'delete', data: {id: p.id}})}><Trash2 size={16}/></button></span>
-    </li>)}</ul>
-    {editing && <form className="service-form" ref={el => el?.scrollIntoView({block: 'nearest', behavior: 'smooth'})} onSubmit={e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.currentTarget)); run({kind: 'product', action: 'save', data: {id: editing.id, name: f.name, price: f.price, active: f.active === 'on', sort: editing.sort ?? products.length}}); }}>
-      <div className="field-grid"><label className="field"><span>Název produktu</span><input name="name" required maxLength={150} defaultValue={editing.name}/></label>
-        <label className="field"><span>Cena (Kč)</span><input name="price" inputMode="decimal" required defaultValue={editing.priceCents != null ? String(editing.priceCents / 100).replace('.', ',') : ''}/></label></div>
-      <label className="check"><input type="checkbox" name="active" defaultChecked={editing.active !== 0}/> Nabízet na účtence</label>
-      <div className="form-actions"><button type="button" className="secondary" onClick={() => setEditing(null)}>Zrušit</button><button className="primary" disabled={busy}>Uložit produkt</button></div>
-    </form>}
-  </section>;
 }
 
 /** Odeslání účtenky a QR platby klientce: e-mail přes server, SMS z telefonu, sdílení nebo odkaz. */

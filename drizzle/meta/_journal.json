@@ -92,6 +92,20 @@
       "when": 1792232574068,
       "tag": "0012_voucher_shop",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1792233702839,
+      "tag": "0013_lapsed_clients",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1792234094098,
+      "tag": "0014_product_stock",
+      "breakpoints": true
     }
   ]
 }
