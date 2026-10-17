@@ -1,7 +1,8 @@
 // Dárkové poukazy: stav podle platnosti a zůstatku, kódy a výpočet čerpání na účtence.
 export type Voucher = {id: string; code: string; kind: 'value' | 'service'; serviceName: string; valueCents: number; balanceCents: number;
-  buyerName: string; buyerContact: string; recipientName: string; note: string; issued: string; validUntil: string; status: string; receiptId: string | null};
-export type VoucherState = 'active' | 'expiring' | 'expired' | 'used' | 'cancelled';
+  buyerName: string; buyerContact: string; recipientName: string; note: string; issued: string; validUntil: string; status: string; receiptId: string | null;
+  source?: string; buyerEmail?: string; delivery?: string; vs?: string | null; payDue?: string | null; token?: string | null};
+export type VoucherState = 'pending' | 'active' | 'expiring' | 'expired' | 'used' | 'cancelled';
 export const EXPIRING_DAYS = 30;
 
 const day = (date: string) => Math.round(Date.parse(date + 'T12:00:00Z') / 86400000);
@@ -10,6 +11,7 @@ export const daysLeft = (validUntil: string, today: string) => day(validUntil) -
 /** Stav poukazu k danému dni (platí včetně posledního dne platnosti). */
 export function voucherState(v: Pick<Voucher, 'status' | 'balanceCents' | 'validUntil'>, today: string): VoucherState {
   if (v.status === 'cancelled') return 'cancelled';
+  if (v.status === 'pending') return 'pending'; // objednávka z webu, čeká na platbu
   if (v.balanceCents <= 0) return 'used';
   const left = daysLeft(v.validUntil, today);
   return left < 0 ? 'expired' : left <= EXPIRING_DAYS ? 'expiring' : 'active';
@@ -43,4 +45,11 @@ export function voucherCover(v: Pick<Voucher, 'kind' | 'serviceName' | 'balanceC
     return Math.min(toPay, Math.max(v.balanceCents, match?.unitCents || 0));
   }
   return Math.min(toPay, v.balanceCents);
+}
+
+/** Kolik dní má kupující na zaplacení poukazu objednaného přes web. */
+export const VOUCHER_PAY_DAYS = 5;
+/** Nabízené částky poukazů na webu z textu „1000, 1500, 2000“ (celé Kč, vzestupně, bez duplicit). */
+export function parseAmounts(text: string) {
+  return [...new Set(text.split(/[,;]+/).map(x => x.replace(/kč|\s/gi, '')).filter(Boolean).map(Number).filter(n => Number.isInteger(n) && n >= 100 && n <= 100000))].sort((a, b) => a - b).slice(0, 8);
 }

@@ -13,7 +13,7 @@ const publicOrigin=process.env.SALON_PUBLIC_ORIGIN?new URL(process.env.SALON_PUB
 const webRoot=path.resolve('dist-selfhost/client');
 const types:Record<string,string>={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.ico':'image/x-icon','.woff2':'font/woff2'};
 // Veřejné jsou jen rezervační stránka, její statické soubory a /api/public; vše ostatní chrání přihlášení.
-const isPublic=(p:string)=>p==='/rezervace'||p==='/rezervace/'||p==='/uctenka'||p==='/dotaznik'||p.startsWith('/assets/')||p==='/favicon.svg'||p==='/logo.png'||p==='/api/public'||/^\/kalendar\/[0-9a-f]{40}\.ics$/.test(p);
+const isPublic=(p:string)=>p==='/rezervace'||p==='/rezervace/'||p==='/uctenka'||p==='/dotaznik'||p==='/poukaz'||p.startsWith('/assets/')||p==='/favicon.svg'||p==='/logo.png'||p==='/api/public'||/^\/kalendar\/[0-9a-f]{40}\.ics$/.test(p);
 const frameAncestors=process.env.SALON_BOOKING_FRAME_ANCESTORS||'*';
 const hits=new Map<string,number[]>();
 function rateLimited(ip:string){const now=Date.now(),list=(hits.get(ip)||[]).filter(t=>now-t<3600_000);list.push(now);hits.set(ip,list);if(hits.size>5000)hits.clear();return list.length>20;}
@@ -77,7 +77,7 @@ const server=http.createServer(async(req,res)=>{try{
   res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));return;
  }
  if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);res.end();return;}
- const bookingPage=pathname==='/rezervace'||pathname==='/rezervace/'||pathname==='/uctenka'||pathname==='/dotaznik';
+ const bookingPage=pathname==='/rezervace'||pathname==='/rezervace/'||pathname==='/uctenka'||pathname==='/dotaznik'||pathname==='/poukaz';
  let file=bookingPage?path.join(webRoot,'rezervace.html'):path.resolve(webRoot,'.'+decodeURIComponent(url.pathname));if(!file.startsWith(webRoot+path.sep)){file=path.join(webRoot,'index.html');}
  if(!existsSync(file)||!statSync(file).isFile()){if(!allowed){res.writeHead(404);res.end();return;}file=path.join(webRoot,'index.html');}
  res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':file.endsWith('.html')?'no-store':'private, max-age=3600','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin',...(bookingPage?{'Content-Security-Policy':'frame-ancestors '+frameAncestors}:{'X-Frame-Options':'DENY'})});res.end(req.method==='HEAD'?undefined:readFileSync(file));

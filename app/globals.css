@@ -336,3 +336,10 @@ dd .voucher-state.expiring{background:#fdf6e8}dd .voucher-state.expired{backgrou
 .voucher-tools .segmented-mini{max-width:100%;overflow-x:auto}.voucher-tools .segmented-mini button{white-space:nowrap}
 @media(max-width:1440px){.app>header .private{display:none}}
 @media print{.voucher-card{display:flex;flex-direction:column;justify-content:center}}
+/* Nákup poukazu na webu */
+.voucher-shop h1{margin:0 0 6px}.voucher-shop h2{font-size:17px;margin:4px 0 10px}
+.voucher-shop .voucher-amounts .secondary.active{border-color:var(--teal);background:#e8f4f2;color:var(--teal);font-weight:600}
+.voucher-own{display:flex;align-items:center;gap:6px;flex:1 1 200px;color:var(--muted);font-size:14px}.voucher-own input{flex:1;min-width:0}
+.voucher-preview{display:flex;flex-direction:column;gap:6px}.voucher-preview .voucher-card{max-width:440px;width:100%}
+.voucher-buyer{display:flex;flex-direction:column;gap:14px}
+.voucher-ready{gap:14px}.voucher-ready .voucher-card{max-width:460px;width:100%}

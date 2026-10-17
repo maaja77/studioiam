@@ -6,6 +6,7 @@ import Home from '../../app/page';
 import PublicBooking from '../../app/public-booking';
 import PublicReceipt from '../../app/public-receipt';
 import PublicIntake from '../../app/public-intake';
+import PublicVoucher from '../../app/public-voucher';
 import * as bookings from '../../app/api/bookings/route';
 import * as publicApi from '../../app/api/public/route';
 import * as receiptsApi from '../../app/api/receipts/route';
@@ -67,7 +68,7 @@ new MutationObserver(list => {
   }
 }).observe(document.body, {subtree: true, childList: true, attributes: true, attributeFilter: ['src']});
 
-type View = 'admin' | 'public' | 'login';
+type View = 'admin' | 'public' | 'voucher' | 'login';
 function DemoBar({view, setView}: {view: View; setView: (v: View) => void}) {
   const [confirming, setConfirming] = React.useState(false), [mail, setMail] = React.useState<string[]>([]);
   React.useEffect(() => { const on = (e: Event) => setMail(list => [...list, (e as CustomEvent<string>).detail].slice(-3)); window.addEventListener('demo-mail', on); return () => window.removeEventListener('demo-mail', on); }, []);
@@ -77,6 +78,7 @@ function DemoBar({view, setView}: {view: View; setView: (v: View) => void}) {
       <span className="demo-actions" role="group" aria-label="Pohled">
         <button type="button" aria-pressed={view === 'admin'} onClick={() => setView('admin')}>Administrace</button>
         <button type="button" aria-pressed={view === 'public'} onClick={() => setView('public')}>Rezervace pro klientky</button>
+        <button type="button" aria-pressed={view === 'voucher'} onClick={() => setView('voucher')}>Nákup poukazu</button>
         <button type="button" aria-pressed={view === 'login'} onClick={() => setView('login')}>Přihlášení</button>
       </span>
       {confirming
@@ -97,20 +99,22 @@ function DemoLogin({onLogin}: {onLogin: () => void}) {
 }
 
 function Demo() {
-  const [view, setView] = React.useState<View>(() => location.hash === '#rezervace' ? 'public' : location.hash === '#prihlaseni' ? 'login' : 'admin');
+  const [view, setView] = React.useState<View>(() => location.hash === '#rezervace' ? 'public' : location.hash === '#poukaz' ? 'voucher' : location.hash === '#prihlaseni' ? 'login' : 'admin');
   // Odkaz na účtenku pro klientku v náhledu neotevře novou stránku, ale ukáže ji tady.
-  const [receipt, setReceipt] = React.useState(''), [intake, setIntake] = React.useState('');
+  const [receipt, setReceipt] = React.useState(''), [intake, setIntake] = React.useState(''), [order, setOrder] = React.useState('');
   React.useEffect(() => {
     const on = (e: MouseEvent) => {
-      const a = (e.target as HTMLElement).closest?.('a'), m = a?.href.match(/\/uctenka\?t=([0-9a-f-]{36})/), q = a?.href.match(/\/dotaznik\?t=([0-9a-f]{40})/);
+      const a = (e.target as HTMLElement).closest?.('a'), m = a?.href.match(/\/uctenka\?t=([0-9a-f-]{36})/), q = a?.href.match(/\/dotaznik\?t=([0-9a-f]{40})/), o = a?.href.match(/\/poukaz(?:\?t=([0-9a-f]{40}))?$/);
       if (m) { e.preventDefault(); setReceipt(m[1]); }
       if (q) { e.preventDefault(); setIntake(q[1]); window.scrollTo(0, 0); }
+      if (o) { e.preventDefault(); if (o[1]) setOrder(o[1]); else setView('voucher'); window.scrollTo(0, 0); }
     };
     document.addEventListener('click', on, true); return () => document.removeEventListener('click', on, true);
   }, []);
+  if (order) return <><div className="demo-bar" role="note"><span><strong>Ukázka:</strong> takhle objednávku poukazu uvidí kupující po otevření odkazu z e-mailu.</span><button type="button" onClick={() => setOrder('')}>Zpět</button></div><PublicVoucher key={order} token={order}/></>;
   if (intake) return <><div className="demo-bar" role="note"><span><strong>Ukázka:</strong> takhle dotazník uvidí klientka po otevření odkazu (v telefonu nebo na tabletu v salonu).</span><button type="button" onClick={() => setIntake('')}>Zpět</button></div><PublicIntake token={intake}/></>;
   if (receipt) return <><div className="demo-bar" role="note"><span><strong>Ukázka:</strong> takhle účtenku uvidí klientka po otevření odkazu.</span><button type="button" onClick={() => setReceipt('')}>Zpět do administrace</button></div><PublicReceipt token={receipt}/></>;
-  return <><DemoBar view={view} setView={setView}/>{view === 'admin' ? <Home onLogout={() => setView('login')}/> : view === 'login' ? <DemoLogin onLogin={() => setView('admin')}/> : <PublicBooking/>}</>;
+  return <><DemoBar view={view} setView={setView}/>{view === 'admin' ? <Home onLogout={() => setView('login')}/> : view === 'login' ? <DemoLogin onLogin={() => setView('admin')}/> : view === 'voucher' ? <PublicVoucher token=""/> : <PublicBooking/>}</>;
 }
 
 createRoot(document.getElementById('root')!).render(<Demo/>);

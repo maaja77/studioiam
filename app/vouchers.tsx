@@ -1,18 +1,19 @@
 'use client';
 // Dárkové poukazy: prodej, přehled s hlídáním platnosti, čerpání, prodloužení, storno a tisk.
 import {useEffect, useRef, useState} from 'react';
-import {CalendarClock, Gift, Plus, Printer, Search, X} from 'lucide-react';
+import {BadgeCheck, CalendarClock, Gift, Plus, Printer, Search, X} from 'lucide-react';
 import {formatRevenue} from '../lib/revenue';
 import {addMonths, daysLeft, voucherState, type Voucher, type VoucherState} from '../lib/vouchers';
 import {DEFAULT_SETTINGS, salonName, type BookingSettings} from '../lib/booking';
 import {ReceiptDialog} from './receipts';
-import {logoSrc} from './logo';
+import {VoucherCard} from './voucher-card';
+export {VoucherCard};
 
 type Client = {id: string; name: string};
 type Use = {id: string; date: string; amountCents: number; note: string; receiptId: string | null; receiptNumber: string | null};
-type Filter = 'valid' | 'expiring' | 'expired' | 'used' | 'all';
+type Filter = 'pending' | 'valid' | 'expiring' | 'expired' | 'used' | 'all';
 const dateText = (s: string) => s.split('-').reverse().map(Number).join('. ');
-const STATE_LABEL: Record<VoucherState, string> = {active: 'Platný', expiring: 'Brzy vyprší', expired: 'Prošlý', used: 'Vyčerpaný', cancelled: 'Stornovaný'};
+const STATE_LABEL: Record<VoucherState, string> = {pending: 'Čeká na platbu', active: 'Platný', expiring: 'Brzy vyprší', expired: 'Prošlý', used: 'Vyčerpaný', cancelled: 'Stornovaný'};
 const fold = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 async function post(body: unknown) {
@@ -24,25 +25,13 @@ async function post(body: unknown) {
 
 function stateText(v: Voucher, today: string) {
   const state = voucherState(v, today), left = daysLeft(v.validUntil, today);
+  if (state === 'pending') return v.payDue && v.payDue < today ? `nezaplaceno, splatnost ${dateText(v.payDue)}` : v.payDue ? `zaplatit do ${dateText(v.payDue)}` : 'čeká na platbu';
   if (state === 'expiring') return left === 0 ? 'vyprší dnes' : left === 1 ? 'vyprší zítra' : `vyprší za ${left} ${left <= 4 ? 'dny' : 'dní'}`;
   if (state === 'expired') return `prošel ${dateText(v.validUntil)}`;
   if (state === 'active') return `platí do ${dateText(v.validUntil)}`;
   return STATE_LABEL[state].toLowerCase();
 }
 const valueText = (v: Voucher) => v.kind === 'service' ? v.serviceName : formatRevenue(v.valueCents);
-
-/** Poukaz k tisku nebo uložení do PDF (formát A6 na šířku). */
-export function VoucherCard({voucher, settings}: {voucher: Voucher; settings: BookingSettings}) {
-  return <article className="voucher-card">
-    <img src={logoSrc(settings.logoVersion)} alt="" width={64} height={64}/>
-    <p className="voucher-salon">{salonName(settings)}</p>
-    <h3>Dárkový poukaz</h3>
-    <p className="voucher-value">{voucher.kind === 'service' ? <>na ošetření<br/><b>{voucher.serviceName}</b></> : <>v hodnotě <b>{formatRevenue(voucher.valueCents)}</b></>}</p>
-    {voucher.recipientName && <p className="voucher-for">pro <b>{voucher.recipientName}</b></p>}
-    <p className="voucher-meta"><span>Kód <b>{voucher.code}</b></span><span>Platí do <b>{dateText(voucher.validUntil)}</b></span></p>
-    <p className="voucher-contact">{[settings.businessAddress, settings.businessPhone && 'tel. ' + settings.businessPhone].filter(Boolean).join(' · ')}</p>
-  </article>;
-}
 
 function NewVoucher({months, onCreated, onCancel}: {months: number; onCreated: (id: string, receiptId: string | null) => void; onCancel: () => void}) {
   const today = new Date().toLocaleDateString('sv-SE', {timeZone: 'Europe/Prague'});
@@ -91,14 +80,16 @@ function VoucherDetail({id, settings, onChanged, onReceipt}: {id: string; settin
     try { await post(body); setMode(''); setAmount(''); setNote(''); await load(); onChanged(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   if (!data) return <div className="fields">{error ? <p className="error" role="alert">{error}</p> : <p className="muted">Načítám…</p>}</div>;
-  const v = data.voucher, state = voucherState(v, data.today), open = state !== 'cancelled' && state !== 'used';
+  const v = data.voucher, state = voucherState(v, data.today), open = state !== 'cancelled' && state !== 'used', pending = state === 'pending';
   return <>
     <div className="fields">
       <VoucherCard voucher={v} settings={settings}/>
       <dl className="voucher-facts">
         <div><dt>Stav</dt><dd><span className={'voucher-state ' + state}>{STATE_LABEL[state]}</span> {stateText(v, data.today)}</dd></div>
-        <div><dt>Zůstatek</dt><dd>{v.kind === 'service' ? (v.balanceCents > 0 ? 'nevyčerpáno' : 'vyčerpáno') : formatRevenue(v.balanceCents) + ' z ' + formatRevenue(v.valueCents)}</dd></div>
-        <div><dt>Vystaven</dt><dd>{dateText(v.issued)}{v.receiptId && <> · <button type="button" className="link-button" onClick={() => onReceipt(v.receiptId!)}>účtenka za prodej</button></>}</dd></div>
+        {!pending && <div><dt>Zůstatek</dt><dd>{v.kind === 'service' ? (v.balanceCents > 0 ? 'nevyčerpáno' : 'vyčerpáno') : formatRevenue(v.balanceCents) + ' z ' + formatRevenue(v.valueCents)}</dd></div>}
+        {pending && <div><dt>Platba</dt><dd>{formatRevenue(v.valueCents)} na účet salonu, VS <b>{v.vs}</b>{v.payDue && `, splatnost ${dateText(v.payDue)}`}. Platnost poukazu se počítá od potvrzení platby.</dd></div>}
+        {v.source === 'online' && <div><dt>Objednávka</dt><dd>přes web{v.delivery === 'pickup' ? ', vyzvedne si tištěný poukaz v salonu' : ', poukaz e-mailem'}</dd></div>}
+        <div><dt>{pending ? 'Objednán' : 'Vystaven'}</dt><dd>{dateText(v.issued)}{v.receiptId && <> · <button type="button" className="link-button" onClick={() => onReceipt(v.receiptId!)}>účtenka za prodej</button></>}</dd></div>
         {(v.buyerName || v.buyerContact) && <div><dt>Kupující</dt><dd>{[v.buyerName, v.buyerContact].filter(Boolean).join(', ')}</dd></div>}
         {v.note && <div><dt>Poznámka</dt><dd className="pre">{v.note}</dd></div>}
       </dl>
@@ -113,15 +104,15 @@ function VoucherDetail({id, settings, onChanged, onReceipt}: {id: string; settin
         <label className="field"><span>Nová platnost do</span><span className="voucher-amounts"><input type="date" required value={until} onChange={e => setUntil(e.target.value)}/>{[1, 3, 6].map(m => <button type="button" key={m} className="secondary" onClick={() => setUntil(addMonths(v.validUntil > data.today ? v.validUntil : data.today, m))}>+{m} měs.</button>)}</span></label>
         <div className="form-actions"><button type="button" className="secondary" onClick={() => setMode('')}>Zpět</button><button className="primary" disabled={busy}>Uložit platnost</button></div>
       </form>}
-      {mode === 'cancel' && <div className="voucher-inline"><p>Stornovat poukaz {v.code}? {v.receiptId && 'Stornuje se i účtenka za jeho prodej.'}</p>
-        <div className="form-actions"><button type="button" className="secondary" onClick={() => setMode('')}>Ne</button><button type="button" className="secondary danger-text" disabled={busy} onClick={() => run({action: 'cancel', data: {id}})}>Ano, stornovat</button></div></div>}
+      {mode === 'cancel' && <div className="voucher-inline"><p>{pending ? 'Zrušit objednávku? Kupující poukaz nedostane.' : <>Stornovat poukaz {v.code}? {v.receiptId && 'Stornuje se i účtenka za jeho prodej.'}</>}</p>
+        <div className="form-actions"><button type="button" className="secondary" onClick={() => setMode('')}>Ne</button><button type="button" className="secondary danger-text" disabled={busy} onClick={() => run({action: 'cancel', data: {id}})}>{pending ? 'Ano, zrušit' : 'Ano, stornovat'}</button></div></div>}
     </div>
     {error && <p className="error" role="alert">{error}</p>}
     {!mode && <div className="dialog-footer receipt-actions">
-      {open && v.balanceCents === v.valueCents && <button className="secondary" onClick={() => setMode('cancel')}>Storno</button>}
-      {state !== 'cancelled' && state !== 'used' && <button className="secondary" onClick={() => setMode('use')}>Zapsat čerpání</button>}
-      {state !== 'cancelled' && state !== 'used' && <button className="secondary" onClick={() => setMode('extend')}><CalendarClock size={16}/> Prodloužit</button>}
-      <button className="secondary" onClick={() => window.print()}><Printer size={16}/> Tisk / PDF</button>
+      {open && v.balanceCents === v.valueCents && <button className="secondary" onClick={() => setMode('cancel')}>{pending ? 'Zrušit objednávku' : 'Storno'}</button>}
+      {open && !pending && <button className="secondary" onClick={() => setMode('use')}>Zapsat čerpání</button>}
+      {open && !pending && <button className="secondary" onClick={() => setMode('extend')}><CalendarClock size={16}/> Prodloužit</button>}
+      {pending ? <button className="primary" disabled={busy} onClick={() => run({action: 'paid', data: {id}})}><BadgeCheck size={16}/> Platba přišla</button> : <button className="secondary" onClick={() => window.print()}><Printer size={16}/> Tisk / PDF</button>}
     </div>}
   </>;
 }
@@ -146,16 +137,17 @@ export default function Vouchers({clients, onChanged}: {clients: Client[]; onCha
   const states = list.map(v => ({v, state: voucherState(v, today)}));
   const count = (f: (s: VoucherState) => boolean) => states.filter(x => f(x.state)).length;
   const valid = states.filter(x => x.state === 'active' || x.state === 'expiring');
-  const year = today.slice(0, 4), soldThisYear = list.filter(v => v.status !== 'cancelled' && v.issued.startsWith(year));
-  const match: Record<Filter, (s: VoucherState) => boolean> = {valid: s => s === 'active' || s === 'expiring', expiring: s => s === 'expiring', expired: s => s === 'expired', used: s => s === 'used' || s === 'cancelled', all: () => true};
+  const year = today.slice(0, 4), soldThisYear = list.filter(v => v.status === 'active' && v.issued.startsWith(year)), pendingCount = count(s => s === 'pending');
+  const match: Record<Filter, (s: VoucherState) => boolean> = {pending: s => s === 'pending', valid: s => s === 'active' || s === 'expiring', expiring: s => s === 'expiring', expired: s => s === 'expired', used: s => s === 'used' || s === 'cancelled', all: () => true};
   const q = fold(query.trim());
   const shown = states.filter(x => match[filter](x.state) && (!q || fold([x.v.code, x.v.recipientName, x.v.buyerName, x.v.buyerContact, x.v.serviceName].join(' ')).includes(q)))
-    .sort((a, b) => filter === 'valid' || filter === 'expiring' ? a.v.validUntil.localeCompare(b.v.validUntil) : b.v.issued.localeCompare(a.v.issued));
+    .sort((a, b) => filter === 'pending' ? (a.v.payDue || '').localeCompare(b.v.payDue || '') : filter === 'valid' || filter === 'expiring' ? a.v.validUntil.localeCompare(b.v.validUntil) : b.v.issued.localeCompare(a.v.issued));
 
   return <div className="vouchers">
     <div className="heading"><div><p className="eyebrow">DÁRKOVÉ POUKAZY</p><h1>Poukazy</h1><p>Prodané poukazy, jejich zůstatek a platnost. Uplatníte je na účtence při Dokončit.{mail && ' E-mailem Vám připomeneme poukazy 30 a 7 dní před koncem platnosti.'}</p></div>
       <button className="primary" onClick={() => setDialog({kind: 'new'})}><Plus size={18}/> Nový poukaz</button></div>
     {error && <div className="error" role="alert">{error}</div>}
+    {pendingCount > 0 && filter !== 'pending' && <div className="setup-hint" role="note"><span><Gift size={16}/> {pendingCount === 1 ? '1 poukaz objednaný na webu čeká' : `${pendingCount} poukazy objednané na webu čekají`} na platbu. Až peníze dorazí na účet, potvrďte platbu a kupující dostane poukaz e-mailem.</span><button className="secondary" onClick={() => setFilter('pending')}>Zobrazit</button></div>}
     {count(s => s === 'expiring') > 0 && <div className="setup-hint" role="note"><span><CalendarClock size={16}/> {count(s => s === 'expiring')} {count(s => s === 'expiring') === 1 ? 'poukaz vyprší' : 'poukazy vyprší'} do 30 dnů. Můžete obdarované připomenout, ať se objednají, nebo platnost prodloužit.</span>{filter !== 'expiring' && <button className="secondary" onClick={() => setFilter('expiring')}>Zobrazit</button>}</div>}
     <section className="stat-tiles" aria-label="Souhrn poukazů">
       <div className="stat-tile main"><span>Platné poukazy</span><strong>{valid.length}</strong><small>nevyčerpáno {formatRevenue(valid.reduce((s, x) => s + (x.v.kind === 'service' ? x.v.valueCents : x.v.balanceCents), 0))}</small></div>
@@ -163,14 +155,14 @@ export default function Vouchers({clients, onChanged}: {clients: Client[]; onCha
       <div className="stat-tile"><span>Prodáno v roce {year}</span><strong>{soldThisYear.length}</strong><small>v hodnotě {formatRevenue(soldThisYear.reduce((s, v) => s + v.valueCents, 0))}</small></div>
     </section>
     <div className="voucher-tools">
-      <span className="segmented-mini" role="radiogroup" aria-label="Zobrazit">{([['valid', 'Platné'], ['expiring', 'Brzy vyprší'], ['expired', 'Prošlé'], ['used', 'Vyčerpané'], ['all', 'Vše']] as const).map(([k, l]) => <button type="button" key={k} role="radio" aria-checked={filter === k} className={filter === k ? 'active' : ''} onClick={() => setFilter(k)}>{l}</button>)}</span>
+      <span className="segmented-mini" role="radiogroup" aria-label="Zobrazit">{([...(pendingCount || filter === 'pending' ? [['pending', `Čeká na platbu (${pendingCount})`] as const] : []), ['valid', 'Platné'], ['expiring', 'Brzy vyprší'], ['expired', 'Prošlé'], ['used', 'Vyčerpané'], ['all', 'Vše']] as const).map(([k, l]) => <button type="button" key={k} role="radio" aria-checked={filter === k} className={filter === k ? 'active' : ''} onClick={() => setFilter(k)}>{l}</button>)}</span>
       <label className="search"><Search size={16}/><input aria-label="Hledat poukaz" placeholder="Kód nebo jméno…" value={query} onChange={e => setQuery(e.target.value)}/></label>
     </div>
     <div className="panel"><ul className="receipt-list voucher-list">{loading ? <li className="muted">Načítám…</li> : !shown.length ? <li className="muted">{list.length ? 'Žádný poukaz v tomto výběru.' : 'Zatím žádné poukazy. Nový vystavíte tlačítkem Nový poukaz.'}</li> : shown.map(({v, state}) => <li key={v.id}>
       <button onClick={() => setDialog({kind: 'detail', id: v.id})} className={state === 'cancelled' ? 'cancelled' : ''}>
         <span className="receipt-no">{v.code}</span>
-        <span className="receipt-who"><b>{v.recipientName || v.buyerName || 'Bez jména'}</b><small>{valueText(v)}{v.buyerName && v.recipientName && ` · od ${v.buyerName}`} · vystaven {dateText(v.issued)}</small></span>
-        <span className="receipt-amount"><b>{v.kind === 'service' ? (v.balanceCents > 0 ? 'ošetření' : '–') : formatRevenue(v.balanceCents)}</b><small className={'voucher-state ' + state}>{stateText(v, today)}</small></span>
+        <span className="receipt-who"><b>{v.recipientName || v.buyerName || 'Bez jména'}</b><small>{valueText(v)}{v.buyerName && v.recipientName && ` · od ${v.buyerName}`} · {state === 'pending' ? 'objednán na webu' : 'vystaven'} {dateText(v.issued)}</small></span>
+        <span className="receipt-amount"><b>{state === 'pending' ? formatRevenue(v.valueCents) : v.kind === 'service' ? (v.balanceCents > 0 ? 'ošetření' : '–') : formatRevenue(v.balanceCents)}</b><small className={'voucher-state ' + state}>{stateText(v, today)}</small></span>
       </button></li>)}</ul></div>
     <dialog ref={ref} className="receipt-dialog voucher-dialog" onCancel={() => setDialog(null)} onClose={() => setDialog(null)}>
       {dialog && <><div className="dialog-header"><div><p className="eyebrow">{dialog.kind === 'new' ? 'NOVÝ POUKAZ' : 'DÁRKOVÝ POUKAZ'}</p><h2>{dialog.kind === 'new' ? 'Prodej poukazu' : list.find(v => v.id === dialog.id)?.code}</h2></div><button type="button" aria-label="Zavřít" onClick={() => setDialog(null)}><X size={21}/></button></div>

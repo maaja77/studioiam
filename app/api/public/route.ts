@@ -1,11 +1,12 @@
 // Veřejné API rezervačního formuláře na webu: jen nabídka ošetření, volné časy a vytvoření rezervace.
 // Žádné údaje o klientkách ani o obsazených termínech se ven neposílají.
 // Klientka může přes tajný odkaz z potvrzení zrušit nebo přesunout svůj termín, nejpozději v nastavené lhůtě předem.
-import {database, notifyClient, notifySalon} from '../../../db/raw';
+import {database, notifyClient, notifySalon, publicOrigin} from '../../../db/raw';
 import {ACTIVE_STATUSES, addDays, addMinutes, freeSlots, isDate, isTime, normalizePhone, parseSettings, salonName, salonNow, type BookingSettings} from '../../../lib/booking';
 import {formatRevenue} from '../../../lib/revenue';
 import {czIban, depositFor, formatIban, spdPayload} from '../../../lib/payment';
 import {intakeGet, intakeSubmit} from './intake';
+import {orderGet, orderSubmit, shopGet} from './vouchers';
 import {createIntake, intakeLink} from '../intake/route';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
@@ -83,6 +84,8 @@ export async function GET(request: Request) {
     await releaseExpiredDeposits();
     const params = new URL(request.url).searchParams, {services, settings} = await context();
     if (params.has('intake')) return intakeGet(params.get('intake') || '');
+    if (params.has('voucherShop')) return shopGet();
+    if (params.has('voucher')) return orderGet(params.get('voucher') || '');
     // Účtenka pro klientku přes tajný odkaz (bez údajů z kartotéky).
     if (params.has('receipt')) {
       const token = params.get('receipt') || '';
@@ -114,6 +117,7 @@ export async function POST(request: Request) {
     const text = (k: string, max: number) => typeof d[k] === 'string' ? (d[k] as string).trim().slice(0, max) : '';
     if (d.action === 'cancel' || d.action === 'move') return manage(d.action, text('token', 64), text('date', 10), text('time', 5));
     if (d.action === 'intake') return intakeSubmit(d, (request.headers.get('x-forwarded-for') || '').split(',')[0].trim());
+    if (d.action === 'voucher') return orderSubmit(d, publicOrigin(new URL(request.url).origin));
     if (text('website', 200)) return json({ok: true}); // past na roboty: skryté pole vyplní jen robot
     const name = text('name', 120), phone = text('phone', 40), email = text('email', 200), note = text('note', 1000), date = text('date', 10), time = text('time', 5);
     if (!name) return json({error: 'Vyplňte prosím jméno.'}, 400);
