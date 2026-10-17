@@ -147,7 +147,9 @@ Tyto zálohy jsou na stejném serveru; pro provoz s platícími salony je potře
 
 Záložka Poukazy: prodej poukazu na částku nebo na ošetření (s účtenkou, takže se započítá do tržeb v den prodeje),
 přehled s hlídáním platnosti (upozornění a odznak u záložky, když poukaz vyprší do 30 dnů), tisk poukazu (A6, PDF),
-ruční čerpání, prodloužení platnosti a storno. Výchozí platnost (12 měsíců) se mění v Nastavení → Kauce a platby.
+ruční čerpání, prodloužení platnosti a storno. Výchozí platnost (6 měsíců) se mění v Nastavení → Kauce a platby.
+Když je nastavený e-mail (SMTP a `SALON_NOTIFY_EMAIL`), server jednou denně po 8. hodině pošle salonu souhrn poukazů,
+kterým za 30 a znovu za 7 dní končí platnost (kupujícím se nic neposílá).
 Poukaz se uplatní na účtence zadáním kódu; uhrazená část se do tržeb znovu nepočítá a storno účtenky ji vrátí na poukaz.
 
 ## Náhled s ukázkovými daty

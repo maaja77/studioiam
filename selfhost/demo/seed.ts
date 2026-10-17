@@ -107,12 +107,12 @@ export async function seedDemo(run: Run, put: Put) {
   }
   // Dárkové poukazy (vymyšlená jména): platné, brzy vyprší, prošlý, částečně a úplně vyčerpaný, na ošetření.
   const vouchers: [string, string, 'value' | 'service', string, number, number, string, string, number, number][] = [
-    ['v-1', 'KQ4M-7XPA', 'value', '', 150000, 150000, 'Tereza Malá', 'Jana Malá', -20, 345],
-    ['v-2', 'H8RT-2NWE', 'value', '', 100000, 100000, 'Lenka Dvořáková', 'Martin Dvořák', -352, 13],
-    ['v-3', 'PZ6C-9LDU', 'service', 'A-QS Hacker', 129000, 129000, 'Eva Horáková', 'Petr Horák', -60, 305],
-    ['v-4', 'M3VB-8KYS', 'value', '', 200000, 70000, 'Klára Benešová', '', -120, 245],
-    ['v-5', 'W7JF-4QHE', 'value', '', 50000, 50000, 'Simona Krejčí', 'Simona Krejčí', -400, -35],
-    ['v-6', 'R2XD-6GNT', 'value', '', 100000, 0, 'Petra Nováková', 'Petra Nováková', -200, 165],
+    ['v-1', 'KQ4M-7XPA', 'value', '', 150000, 150000, 'Tereza Malá', 'Jana Malá', -20, 163],
+    ['v-2', 'H8RT-2NWE', 'value', '', 100000, 100000, 'Lenka Dvořáková', 'Martin Dvořák', -170, 13],
+    ['v-3', 'PZ6C-9LDU', 'service', 'A-QS Hacker', 129000, 129000, 'Eva Horáková', 'Petr Horák', -60, 123],
+    ['v-4', 'M3VB-8KYS', 'value', '', 200000, 70000, 'Klára Benešová', '', -120, 63],
+    ['v-5', 'W7JF-4QHE', 'value', '', 50000, 50000, 'Simona Krejčí', 'Simona Krejčí', -250, -35],
+    ['v-6', 'R2XD-6GNT', 'value', '', 100000, 0, 'Petra Nováková', 'Petra Nováková', -100, 83],
   ];
   for (const [id, code, kind, serviceName, value, balance, recipient, buyer, issuedOffset, validOffset] of vouchers) {
     const issued = day(issuedOffset), y = Number(issued.slice(0, 4)), seq = (seqs.get(y) || 0) + 1; seqs.set(y, seq);

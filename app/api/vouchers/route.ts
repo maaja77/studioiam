@@ -1,8 +1,9 @@
 // API dárkových poukazů: prodej (s účtenkou), přehled s hlídáním platnosti, čerpání, prodloužení a storno.
-import {database} from '../../../db/raw';
-import {isDate, parseSettings, salonNow} from '../../../lib/booking';
+import {database, mailEnabled, salonMailer} from '../../../db/raw';
+import {addDays, isDate, parseSettings, salonNow} from '../../../lib/booking';
+import {formatRevenue} from '../../../lib/revenue';
 import {parseRevenue} from '../../../lib/revenue';
-import {addMonths, normalizeCode, voucherCode, type Voucher} from '../../../lib/vouchers';
+import {addMonths, daysLeft, EXPIRING_DAYS, normalizeCode, voucherCode, type Voucher} from '../../../lib/vouchers';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
 export const VOUCHER_COLUMNS = 'id,code,kind,service_name AS serviceName,value_cents AS valueCents,balance_cents AS balanceCents,buyer_name AS buyerName,buyer_contact AS buyerContact,recipient_name AS recipientName,note,issued,valid_until AS validUntil,status,receipt_id AS receiptId';
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
       db.prepare(`SELECT ${VOUCHER_COLUMNS} FROM vouchers ORDER BY issued DESC,created DESC`),
       db.prepare("SELECT value FROM settings WHERE key='booking'"),
     ]) as {results: Record<string, unknown>[]}[];
-    return json({vouchers: list.results, today: salonNow().slice(0, 10), months: parseSettings((setting.results[0] as {value?: string} | undefined)?.value).voucherMonths});
+    return json({vouchers: list.results, today: salonNow().slice(0, 10), months: parseSettings((setting.results[0] as {value?: string} | undefined)?.value).voucherMonths, mail: mailEnabled()});
   } catch (e) { console.error(e); return json({error: 'Poukazy se nepodařilo načíst. Zkuste to znovu.'}, 503); }
 }
 
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
     if (body.action === 'extend') {
       const validUntil = field('validUntil', 10);
       if (!isDate(validUntil) || validUntil > addMonths(today, 120)) return json({error: 'Zadejte nové datum platnosti.'}, 400);
-      await db.prepare('UPDATE vouchers SET valid_until=?,note=ltrim(note||char(10)||?,char(10)) WHERE id=?').bind(validUntil, `Platnost změněna ${today} z ${v.validUntil} na ${validUntil}.`, id).run();
+      await db.prepare('UPDATE vouchers SET valid_until=?,reminder_stage=0,note=ltrim(note||char(10)||?,char(10)) WHERE id=?').bind(validUntil, `Platnost změněna ${today} z ${v.validUntil} na ${validUntil}.`, id).run();
       return json({ok: true});
     }
     // Ruční čerpání, např. poukaz uplatněný mimo účtenku nebo ve starém systému.
@@ -103,4 +104,33 @@ export async function POST(request: Request) {
     }
     return json({error: 'Neplatná operace.'}, 400);
   } catch (e) { console.error(e); return json({error: 'Změnu poukazu se nepodařilo uložit. Zkuste to znovu.'}, 503); }
+}
+
+const REMIND_AGAIN_DAYS = 7;
+const dateText = (s: string) => s.split('-').reverse().map(Number).join('. ');
+
+/**
+ * Připomenutí poukazů, které brzy vyprší: jeden souhrnný e-mail jen salonu (SALON_NOTIFY_EMAIL),
+ * 30 dní a znovu 7 dní před koncem platnosti. Každý poukaz se v každém kroku připomene jen jednou.
+ */
+export async function remindExpiring(adminUrl: string, today = salonNow().slice(0, 10)) {
+  const send = salonMailer();
+  if (!send) return 0;
+  const db = database();
+  const rows = await db.prepare(`SELECT ${VOUCHER_COLUMNS},reminder_stage AS stage FROM vouchers WHERE status='active' AND balance_cents>0 AND valid_until>=? AND valid_until<=? ORDER BY valid_until,code`)
+    .bind(today, addDays(today, EXPIRING_DAYS)).all<Voucher & {stage: number}>();
+  const due = rows.results.map(v => ({v, stage: daysLeft(v.validUntil, today) <= REMIND_AGAIN_DAYS ? 2 : 1})).filter(x => x.v.stage < x.stage);
+  if (!due.length) return 0;
+  const line = ({v}: {v: Voucher}) => {
+    const left = daysLeft(v.validUntil, today);
+    return '- ' + [v.code, v.kind === 'service' ? v.serviceName : `zůstatek ${formatRevenue(v.balanceCents)}`, v.recipientName && `pro ${v.recipientName}`,
+      `platí do ${dateText(v.validUntil)} (${left === 0 ? 'dnes je poslední den' : left === 1 ? 'zítra končí' : `zbývá ${left} ${left <= 4 ? 'dny' : 'dní'}`})`,
+      (v.buyerName || v.buyerContact) && `kupující ${[v.buyerName, v.buyerContact].filter(Boolean).join(', ')}`].filter(Boolean).join(' · ');
+  };
+  await send(`Dárkové poukazy brzy vyprší (${due.length})`, [
+    'Dobrý den,', '', due.length === 1 ? 'tento dárkový poukaz brzy vyprší:' : 'tyto dárkové poukazy brzy vyprší:', '', ...due.map(line), '',
+    'Můžete obdarované připomenout, ať se objednají, nebo platnost prodloužit v administraci v části Poukazy:', adminUrl,
+  ].join('\n'));
+  await db.batch(due.map(x => db.prepare('UPDATE vouchers SET reminder_stage=? WHERE id=?').bind(x.stage, x.v.id)));
+  return due.length;
 }

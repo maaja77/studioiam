@@ -66,7 +66,7 @@ function NewVoucher({months, onCreated, onCancel}: {months: number; onCreated: (
       </div> : <label className="field"><span>Hodnota (Kč)</span><span className="voucher-amounts"><input inputMode="decimal" required value={value} placeholder="např. 1500" onChange={e => setValue(e.target.value)}/>{[500, 1000, 1500, 2000].map(n => <button type="button" key={n} className="secondary" onClick={() => setValue(String(n))}>{formatRevenue(n * 100)}</button>)}</span></label>}
       <div className="field-grid">
         <label className="field"><span>Pro koho (jméno na poukazu)</span><input name="recipientName" maxLength={120} placeholder="Nepovinné"/></label>
-        <label className="field"><span>Platí do</span><span className="voucher-amounts"><input type="date" required min={today} value={validUntil} onChange={e => setValidUntil(e.target.value)}/>{[6, 12].map(m => <button type="button" key={m} className="secondary" onClick={() => setValidUntil(addMonths(today, m))}>{m} měs.</button>)}</span></label>
+        <label className="field"><span>Platí do</span><span className="voucher-amounts"><input type="date" required min={today} value={validUntil} onChange={e => setValidUntil(e.target.value)}/>{[3, 6, 12].map(m => <button type="button" key={m} className="secondary" onClick={() => setValidUntil(addMonths(today, m))}>{m} měs.</button>)}</span></label>
       </div>
       <div className="field-grid">
         <label className="field"><span>Kupující</span><input name="buyerName" maxLength={120} placeholder="Kdo poukaz koupil"/></label>
@@ -127,15 +127,15 @@ function VoucherDetail({id, settings, onChanged, onReceipt}: {id: string; settin
 }
 
 export default function Vouchers({clients, onChanged}: {clients: Client[]; onChanged?: () => void}) {
-  const [list, setList] = useState<Voucher[]>([]), [today, setToday] = useState(''), [months, setMonths] = useState(12), [settings, setSettings] = useState<BookingSettings>(DEFAULT_SETTINGS);
+  const [list, setList] = useState<Voucher[]>([]), [today, setToday] = useState(''), [months, setMonths] = useState(6), [settings, setSettings] = useState<BookingSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true), [error, setError] = useState(''), [filter, setFilter] = useState<Filter>('valid'), [query, setQuery] = useState('');
-  const [dialog, setDialog] = useState<{kind: 'new'} | {kind: 'detail'; id: string} | null>(null), [receiptId, setReceiptId] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<{kind: 'new'} | {kind: 'detail'; id: string} | null>(null), [receiptId, setReceiptId] = useState<string | null>(null), [mail, setMail] = useState(false);
   const ref = useRef<HTMLDialogElement>(null);
   async function load() {
     try {
       const [r, s] = await Promise.all([fetch('/api/vouchers', {cache: 'no-store'}), fetch('/api/receipts?month=2000-01', {cache: 'no-store'})]);
-      const d = await r.json() as {vouchers?: Voucher[]; today?: string; months?: number; error?: string}; if (!d.vouchers) throw new Error(d.error);
-      setList(d.vouchers); setToday(d.today!); setMonths(d.months || 12); setError('');
+      const d = await r.json() as {vouchers?: Voucher[]; today?: string; months?: number; mail?: boolean; error?: string}; if (!d.vouchers) throw new Error(d.error);
+      setMail(!!d.mail); setList(d.vouchers); setToday(d.today!); setMonths(d.months || 6); setError('');
       const ds = await s.json() as {settings?: BookingSettings}; if (ds.settings) setSettings(ds.settings);
     } catch (e) { setError((e as Error).message || 'Poukazy se nepodařilo načíst.'); } finally { setLoading(false); }
   }
@@ -153,7 +153,7 @@ export default function Vouchers({clients, onChanged}: {clients: Client[]; onCha
     .sort((a, b) => filter === 'valid' || filter === 'expiring' ? a.v.validUntil.localeCompare(b.v.validUntil) : b.v.issued.localeCompare(a.v.issued));
 
   return <div className="vouchers">
-    <div className="heading"><div><p className="eyebrow">DÁRKOVÉ POUKAZY</p><h1>Poukazy</h1><p>Prodané poukazy, jejich zůstatek a platnost. Uplatníte je na účtence při Dokončit.</p></div>
+    <div className="heading"><div><p className="eyebrow">DÁRKOVÉ POUKAZY</p><h1>Poukazy</h1><p>Prodané poukazy, jejich zůstatek a platnost. Uplatníte je na účtence při Dokončit.{mail && ' E-mailem Vám připomeneme poukazy 30 a 7 dní před koncem platnosti.'}</p></div>
       <button className="primary" onClick={() => setDialog({kind: 'new'})}><Plus size={18}/> Nový poukaz</button></div>
     {error && <div className="error" role="alert">{error}</div>}
     {count(s => s === 'expiring') > 0 && <div className="setup-hint" role="note"><span><CalendarClock size={16}/> {count(s => s === 'expiring')} {count(s => s === 'expiring') === 1 ? 'poukaz vyprší' : 'poukazy vyprší'} do 30 dnů. Můžete obdarované připomenout, ať se objednají, nebo platnost prodloužit.</span>{filter !== 'expiring' && <button className="secondary" onClick={() => setFilter('expiring')}>Zobrazit</button>}</div>}

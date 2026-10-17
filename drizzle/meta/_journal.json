@@ -64,6 +64,13 @@
       "when": 1792225474209,
       "tag": "0008_vouchers",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792226373230,
+      "tag": "0009_voucher_reminders",
+      "breakpoints": true
     }
   ]
 }

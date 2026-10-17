@@ -28,7 +28,7 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   businessEmail: '',
   programEnabled: false,
   logoVersion: 0,
-  voucherMonths: 12,
+  voucherMonths: 6,
 };
 /** Jméno salonu pro nadpisy a e-maily, dokud ho salon nevyplní v Nastavení. */
 export const salonName = (s: Pick<BookingSettings, 'businessName'>) => s.businessName.trim() || 'Salon';

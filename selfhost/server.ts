@@ -1,4 +1,4 @@
-import http from 'node:http';import {readFileSync,existsSync,statSync} from 'node:fs';import path from 'node:path';import {createAuth,hashPassword,loginPage,loginBlocked,loginFailed,loginSucceeded,safeNext} from './auth';import {env,PROFILE,readSetting,writeSetting} from './runtime';import {parseSettings,salonName} from '../lib/booking';
+import http from 'node:http';import {readFileSync,existsSync,statSync} from 'node:fs';import path from 'node:path';import {createAuth,hashPassword,loginPage,loginBlocked,loginFailed,loginSucceeded,safeNext} from './auth';import {env,PROFILE,readSetting,writeSetting} from './runtime';import {parseSettings,salonName,salonNow} from '../lib/booking';
 import * as records from '../app/api/records/route';import * as photos from '../app/api/photos/route';import * as bookings from '../app/api/bookings/route';import * as publicBooking from '../app/api/public/route';import * as receipts from '../app/api/receipts/route';import * as stats from '../app/api/stats/route';import * as vouchers from '../app/api/vouchers/route';import {LOGO_KEY,imageType} from '../app/api/bookings/route';
 const user=process.env.SALON_USER,encoded=process.env.SALON_PASSWORD_HASH,origin=process.env.SALON_ORIGIN;
 if(!user||!encoded||!origin)throw Error('Set SALON_USER, SALON_PASSWORD_HASH and SALON_ORIGIN before starting.');
@@ -78,3 +78,8 @@ const server=http.createServer(async(req,res)=>{try{
  res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':file.endsWith('.html')?'no-store':'private, max-age=3600','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin',...(bookingPage?{'Content-Security-Policy':'frame-ancestors '+frameAncestors}:{'X-Frame-Options':'DENY'})});res.end(req.method==='HEAD'?undefined:readFileSync(file));
 }catch(e){console.error('Request failed',e instanceof Error?e.message:'error');res.writeHead(500,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:'Server je dočasně nedostupný.'}));}});
 server.listen(Number(process.env.PORT||8787),process.env.HOST||'127.0.0.1',()=>console.log('Salon self-host server ready'));
+// Jednou denně po 8. hodině pošle salonu e-mail o poukazech, které brzy vyprší (každý poukaz 30 a 7 dní předem).
+let remindedOn='';
+async function dailyTasks(){const now=salonNow();if(now.slice(11,13)<'08'||remindedOn===now.slice(0,10))return;remindedOn=now.slice(0,10);
+ try{const n=await vouchers.remindExpiring(origin+'/');if(n)console.log(`Připomenutí poukazů odesláno (${n}).`);}catch(e){remindedOn='';console.error('Voucher reminder failed',e instanceof Error?e.message:e);}}
+setTimeout(dailyTasks,10_000);setInterval(dailyTasks,15*60_000);
