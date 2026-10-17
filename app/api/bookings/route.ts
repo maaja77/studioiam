@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams, db = database();
     const from = isDate(params.get('from')) ? params.get('from')! : '0000-01-01', to = isDate(params.get('to')) ? params.get('to')! : '9999-12-31';
     const [bookings, services, setting, calendar] = await db.batch([
-      db.prepare('SELECT b.id,b.service_id AS serviceId,b.client_id AS clientId,b.start_at AS start,b.end_at AS end,b.service_name AS serviceName,b.price_cents AS priceCents,b.name,b.phone,b.email,b.note,b.status,b.source,b.deposit_cents AS depositCents,b.deposit_status AS depositStatus,b.deposit_due AS depositDue,b.vs,b.payment_kind AS paymentKind,b.reminded_start AS remindedStart,b.reminded_at AS remindedAt,b.created,s.color,s.category,(SELECT r.id FROM receipts r WHERE r.booking_id=b.id AND r.status=\'issued\' ORDER BY r.created DESC LIMIT 1) AS receiptId FROM bookings b LEFT JOIN services s ON s.id=b.service_id WHERE b.start_at>=? AND b.start_at<? ORDER BY b.start_at').bind(from, to + 'T99'),
+      db.prepare('SELECT b.id,b.service_id AS serviceId,b.client_id AS clientId,b.start_at AS start,b.end_at AS end,b.service_name AS serviceName,b.price_cents AS priceCents,b.name,b.phone,b.email,b.note,b.status,b.source,b.deposit_cents AS depositCents,b.deposit_status AS depositStatus,b.deposit_due AS depositDue,b.vs,b.payment_kind AS paymentKind,b.reminded_start AS remindedStart,b.reminded_at AS remindedAt,(SELECT f.status FROM intake_forms f WHERE f.client_id=b.client_id OR f.booking_id=b.id ORDER BY f.created DESC LIMIT 1) AS intake,b.created,s.color,s.category,(SELECT r.id FROM receipts r WHERE r.booking_id=b.id AND r.status=\'issued\' ORDER BY r.created DESC LIMIT 1) AS receiptId FROM bookings b LEFT JOIN services s ON s.id=b.service_id WHERE b.start_at>=? AND b.start_at<? ORDER BY b.start_at').bind(from, to + 'T99'),
       db.prepare('SELECT id,name,duration_min AS durationMin,price_cents AS priceCents,active,sort,category,description,color,sessions,prepay FROM services ORDER BY sort,name'),
       db.prepare("SELECT value FROM settings WHERE key='booking'"),
       db.prepare("SELECT value FROM settings WHERE key='calendar'"),
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
     if (body.kind !== 'booking') return json({error: 'Neplatná operace.'}, 400);
     const id = field('id');
 
-    if (body.action === 'delete') { await db.prepare('DELETE FROM bookings WHERE id=?').bind(id).run(); return json({ok: true}); }
+    if (body.action === 'delete') { await db.batch([db.prepare('DELETE FROM bookings WHERE id=?').bind(id), db.prepare('DELETE FROM intake_forms WHERE booking_id=? AND client_id IS NULL').bind(id)]); return json({ok: true}); }
 
     if (body.action === 'status') {
       const status = field('status');

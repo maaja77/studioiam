@@ -8,7 +8,7 @@ export type BookingSettings = {hours: Hours; leadHours: number; horizonDays: num
   depositFromKc: number; depositPercent: number; depositHoldHours: number; account: string; accountName: string; changeLimitHours: number;
   businessName: string; businessOwner: string; businessAddress: string; businessId: string; businessPhone: string; businessEmail: string;
   programEnabled: boolean; logoVersion: number; voucherMonths: number;
-  smsReminders: boolean; smsTime: string; smsTemplate: string; smsAscii: boolean};
+  smsReminders: boolean; smsTime: string; smsTemplate: string; smsAscii: boolean; intakeOnline: boolean};
 export type BusyRange = {start: string; end: string};
 
 export const DEFAULT_SETTINGS: BookingSettings = {
@@ -35,6 +35,7 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   smsTime: '10:00',
   smsTemplate: DEFAULT_SMS_TEMPLATE,
   smsAscii: true,
+  intakeOnline: true,
 };
 /** Jméno salonu pro nadpisy a e-maily, dokud ho salon nevyplní v Nastavení. */
 export const salonName = (s: Pick<BookingSettings, 'businessName'>) => s.businessName.trim() || 'Salon';
@@ -104,7 +105,7 @@ export function validateSettings(v: unknown): BookingSettings | string {
   if (raw.smsReminders === true && smsTemplate.includes('{telefon}') && !businessPhone) return 'Text SMS obsahuje {telefon}: vyplňte telefon salonu v části Údaje salonu.';
   return {businessName: text('businessName', 80), businessOwner: text('businessOwner', 80), businessAddress: text('businessAddress', 160), businessId, businessPhone, businessEmail,
     programEnabled: raw.programEnabled === true, voucherMonths,
-    smsReminders: raw.smsReminders === true, smsTime, smsTemplate, smsAscii: raw.smsAscii !== false, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0,
+    smsReminders: raw.smsReminders === true, smsTime, smsTemplate, smsAscii: raw.smsAscii !== false, intakeOnline: raw.intakeOnline !== false, logoVersion: Number.isInteger(raw.logoVersion) ? raw.logoVersion as number : 0,
     hours, leadHours: lead, horizonDays: horizon, stepMinutes: step, depositFromKc: depositFrom, depositPercent: percent, depositHoldHours: hold, account, accountName, changeLimitHours: change};
 }
 

@@ -41,6 +41,12 @@
 .booking-chip.status-no_show em{color:#963b30}
 .booking-chip.status-done{background:#f1f5f4;border-left-color:#7da9a4}
 .booking-detail p{margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.intake-panel{border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:22px;display:flex;flex-direction:column;gap:10px}.intake-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.intake-head h3{display:flex;align-items:center;gap:8px;margin:0;font-size:15px}
+.intake-state{font-size:12px;border-radius:20px;padding:2px 10px;background:#f1f4f4;color:var(--muted)}.intake-state.ok{background:#e2f3ed;color:var(--teal)}.intake-state.off{background:#fff1ef;color:#963b30}
+.intake-warnings{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.intake-warnings li{display:flex;gap:8px;align-items:flex-start;background:#fff6e8;color:#7a4a0c;border-radius:8px;padding:8px 10px;font-size:14px}.intake-warnings svg{flex-shrink:0;margin-top:3px}
+.intake-details summary{cursor:pointer;font-size:14px;color:var(--teal)}.intake-details ul{font-size:14px;padding-left:20px}.intake-details figure{margin:10px 0}.intake-details img{max-width:320px;width:100%;border:1px solid var(--line);border-radius:8px;background:white}.intake-details figcaption{font-size:12px;color:var(--muted)}.intake-details .intake-consent{font-size:12px;color:var(--muted);background:#f7f9f9;border-radius:8px;padding:2px 12px;max-height:200px;overflow:auto}
+.intake-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.intake-actions .primary,.intake-actions .secondary{min-height:38px;padding:8px 12px;font-size:13px;gap:6px}
+.booking-detail .intake-line{font-size:14px;color:#9a5a14}.booking-detail .intake-line.ok{color:var(--teal)}
 .booking-detail .sms-line{font-size:14px;color:var(--muted)}
 .booking-detail .note{display:block;background:#f8faf9;border-radius:8px;padding:10px 12px;font-size:14px;white-space:pre-wrap}
 .status-pill{align-self:flex-start;font-size:12px;font-weight:700;border-radius:99px;padding:3px 10px;background:#e2f3ed;color:var(--teal)}
@@ -148,6 +154,13 @@ dialog[open]{margin:auto}
 .pb-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
 .pb-manage .pb-actions{justify-content:flex-start}
 .pb-manage h2{font-family:Georgia,serif;font-weight:400;font-size:22px}
+.pb-intake{background:white;border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px;max-width:460px}.pb-intake p{color:var(--ink)}a.primary{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.intake-form{display:flex;flex-direction:column;gap:18px}.intake-block{background:white;border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px}.intake-block h2{font-family:Georgia,serif;font-weight:400;font-size:22px}
+.intake-q{border:0;border-top:1px solid var(--line);margin:0;padding:12px 0 0;display:flex;flex-direction:column;gap:8px}.intake-q legend{float:left;width:100%;font-size:15px;padding:0;margin-bottom:6px}.intake-q.yes legend{font-weight:600}
+.intake-yesno{display:flex;gap:10px}.intake-yesno label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:15px;min-height:44px}.intake-yesno label:has(input:checked){border-color:var(--teal);background:#f4efe6}
+.intake-q>input{border:1px solid #d8cfc2;border-radius:7px;padding:10px 12px;font-size:16px}
+.intake-consent{font-size:13px;color:var(--muted);background:#faf7f2;border-radius:8px;padding:4px 14px;max-height:260px;overflow:auto}.intake-consent p{margin:10px 0}.intake-form .check{align-items:flex-start;font-size:14px}.intake-form .check input{margin-top:3px;flex-shrink:0}
+.signature{display:flex;flex-direction:column;gap:8px;align-items:flex-start}.signature canvas{width:100%;height:170px;border:1px dashed #b9a98f;border-radius:10px;background:#fffdf9;touch-action:none;cursor:crosshair}
 .pb-ok{background:#eef6ef;color:#2f6a3a;border:1px solid #d3e8d6;padding:12px 16px;border-radius:8px;margin:0;font-size:14px}
 .pb-confirm{display:flex;flex-direction:column;gap:10px}
 .pb-confirm p{margin:0}

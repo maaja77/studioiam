@@ -5,6 +5,8 @@ import {database, notifyClient, notifySalon} from '../../../db/raw';
 import {ACTIVE_STATUSES, addDays, addMinutes, freeSlots, isDate, isTime, normalizePhone, parseSettings, salonName, salonNow, type BookingSettings} from '../../../lib/booking';
 import {formatRevenue} from '../../../lib/revenue';
 import {czIban, depositFor, formatIban, spdPayload} from '../../../lib/payment';
+import {intakeGet, intakeSubmit} from './intake';
+import {createIntake, intakeLink} from '../intake/route';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, {status, headers: {'Cache-Control': 'no-store'}});
 type Service = {id: string; name: string; durationMin: number; priceCents: number; category: string; description: string; sessions: number; prepay: number};
@@ -80,6 +82,7 @@ export async function GET(request: Request) {
   try {
     await releaseExpiredDeposits();
     const params = new URL(request.url).searchParams, {services, settings} = await context();
+    if (params.has('intake')) return intakeGet(params.get('intake') || '');
     // Účtenka pro klientku přes tajný odkaz (bez údajů z kartotéky).
     if (params.has('receipt')) {
       const token = params.get('receipt') || '';
@@ -110,6 +113,7 @@ export async function POST(request: Request) {
     const d = await request.json() as Record<string, unknown>;
     const text = (k: string, max: number) => typeof d[k] === 'string' ? (d[k] as string).trim().slice(0, max) : '';
     if (d.action === 'cancel' || d.action === 'move') return manage(d.action, text('token', 64), text('date', 10), text('time', 5));
+    if (d.action === 'intake') return intakeSubmit(d, (request.headers.get('x-forwarded-for') || '').split(',')[0].trim());
     if (text('website', 200)) return json({ok: true}); // past na roboty: skryté pole vyplní jen robot
     const name = text('name', 120), phone = text('phone', 40), email = text('email', 200), note = text('note', 1000), date = text('date', 10), time = text('time', 5);
     if (!name) return json({error: 'Vyplňte prosím jméno.'}, 400);
@@ -142,6 +146,9 @@ export async function POST(request: Request) {
       .bind(id, service.id, matches[0]?.id ?? null, start, end, service.name, service.priceCents, name, phone, email, service.sessions > 1 ? [`Balíček ${service.sessions}× ošetření, 1. termín; další termíny domluvit.`, note].filter(Boolean).join('\n') : note, needsDeposit ? 'pending' : 'confirmed', 'online', depositCents, needsDeposit ? 'pending' : null, due, vs, kind, token, new Date().toISOString()).run();
     const deposit = needsDeposit ? depositInfo(settings, depositCents!, due!, vs!, service.name, kind!) : null;
 
+    // Nová klientka (nebo bez vyplněného dotazníku) dostane odkaz na vstupní dotazník a souhlas.
+    const filled = matches.length ? await db.prepare(`SELECT id FROM intake_forms WHERE status='done' AND client_id IN (${matches.map(() => '?').join(',')})`).bind(...matches.map(c => c.id)).first() : null;
+    const intake = settings.intakeOnline && !filled ? intakeLink(new URL(request.url).origin, (await createIntake(matches[0]?.id ?? null, id)).token) : '';
     const when = whenText(start), link = `${new URL(request.url).origin}/rezervace?t=${token}`;
     notifySalon(`Nová rezervace: ${name}, ${when}`, [
       `Nová online rezervace (${salonName(settings)})`, '',
@@ -155,10 +162,11 @@ export async function POST(request: Request) {
       `Dobrý den, děkujeme za rezervaci.`, '',
       `Ošetření: ${service.name}`, `Termín: ${when}`, [salonName(settings), settings.businessAddress].filter(Boolean).join(', '), '',
       deposit ? `Termín držíme do zaplacení ${deposit.kind === 'prepay' ? 'částky' : 'kauce'} ${formatRevenue(deposit.amountCents)} na účet ${deposit.account}, VS ${deposit.vs}, nejpozději ${deposit.due.replace('T', ' ')}.\n` : '',
+      intake ? `Před první návštěvou prosím vyplňte krátký zdravotní dotazník, ať je ošetření bezpečné (zabere asi 3 minuty): ${intake}\n` : '',
       `Zrušit nebo změnit termín můžete nejpozději ${settings.changeLimitHours} h předem zde: ${link}`,
       settings.businessPhone ? `Později nám prosím zavolejte: ${settings.businessPhone}.` : '', '', `Těšíme se na vás, ${salonName(settings)}`,
     ].filter(Boolean).join('\n'));
-    return json({ok: true, id, start, end, service: service.name, deposit, token});
+    return json({ok: true, id, start, end, service: service.name, deposit, token, intake});
   } catch (e) { console.error(e); return json({error: 'Rezervaci se nepodařilo odeslat. Zkuste to prosím znovu nebo nám zavolejte.'}, 503); }
 }
 

@@ -191,6 +191,20 @@ Brána se nastaví v `.env.selfhost` a pak `docker compose up -d`:
 
 Po spuštění je v logu `SMS připomínky přes: …`. Chyby odeslání (např. došlý kredit) jsou v `docker compose logs salon`.
 
+## Vstupní dotazník a souhlas (GDPR)
+
+Před první návštěvou vyplní klientka zdravotní dotazník (alergie, léky, těhotenství, kožní a další onemocnění,
+nedávné zákroky…), souhlas se zpracováním osobních údajů a údajů o zdraví, volitelně souhlas s fotografiemi, a podepíše se prstem.
+
+- Nová klientka dostane odkaz `/dotaznik?t=…` hned po online rezervaci (na potvrzovací stránce i v e-mailu). Vypnout jde
+  v Nastavení → Otevírací doba a pravidla. Po vyplnění se karta klientky založí sama (nebo se spáruje podle telefonu).
+- Stávajícím klientkám se dotazník připraví na kartě: odkaz SMS, e-mailem, nebo „Vyplnit teď v salonu“ na tabletu či telefonu.
+- Na kartě jsou odpovědi „ano“ jako upozornění, souhlas s fotkami, podpis a uložený text souhlasu (pozdější změna textu
+  vyplněné dotazníky nemění). V detailu rezervace je vidět, jestli je dotazník vyplněný.
+- „Klientka odvolala souhlas“ smaže odpovědi o zdraví; jméno, podpis a text souhlasu zůstanou jako doklad.
+- Text souhlasu se skládá z údajů salonu (název, provozovatel, IČO, adresa) v `lib/intake.ts`. Uvádí uchování po dobu
+  návštěv a nejdéle 3 roky od poslední; staré karty je potřeba mazat ručně. Text je vhodné nechat zkontrolovat.
+
 ## Kalendář v telefonu
 
 V Nastavení → Kalendář v telefonu se zapne tajný odkaz `/kalendar/<kód>.ics`. Telefon ho odebírá jako kalendář

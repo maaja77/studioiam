@@ -92,6 +92,7 @@ export default function BookingSettingsView({bookingUrl, onSaved}: {bookingUrl: 
         <label className="field"><span>Nejdál dopředu (dní)</span><input type="number" min={1} max={365} value={settings.horizonDays} onChange={e => setSettings({...settings, horizonDays: Number(e.target.value)})}/></label>
         <label className="field"><span>Nabízet časy po</span><select value={settings.stepMinutes} onChange={e => setSettings({...settings, stepMinutes: Number(e.target.value)})}><option value={15}>15 minutách</option><option value={30}>30 minutách</option><option value={60}>hodině</option></select></label>
       </div>
+      <label className="check"><input type="checkbox" checked={settings.intakeOnline} onChange={e => setSettings({...settings, intakeOnline: e.target.checked})}/> Po online rezervaci poslat nové klientce vstupní dotazník a souhlas se zpracováním údajů</label>
       <label className="field narrow"><span>Klientka může zrušit nebo přesunout termín nejpozději (hodin předem)</span><input type="number" min={0} max={336} value={settings.changeLimitHours} onChange={e => setSettings({...settings, changeLimitHours: Number(e.target.value)})}/></label>
       <div className="form-actions"><button className="primary" disabled={busy} onClick={() => run(() => post({kind: 'settings', data: settings}), 'Nastavení bylo uloženo.')}>Uložit otevírací dobu</button></div>
     </section>

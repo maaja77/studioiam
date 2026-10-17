@@ -1,6 +1,8 @@
 // Vymyšlené ukázkové klientky pro náhled. Žádná skutečná data.
 import {CATEGORY_COLORS, PRICE_LIST} from '../../lib/price-list';
 import {DEFAULT_SETTINGS} from '../../lib/booking';
+import {consentText, INTAKE_QUESTIONS, PHOTO_CONSENT} from '../../lib/intake';
+import {DEMO_SIGNATURE} from './demo-signature';
 
 // Ukázkové popisy pro náhled; skutečné popisy si salon doplní v Nastavení.
 const DESCRIPTIONS: Record<string, string> = {
@@ -126,7 +128,13 @@ export async function seedDemo(run: Run, put: Put) {
     if (balance < value) run('INSERT INTO voucher_uses (id,voucher_id,receipt_id,date,amount_cents,note,created) VALUES (?,?,?,?,?,?,?)', ['vu-' + id, id, null, day(issuedOffset + 30), value - balance, 'Uplatněno při ošetření', now]);
   }
 
-  run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify({...DEFAULT_SETTINGS, smsReminders: true, account: '331122037/0300', accountName: 'STUDIO I AM', businessName: 'STUDIO I AM', businessOwner: 'Andrea Marešová', businessAddress: 'Nerudova 884/11, 500 02 Hradec Králové', businessId: '73975052', businessPhone: '775 963 462', programEnabled: true})]);
+  const bookingSettings = {...DEFAULT_SETTINGS, smsReminders: true, account: '331122037/0300', accountName: 'STUDIO I AM', businessName: 'STUDIO I AM', businessOwner: 'Andrea Marešová', businessAddress: 'Nerudova 884/11, 500 02 Hradec Králové', businessId: '73975052', businessPhone: '775 963 462', programEnabled: true};
+  run("INSERT INTO settings (key,value) VALUES ('booking',?)", [JSON.stringify(bookingSettings)]);
+  // Ukázkové dotazníky: Tereza vyplnila (s upozorněním), Lucie má odkaz, který čeká na vyplnění.
+  const answers = Object.fromEntries(INTAKE_QUESTIONS.map(q => [q.id, {yes: q.id === 'allergy' || q.id === 'lenses', detail: q.id === 'allergy' ? 'parfemace, lanolin' : ''}]));
+  run("INSERT INTO intake_forms (id,client_id,token,status,answers,birth_date,consent_health,consent_photos,signed_name,signature,consent_text,submitted_at,created) VALUES ('i-1','demo-1',?,'done',?,'1991-05-14',1,1,'Tereza Nováková',?,?,?,?)",
+    ['b'.repeat(40), JSON.stringify(answers), DEMO_SIGNATURE, consentText(bookingSettings) + '\n\n' + PHOTO_CONSENT, day(-31) + 'T18:20:00.000Z', day(-32) + 'T09:00:00.000Z']);
+  run("INSERT INTO intake_forms (id,client_id,token,status,created) VALUES ('i-2','demo-2',?,'sent',?)", ['c'.repeat(40), day(-1) + 'T09:00:00.000Z']);
 
   const photos: [string, string, string, string, number][] = [
     ['p-1', 'demo-1', day(-30), 'Před ošetřením', 18],

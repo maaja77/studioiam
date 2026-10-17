@@ -5,11 +5,13 @@ import {createRoot} from 'react-dom/client';
 import Home from '../../app/page';
 import PublicBooking from '../../app/public-booking';
 import PublicReceipt from '../../app/public-receipt';
+import PublicIntake from '../../app/public-intake';
 import * as bookings from '../../app/api/bookings/route';
 import * as publicApi from '../../app/api/public/route';
 import * as receiptsApi from '../../app/api/receipts/route';
 import * as statsApi from '../../app/api/stats/route';
 import * as vouchersApi from '../../app/api/vouchers/route';
+import * as intakeApi from '../../app/api/intake/route';
 import * as records from '../../app/api/records/route';
 import * as photos from '../../app/api/photos/route';
 import {env, resetDemo} from './runtime';
@@ -29,6 +31,7 @@ async function handle(url: URL, request: Request) {
   if (url.pathname === '/api/receipts') return m === 'GET' ? receiptsApi.GET(request) : receiptsApi.POST(request);
   if (url.pathname === '/api/stats') return statsApi.GET(request);
   if (url.pathname === '/api/vouchers') return m === 'GET' ? vouchersApi.GET(request) : vouchersApi.POST(request);
+  if (url.pathname === '/api/intake') return m === 'GET' ? intakeApi.GET(request) : intakeApi.POST(request);
   if (url.pathname === '/api/demo-logo') { const o = await env.BUCKET.get('branding/logo'); return o ? new Response(o.body as BodyInit, {headers: {'Content-Type': 'image/png'}}) : new Response(null, {status: 404}); }
   if (url.pathname === '/api/account') return Response.json({error: 'V ukázce se heslo nemění. Na serveru tu změníte heslo do administrace.'}, {status: 400});
   if (url.pathname === '/api/public') return m === 'GET' ? publicApi.GET(request) : publicApi.POST(request);
@@ -96,11 +99,16 @@ function DemoLogin({onLogin}: {onLogin: () => void}) {
 function Demo() {
   const [view, setView] = React.useState<View>(() => location.hash === '#rezervace' ? 'public' : location.hash === '#prihlaseni' ? 'login' : 'admin');
   // Odkaz na účtenku pro klientku v náhledu neotevře novou stránku, ale ukáže ji tady.
-  const [receipt, setReceipt] = React.useState('');
+  const [receipt, setReceipt] = React.useState(''), [intake, setIntake] = React.useState('');
   React.useEffect(() => {
-    const on = (e: MouseEvent) => { const a = (e.target as HTMLElement).closest?.('a'); const m = a?.href.match(/\/uctenka\?t=([0-9a-f-]{36})/); if (m) { e.preventDefault(); setReceipt(m[1]); } };
+    const on = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement).closest?.('a'), m = a?.href.match(/\/uctenka\?t=([0-9a-f-]{36})/), q = a?.href.match(/\/dotaznik\?t=([0-9a-f]{40})/);
+      if (m) { e.preventDefault(); setReceipt(m[1]); }
+      if (q) { e.preventDefault(); setIntake(q[1]); window.scrollTo(0, 0); }
+    };
     document.addEventListener('click', on, true); return () => document.removeEventListener('click', on, true);
   }, []);
+  if (intake) return <><div className="demo-bar" role="note"><span><strong>Ukázka:</strong> takhle dotazník uvidí klientka po otevření odkazu (v telefonu nebo na tabletu v salonu).</span><button type="button" onClick={() => setIntake('')}>Zpět</button></div><PublicIntake token={intake}/></>;
   if (receipt) return <><div className="demo-bar" role="note"><span><strong>Ukázka:</strong> takhle účtenku uvidí klientka po otevření odkazu.</span><button type="button" onClick={() => setReceipt('')}>Zpět do administrace</button></div><PublicReceipt token={receipt}/></>;
   return <><DemoBar view={view} setView={setView}/>{view === 'admin' ? <Home onLogout={() => setView('login')}/> : view === 'login' ? <DemoLogin onLogin={() => setView('admin')}/> : <PublicBooking/>}</>;
 }

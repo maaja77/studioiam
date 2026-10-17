@@ -1,6 +1,6 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
-import {Ban, Check, ChevronLeft, ChevronRight, Clock, ExternalLink, MessageSquare, Phone, Plus, Search, UserPlus, X} from 'lucide-react';
+import {Ban, Check, ChevronLeft, ChevronRight, ClipboardList, Clock, ExternalLink, MessageSquare, Phone, Plus, Search, UserPlus, X} from 'lucide-react';
 import {smsPhone} from '../lib/sms';
 import {addDays, DEFAULT_SETTINGS, fromMinutes, salonNow, toMinutes, weekday, type BookingSettings} from '../lib/booking';
 import {serviceColor} from '../lib/price-list';
@@ -10,7 +10,7 @@ import {PaymentDetails} from './qr-payment';
 import {ReceiptDialog, type ReceiptDraft} from './receipts';
 import {Receipt as ReceiptIcon} from 'lucide-react';
 
-export type Booking = {id: string; serviceId: string | null; clientId: string | null; start: string; end: string; serviceName: string; priceCents: number | null; name: string; phone: string; email: string; note: string; status: string; source: string; depositCents?: number | null; depositStatus?: string | null; depositDue?: string | null; vs?: string | null; paymentKind?: string | null; receiptId?: string | null; color?: string | null; category?: string | null; remindedStart?: string | null; remindedAt?: string | null};
+export type Booking = {id: string; serviceId: string | null; clientId: string | null; start: string; end: string; serviceName: string; priceCents: number | null; name: string; phone: string; email: string; note: string; status: string; source: string; depositCents?: number | null; depositStatus?: string | null; depositDue?: string | null; vs?: string | null; paymentKind?: string | null; receiptId?: string | null; color?: string | null; category?: string | null; remindedStart?: string | null; remindedAt?: string | null; intake?: string | null};
 export type Service = {id: string; name: string; durationMin: number; priceCents: number; active: number; sort: number; category: string; description: string; color: string; sessions: number; prepay: number};
 type ClientLite = {id: string; name: string; phone: string; email: string; blocked?: number};
 const DEPOSIT_LABEL: Record<string, string> = {pending: 'čeká na zaplacení', paid: 'zaplacena', returned: 'vrácena', forfeited: 'propadla', expired: 'nezaplacena, termín uvolněn', cancelled: 'nezaplacena, termín zrušen', used: 'započtena do účtenky'};
@@ -147,6 +147,7 @@ export default function Bookings({clients, onOpenClient, onClientsChanged}: {cli
             {smsReady && current.status === 'confirmed' && current.start! > salonNow() && !!smsPhone(current.phone || '') && <p className="sms-line"><MessageSquare size={16}/>
               {current.remindedStart === current.start && current.remindedAt ? `SMS připomínka odeslána ${new Date(current.remindedAt).toLocaleString('cs-CZ', {day: 'numeric', month: 'numeric', hour: 'numeric', minute: '2-digit'})}` : settings.smsReminders ? 'SMS připomínka odejde den předem' : 'SMS připomínky jsou vypnuté'}
               <button type="button" className="link-button" disabled={busy} onClick={() => run(async () => { await post({kind: 'sms', action: 'remind', data: {id: current.id}}); setOpen(o => o && {...o, booking: {...o.booking, remindedStart: o.booking.start, remindedAt: new Date().toISOString()}}); }, 'SMS připomínka byla odeslána.', false)}>{current.remindedStart === current.start ? 'Poslat znovu' : 'Poslat teď'}</button></p>}
+            {current.status !== 'cancelled' && <p className={'intake-line' + (current.intake === 'done' ? ' ok' : '')}><ClipboardList size={16}/> {current.intake === 'done' ? 'Vstupní dotazník vyplněný' : current.intake === 'sent' ? 'Vstupní dotazník čeká na vyplnění' : current.intake === 'withdrawn' ? 'Klientka odvolala souhlas' : 'Bez vstupního dotazníku'}{current.clientId && current.intake !== 'done' && <> · <button type="button" className="link-button" onClick={() => { setOpen(null); onOpenClient(current.clientId!); }}>na kartě</button></>}</p>}
             <p className={'status-pill status-' + current.status}>{STATUS_LABEL[current.status!]}</p>
             {current.depositCents != null && <div className="deposit-box">
               <p><b>{payLabel} {formatRevenue(current.depositCents)}</b> · {DEPOSIT_LABEL[current.depositStatus || 'pending']}{current.vs && <> · VS {current.vs}</>}</p>
