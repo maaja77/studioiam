@@ -5,7 +5,7 @@ export type IntakeQuestion = {id: string; text: string; detail: string};
 /** Otázky s odpovědí ano/ne; u „ano“ klientka doplní podrobnosti. */
 export const INTAKE_QUESTIONS: IntakeQuestion[] = [
   {id: 'allergy', text: 'Máte nějakou alergii (léky, kosmetika, latex, náplasti, potraviny)?', detail: 'Na co?'},
-  {id: 'medication', text: 'Užíváte pravidelně léky (např. na ředění krve, hormony, isotretinoin/Roaccutane, antibiotika)?', detail: 'Jaké?'},
+  {id: 'medication', text: 'Užíváte pravidelně léky (např. na ředění krve, hormony, antibiotika)?', detail: 'Jaké?'},
   {id: 'pregnancy', text: 'Jste těhotná nebo kojíte?', detail: 'Případně v kolikátém měsíci'},
   {id: 'skin', text: 'Máte kožní onemocnění (ekzém, lupénka, rosacea, akné, opary)?', detail: 'Jaké a kde?'},
   {id: 'illness', text: 'Léčíte se s cukrovkou, epilepsií, srdcem, autoimunitním nebo onkologickým onemocněním, nebo máte poruchu srážlivosti krve?', detail: 'S čím?'},
